@@ -1,3 +1,4 @@
+export const revalidate = 180;
 import { getArticles } from "@/lib/rss";
 import { createCategorySummary } from "@/lib/editor";
 import { createMorningBrief } from "@/lib/morningBrief";
