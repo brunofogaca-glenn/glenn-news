@@ -82,7 +82,7 @@ Skriv:
 
 1. Ett journalistiskt lägesbildstycke.
 2. Välj dagens huvudstory.
-3. Rangordna de 5 viktigaste artiklarna.
+3. Rangordna de 10 viktigaste artiklarna.
 
 Lägesbilden ska vara max 6 meningar.
 
@@ -91,7 +91,7 @@ Returnera ENDAST giltig JSON.
 {
   "summary": "...",
   "mainStoryId": 0,
-  "topStoryIds": [0,1,2,3,4]
+  "topStoryIds": [0,1,2,3,4,5,6,7,8,9]
 }
 
 Artiklar:
