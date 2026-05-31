@@ -198,7 +198,7 @@ export async function getArticles() {
               ).getTime()
             );
           })
-          .slice(0, 30);
+          .slice(0, 60);
 
       articles.forEach(article => {
         const detectedCategory =
