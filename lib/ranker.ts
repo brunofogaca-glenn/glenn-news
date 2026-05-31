@@ -15,6 +15,7 @@ const TIER_1 = [
   "if elfsborg",
   "borås",
   "sjuhärad",
+  "socialism",
   "allsvenskan",
   "vänsterpartiet",
   "socialdemokraterna",
