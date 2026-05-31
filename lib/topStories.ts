@@ -6,5 +6,5 @@ export function getTopStories(news: any) {
     ...news.varlden.slice(0, 1),
   ]
     .filter(Boolean)
-    .slice(0, 5);
+    .slice(0, 10);
 }
