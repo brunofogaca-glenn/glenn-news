@@ -84,7 +84,7 @@ Skriv:
 2. Välj dagens huvudstory.
 3. Rangordna de 5 viktigaste artiklarna.
 
-Lägesbilden ska vara max 4 meningar.
+Lägesbilden ska vara max 6 meningar.
 
 Returnera ENDAST giltig JSON.
 
