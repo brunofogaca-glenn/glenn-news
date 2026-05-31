@@ -217,30 +217,7 @@ export function detectCategory(
     text.includes("längdskidor") ||
     text.includes("friidrott") ||
     text.includes("formel 1") ||
-    text.includes("f1") ||
-    text.includes("verstappen") ||
-    text.includes("hamilton") ||
-    text.includes("norris") ||
-    text.includes("ferrari") ||
-    text.includes("mclaren") ||
-    text.includes("tre kronor") ||
-    text.includes("handboll") ||
-    text.includes("golf") ||
-    text.includes("pga tour") ||
-    text.includes("tour de france") ||
-    text.includes("ufc") ||
-    text.includes("mma") ||
-    text.includes("boxning") ||
-    text.includes("simning") ||
-    text.includes("padel") ||
-    text.includes("innebandy") ||
-    text.includes("duplantis") ||
-    text.includes("sarah sjöström") ||
-    text.includes("frida karlsson") ||
-    text.includes("ebba andersson") ||
-    text.includes("jonna sundling") ||
-    text.includes("sebastian samuelsson") ||
-    text.includes("hanna öberg")
+    text.includes("tour de france")
   ) {
     return "sport";
   }
