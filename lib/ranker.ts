@@ -22,7 +22,12 @@ const TIER_1 = [
   "öresjö",
   "sjöbo",
   "cervenka",
-  "ica",
+  "manchester united",
+  "barcelona",
+  "roma",
+  "italy",
+  "italien",
+  "ica banken",
 ];
 
 const TIER_2 = [
@@ -30,6 +35,7 @@ const TIER_2 = [
   "premier league",
   "champions league",
   "conference league",
+  "svensk elitfotboll",
   "europa league",
   "bolån",
   "tennis",
@@ -38,9 +44,6 @@ const TIER_2 = [
   "andreasson",
   "film",
   "indiepop",
-  "manchester united",
-  "barcelona",
-  "roma",
 ];
 
 const TIER_3 = [
