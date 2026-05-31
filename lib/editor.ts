@@ -23,7 +23,7 @@ export async function createCategorySummary(
   );
 
   const candidates = rankedArticles
-    .slice(0, 50)
+    .slice(0, 100)
     .map((article, index) => ({
       id: index,
       title: article.title,
