@@ -20,8 +20,6 @@ export function detectCategory(
     text.includes("kandolin") ||
     text.includes("borås arena") ||
     text.includes("hiljemark") ||
-    text.includes("gulsvart") ||
-    text.includes("gulsvarta") ||
     text.includes("di gule")
   ) {
     return "elfsborg";
@@ -145,9 +143,7 @@ export function detectCategory(
     text.includes("nato") ||
     text.includes("gaza") ||
     text.includes("hormuz") ||
-    text.includes("krig") ||
     text.includes("terror") ||
-    text.includes("attack") ||
     text.includes("missil") ||
     text.includes("militär") ||
     text.includes("invasion") ||
@@ -171,15 +167,11 @@ export function detectCategory(
   // KULTUR
 
   if (
-    text.includes("film") ||
-    text.includes("musik") ||
-    text.includes("streaming") ||
     text.includes("spotify") ||
     text.includes("konsert") ||
     text.includes("netflix") ||
-    text.includes("teater") ||
-    text.includes("konst") ||
-    text.includes("recension") ||
+    text.includes("avantgardet") ||
+    text.includes("indiepop") ||
     text.includes("festival") ||
     text.includes("melodifestivalen") ||
     text.includes("eurovision") ||
