@@ -142,20 +142,10 @@ export function detectCategory(
   if (
     text.includes("trump") ||
     text.includes("putin") ||
-    text.includes("ukraina") ||
-    text.includes("ryssland") ||
-    text.includes("usa") ||
-    text.includes("kina") ||
-    text.includes("taiwan") ||
     text.includes("nato") ||
-    text.includes("iran") ||
-    text.includes("israel") ||
     text.includes("gaza") ||
     text.includes("hormuz") ||
-    text.includes("fn") ||
-    text.includes("eu") ||
     text.includes("krig") ||
-    text.includes("konflikt") ||
     text.includes("terror") ||
     text.includes("attack") ||
     text.includes("missil") ||
@@ -163,7 +153,6 @@ export function detectCategory(
     text.includes("invasion") ||
     text.includes("vapenvila") ||
     text.includes("president") ||
-    text.includes("val") ||
     text.includes("jordbävning") ||
     text.includes("earthquake") ||
     text.includes("orkan") ||
