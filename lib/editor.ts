@@ -118,16 +118,15 @@ ${JSON.stringify(candidates)}
     const fallbackTopStories =
       candidates.slice(0, 5);
 
-    if (
-      fallbackMainStory &&
-      !fallbackMainStory.image
-    ) {
-      fallbackMainStory.image =
-        await getOgImage(
-          fallbackMainStory.link
-        );
-    }
-
+if (
+  !fallbackMainStory.image &&
+  fallbackMainStory.link
+) {
+  fallbackMainStory.image =
+    await getOgImage(
+      fallbackMainStory.link
+    );
+}
     await Promise.all(
       fallbackTopStories.map(
         async story => {
