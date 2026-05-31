@@ -79,6 +79,8 @@ const FEEDS = [
   { url: "http://newsrss.bbc.co.uk/rss/sportonline_uk_edition/football/rss.xml", category: "sport" },
   { url: "http://expressen.se/rss/fotboll", category: "fotboll" },
   { url: "http://www.aftonbladet.se/sportbladet/fotboll/rss.xml", category: "fotboll" },
+  { url: "http://www.football-italia.net/rss.xml", category: "fotboll" },
+  { url: "http://feeds.feedburner.com/redrants", category: "fotboll" },
   { url: "https://feeds.expressen.se/dinapengar/", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/boras/feed.xml", category: "boras" },
   { url: "https://www.bt.se/feeds/section/kronikor/feed.xml", category: "livsstil" },
