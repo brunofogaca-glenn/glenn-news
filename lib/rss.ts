@@ -93,7 +93,6 @@ const FEEDS = [
   { url: "https://www.bt.se/feeds/section/varlden/feed.xml", category: "varlden" },
   { url: "http://www.dn.se/nyheter/varlden/m/rss/senaste-nytt", category: "varlden" },
   { url: "http://newsrss.bbc.co.uk/rss/newsonline_world_edition/front_page/rss.xml", category: "varlden" },
-  { url: "http://api.sr.se/api/rssfeed/rssfeed.aspx?rssfeed=179", category: "livsstil" },
   { url: "https://www.bt.se/feeds/section/kultur-noje/feed.xml", category: "livsstil" },
   { url: "http://www.dn.se/film-rss", category: "livsstil" },
   { url: "http://www.dn.se/musik-rss", category: "livsstil" },
