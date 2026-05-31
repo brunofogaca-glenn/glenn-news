@@ -1,4 +1,4 @@
-export const revalidate = 1800;
+export const revalidate = 1900;
 import { getArticles } from "@/lib/rss";
 import { createCategorySummary } from "@/lib/editor";
 import { createMorningBrief } from "@/lib/morningBrief";
