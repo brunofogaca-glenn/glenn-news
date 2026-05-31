@@ -55,7 +55,7 @@ Användaren prioriterar:
 5. Ekonomi
 6. Världen
 7. Tennis
-8. Övrig sport (ingenting om fotboll eller tennis i denna kategorin)
+8. Övrig sport (Här måste du sortera bort fotbolls- och tennisnyheter och fokusera på all annan sport som exempelvis vintersport, formel 1, hockey och trav)
 9. Kultur, mat, resor och livsstil
 
 Varje artikel har:
