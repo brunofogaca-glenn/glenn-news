@@ -166,13 +166,13 @@ FORMAT
 4-6 meningar.
 
 ⚽ Fotboll
-4-6 meningar.
+4-6 meningar. (Inga Elfsborgsnyheter här)
 
 🎾 Tennis
 4-6 meningar.
 
 🏅 Övrig sport
-4-6 meningar.
+4-6 meningar. (Här måste du sortera bort fotbollsnyheter)
 
 🎭 Kultur, Mat & Livsstil
 4-6 meningar.
