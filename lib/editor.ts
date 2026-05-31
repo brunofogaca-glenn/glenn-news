@@ -18,24 +18,24 @@ export async function createCategorySummary(
     };
   }
 
-  const rankedArticles =
-    rankArticles(articles);
+  const rankedArticles = rankArticles(
+    articles
+  );
 
-  const candidates =
-    rankedArticles
-      .slice(0, 20)
-      .map((article, index) => ({
-        id: index,
-        title: article.title,
-        description:
-          article.description ?? "",
-        source: article.source,
-        link: article.link,
-        image: article.image,
-        date: article.date,
-        score: article.score,
-        mentions: article.mentions,
-      }));
+  const candidates = rankedArticles
+    .slice(0, 20)
+    .map((article, index) => ({
+      id: index,
+      title: article.title,
+      description:
+        article.description ?? "",
+      source: article.source,
+      link: article.link ?? "",
+      image: article.image ?? null,
+      date: article.date,
+      score: article.score,
+      mentions: article.mentions,
+    }));
 
   const response =
     await openai.responses.create({
@@ -118,19 +118,24 @@ ${JSON.stringify(candidates)}
     const fallbackTopStories =
       candidates.slice(0, 5);
 
-if (
-  !fallbackMainStory.image &&
-  fallbackMainStory.link
-) {
-  fallbackMainStory.image =
-    await getOgImage(
+    if (
+      fallbackMainStory &&
+      !fallbackMainStory.image &&
       fallbackMainStory.link
-    );
-}
+    ) {
+      fallbackMainStory.image =
+        await getOgImage(
+          fallbackMainStory.link
+        );
+    }
+
     await Promise.all(
       fallbackTopStories.map(
         async story => {
-          if (!story.image) {
+          if (
+            !story.image &&
+            story.link
+          ) {
             story.image =
               await getOgImage(
                 story.link
@@ -168,7 +173,8 @@ if (
 
   if (
     mainStory &&
-    !mainStory.image
+    !mainStory.image &&
+    mainStory.link
   ) {
     mainStory.image =
       await getOgImage(
@@ -179,7 +185,11 @@ if (
   await Promise.all(
     topStories.map(
       async (story: any) => {
-        if (!story.image) {
+        if (
+          story &&
+          !story.image &&
+          story.link
+        ) {
           story.image =
             await getOgImage(
               story.link
@@ -191,8 +201,7 @@ if (
 
   return {
     summary:
-      result.summary ??
-      "",
+      result.summary ?? "",
     mainStory,
     topStories,
   };
