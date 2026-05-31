@@ -108,7 +108,7 @@ export function detectCategory(
   if (
     text.includes("börsen") ||
     text.includes("inflation") ||
-    text.includes("ica") ||
+    text.includes("ica banken") ||
     text.includes("bolån") ||
     text.includes("bostadsrätt") ||
     text.includes("omxs30") ||
