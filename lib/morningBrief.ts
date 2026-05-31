@@ -147,7 +147,7 @@ FORMAT
 7.
 8.
 9.
-
+10.
 ────────────────
 
 🔥 Elfsborg
@@ -166,13 +166,13 @@ FORMAT
 4-6 meningar.
 
 ⚽ Fotboll
-4-6 meningar. (Inga Elfsborgsnyheter här)
+4-6 meningar.
 
 🎾 Tennis
 4-6 meningar.
 
 🏅 Övrig sport
-4-6 meningar. (Här måste du sortera bort fotbollsnyheter)
+4-6 meningar. (Här måste du sortera bort fotbollsnyheter och fokusera på all annan sport som exempelvis vintersport och trav)
 
 🎭 Kultur, Mat & Livsstil
 4-6 meningar.
