@@ -108,11 +108,11 @@ export default async function Home() {
     .slice(0, 15);
 
   return (
-    <main className="min-h-screen bg-slate-100">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
+      <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8">
 
         <header className="mb-8">
-          <h1 className="text-6xl font-black tracking-tight">
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight">
             Glenn News
           </h1>
 
@@ -131,7 +131,7 @@ export default async function Home() {
           </div>
         </header>
 
-        <section className="bg-gradient-to-r from-slate-900 to-slate-700 text-white rounded-3xl p-8 shadow-xl mb-10">
+        <section className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 text-white rounded-3xl p-6 md:p-8 shadow-xl mb-10">
           <div className="text-sm uppercase tracking-widest text-slate-300 mb-2">
             ☀️ Morning Brief
           </div>
@@ -140,18 +140,18 @@ export default async function Home() {
             God morgon Glenn
           </h2>
 
-          <div className="leading-8 text-lg whitespace-pre-wrap">
+          <div className="leading-7 md:leading-8 text-base md:text-lg whitespace-pre-wrap">
             {morningBrief}
           </div>
         </section>
 
         {biggestStory && (
-          <section className="bg-white rounded-3xl shadow-lg overflow-hidden mb-10">
+          <section className="bg-white rounded-3xl shadow-xl border overflow-hidden mb-10">
             {biggestStory.image && (
               <img
                 src={biggestStory.image}
                 alt={biggestStory.title}
-                className="w-full h-[420px] object-cover"
+                className="w-full h-56 md:h-[420px] object-cover"
               />
             )}
 
@@ -165,7 +165,7 @@ export default async function Home() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <h2 className="text-5xl font-black leading-tight hover:text-blue-600 transition">
+                <h2 className="text-3xl md:text-5xl font-black leading-tight text-slate-900 hover:text-blue-600 transition">
                   {biggestStory.title}
                 </h2>
               </a>
@@ -177,9 +177,9 @@ export default async function Home() {
           </section>
         )}
 
-        <div className="grid lg:grid-cols-[320px_1fr] gap-8">
+        <div className="grid lg:grid-cols-[320px_1fr] gap-8 items-start">
 
-          <aside>
+          <aside className="order-last lg:order-first">
             <section className="bg-white rounded-3xl p-6 border sticky top-4">
               <h2 className="text-2xl font-bold mb-5">
                 📰 Senaste nytt
@@ -223,7 +223,7 @@ export default async function Home() {
                 <div className="p-6">
 
                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-3xl font-bold">
+                    <h2 className="text-2xl md:text-3xl font-bold">
                       {category.title}
                     </h2>
 
@@ -247,7 +247,7 @@ export default async function Home() {
                           alt={
                             category.editor.mainStory.title
                           }
-                          className="w-full h-64 object-cover rounded-2xl mb-4"
+                          className="w-full h-48 md:h-64 object-cover rounded-2xl mb-4"
                         />
                       ) : (
                         <div className="w-full h-64 bg-slate-200 rounded-2xl mb-4 flex items-center justify-center">
@@ -259,7 +259,7 @@ export default async function Home() {
                         Huvudstory
                       </div>
 
-                      <h3 className="text-2xl font-bold leading-tight hover:text-blue-600 transition">
+                      <h3 className="text-xl md:text-2xl font-bold leading-tight text-slate-900 hover:text-blue-600 transition">
                         {category.editor.mainStory.title}
                       </h3>
 
@@ -275,7 +275,7 @@ export default async function Home() {
                         Lägesbild
                       </div>
 
-                      <p className="text-slate-700 leading-7">
+                      <p className="text-slate-700 text-sm md:text-base leading-7">
                         {category.editor.summary}
                       </p>
                     </div>
@@ -299,7 +299,7 @@ export default async function Home() {
                           </div>
 
                           <div>
-                            <div className="font-medium">
+                            <div className="font-medium text-sm md:text-base">
                               {story.title}
                             </div>
 
