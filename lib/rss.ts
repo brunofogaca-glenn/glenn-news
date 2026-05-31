@@ -86,7 +86,6 @@ const FEEDS = [
   { url: "http://www.svt.se/nyheter/ekonomi/rss.xml", category: "ekonomi" },
   { url: "http://www.dn.se/nyheter/sverige/m/rss/senaste-nytt", category: "sverige" },
   { url: "https://www.bt.se/feeds/section/sverige/feed.xml", category: "sverige" },
-  { url: "https://api.sr.se/api/rss/program/83", category: "sverige" },
   { url: "https://api.sr.se/api/rss/program/95", category: "boras" },
   { url: "https://www.bt.se/feeds/section/naringsliv/feed.xml", category: "ekonomi" },
   { url: "http://www.dn.se/ekonomi/m/rss/senaste-nytt", category: "ekonomi" },
