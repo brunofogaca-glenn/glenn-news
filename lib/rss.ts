@@ -76,41 +76,45 @@ const parser = new Parser({
 
 const FEEDS = [
   { url: "https://www.bt.se/feeds/section/elfsborg/feed.xml", category: "elfsborg" },
-
+  { url: "http://newsrss.bbc.co.uk/rss/sportonline_uk_edition/football/rss.xml", category: "sport" },
   { url: "http://expressen.se/rss/fotboll", category: "fotboll" },
   { url: "http://www.aftonbladet.se/sportbladet/fotboll/rss.xml", category: "fotboll" },
-
+  { url: "https://feeds.expressen.se/dinapengar/", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/boras/feed.xml", category: "boras" },
   { url: "https://www.bt.se/feeds/section/kronikor/feed.xml", category: "livsstil" },
   { url: "https://www.dn.se/rss/om/boras/", category: "boras" },
-
+  { url: "http://www.svt.se/nyheter/ekonomi/rss.xml", category: "ekonomi" },
   { url: "http://www.dn.se/nyheter/sverige/m/rss/senaste-nytt", category: "sverige" },
   { url: "https://www.bt.se/feeds/section/sverige/feed.xml", category: "sverige" },
   { url: "https://api.sr.se/api/rss/program/83", category: "sverige" },
-
+  { url: "https://api.sr.se/api/rss/program/95", category: "boras" },
   { url: "https://www.bt.se/feeds/section/naringsliv/feed.xml", category: "ekonomi" },
   { url: "http://www.dn.se/ekonomi/m/rss/senaste-nytt", category: "ekonomi" },
-
+  { url: "https://www.avanza.se/placera/forstasidan.rss.xml", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/varlden/feed.xml", category: "varlden" },
   { url: "http://www.dn.se/nyheter/varlden/m/rss/senaste-nytt", category: "varlden" },
   { url: "http://newsrss.bbc.co.uk/rss/newsonline_world_edition/front_page/rss.xml", category: "varlden" },
-
+  { url: "http://api.sr.se/api/rssfeed/rssfeed.aspx?rssfeed=179", category: "livsstil" },
   { url: "https://www.bt.se/feeds/section/kultur-noje/feed.xml", category: "livsstil" },
   { url: "http://www.dn.se/film-rss", category: "livsstil" },
   { url: "http://www.dn.se/musik-rss", category: "livsstil" },
-
+  { url: "http://www.dn.se/fotboll-rss", category: "fotboll" },
+  { url: "http://www.svt.se/sport/fotboll/rss.xml", category: "fotboll" },
+  { url: "http://feeds.guardian.co.uk/theguardian/football/manchester-united/rss", category: "fotboll" },
+  { url: "http://www1.skysports.com/feeds/11667/news.xml", category: "fotboll" },  
+  { url: "http://www.skysports.com/rss/0,20514,11095,00.xml", category: "sport" },  
   { url: "http://feeds.feedburner.com/sportsblogs/BavarianFootballWorks", category: "fotboll" },
   { url: "http://www.guardian.co.uk/football/bundesligafootball/rss", category: "fotboll" },
   { url: "https://www.marca.com/en/rss/googlenews/football/barcelona.xml", category: "fotboll" },
   { url: "http://www.guardian.co.uk/football/laligafootball/rss", category: "fotboll" },
-  { url: "http://menmedia.co.uk/manchestereveningnews/sport/football/manchester_united/rss.xml", category: "fotboll" },
+  { url: "http://www.dn.se/fotboll-rss", category: "fotboll" },
   { url: "http://feeds.guardian.co.uk/theguardian/football/premierleague/rss", category: "fotboll" },
   { url: "https://romapress.net/feed/", category: "fotboll" },
   { url: "http://www.guardian.co.uk/football/serieafootball/rss", category: "fotboll" },
-
+  { url: "http://www.guardian.co.uk/world/sweden/rss", category: "sverige" },
   { url: "http://news.bbc.co.uk/rss/sportonline_world_edition/tennis/rss091.xml", category: "tennis" },
   { url: "http://www.guardian.co.uk/sport/tennis/rss", category: "tennis" },
-
+  { url: "https://feeds.expressen.se/noje/", category: "livsstil" },
   { url: "http://www.dn.se/sport/m/rss/senaste-nytt", category: "sport" },
 ];
 
