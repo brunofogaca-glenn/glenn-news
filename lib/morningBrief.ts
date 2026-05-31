@@ -9,7 +9,7 @@ export async function createMorningBrief(
 ) {
   const briefingData = {
     elfsborg: news.elfsborg
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -20,7 +20,7 @@ export async function createMorningBrief(
       })),
 
     boras: news.boras
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -31,7 +31,7 @@ export async function createMorningBrief(
       })),
 
     sverige: news.sverige
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -42,7 +42,7 @@ export async function createMorningBrief(
       })),
 
     varlden: news.varlden
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -53,7 +53,7 @@ export async function createMorningBrief(
       })),
 
     ekonomi: news.ekonomi
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -64,7 +64,7 @@ export async function createMorningBrief(
       })),
 
     fotboll: news.fotboll
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -75,7 +75,7 @@ export async function createMorningBrief(
       })),
 
     tennis: news.tennis
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -86,7 +86,7 @@ export async function createMorningBrief(
       })),
 
     sport: news.sport
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -97,7 +97,7 @@ export async function createMorningBrief(
       })),
 
     livsstil: news.livsstil
-      .slice(0, 5)
+      .slice(0, 10)
       .map((article: any) => ({
         title: article.title,
         description:
@@ -136,44 +136,48 @@ FORMAT
 
 ☀️ GOD MORGON GLENN
 
-🔥 Dagens fem viktigaste teman
+🔥 Dagens tio viktigaste teman
 
 1.
 2.
 3.
 4.
 5.
+6.
+7.
+8.
+9.
 
 ────────────────
 
 🔥 Elfsborg
-2-4 meningar.
+4-6 meningar.
 
 📍 Borås & Sjuhärad
-2-4 meningar.
+4-6 meningar.
 
 🇸🇪 Sverige
-2-4 meningar.
+4-6 meningar.
 
 🌍 Världen
-2-4 meningar.
+4-6 meningar.
 
 💼 Ekonomi & Näringsliv
-2-4 meningar.
+4-6 meningar.
 
 ⚽ Fotboll
-2-4 meningar.
+4-6 meningar.
 
 🎾 Tennis
-2-4 meningar.
+4-6 meningar.
 
 🏅 Övrig sport
-2-4 meningar.
+4-6 meningar.
 
 🎭 Kultur, Mat & Livsstil
-2-4 meningar.
+4-6 meningar.
 
-Målet är att användaren ska förstå dagens nyhetsläge på 60 sekunder.
+Målet är att användaren ska förstå dagens nyhetsläge på 120 sekunder.
 
 DATA:
 
