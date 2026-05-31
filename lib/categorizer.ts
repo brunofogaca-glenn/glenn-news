@@ -20,19 +20,6 @@ export function detectCategory(
     text.includes("kandolin") ||
     text.includes("borås arena") ||
     text.includes("hiljemark") ||
-    text.includes("johan larsson") ||
-    text.includes("hedlund") ||
-    text.includes("zeneli") ||
-    text.includes("ihler") ||
-    text.includes("wikström") ||
-    text.includes("holmén") ||
-    text.includes("buhari") ||
-    text.includes("magnusson") ||
-    text.includes("silverholt") ||
-    text.includes("yegbe") ||
-    text.includes("rapp") ||
-    text.includes("thomasen") ||
-    text.includes("pettersson") ||
     text.includes("gulsvart") ||
     text.includes("gulsvarta") ||
     text.includes("di gule")
@@ -88,7 +75,6 @@ export function detectCategory(
     text.includes("rublev") ||
     text.includes("ruud") ||
     text.includes("tsitsipas") ||
-    text.includes("rune") ||
     text.includes("fritz") ||
     text.includes("shelton")
   ) {
@@ -125,7 +111,6 @@ export function detectCategory(
     text.includes("ica") ||
     text.includes("bolån") ||
     text.includes("bostadsrätt") ||
-    text.includes("bostad") ||
     text.includes("invester") ||
     text.includes("omxs30") ||
     text.includes("nasdaq") ||
@@ -210,7 +195,6 @@ export function detectCategory(
     text.includes("streaming") ||
     text.includes("spotify") ||
     text.includes("konsert") ||
-    text.includes("svt") ||
     text.includes("netflix") ||
     text.includes("teater") ||
     text.includes("konst") ||
@@ -218,15 +202,8 @@ export function detectCategory(
     text.includes("festival") ||
     text.includes("melodifestivalen") ||
     text.includes("eurovision") ||
-    text.includes("idol") ||
     text.includes("way out west") ||
     text.includes("håkan hellström") ||
-    text.includes("veronica maggio") ||
-    text.includes("kent") ||
-    text.includes("darin") ||
-    text.includes("miss li") ||
-    text.includes("molly sandén") ||
-    text.includes("benjamin ingrosso") ||
     text.includes("laleh")
   ) {
     return "livsstil";
@@ -246,9 +223,6 @@ export function detectCategory(
     text.includes("norris") ||
     text.includes("ferrari") ||
     text.includes("mclaren") ||
-    text.includes("hockey") ||
-    text.includes("shl") ||
-    text.includes("nhl") ||
     text.includes("tre kronor") ||
     text.includes("handboll") ||
     text.includes("golf") ||
