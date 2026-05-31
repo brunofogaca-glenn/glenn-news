@@ -19,6 +19,8 @@ const TIER_1 = [
   "gyökeres",
   "alexander isak",
   "besfort zeneli",
+  "trav",
+  "elitloppet",
   "björn hamberg",
   "borås",
   "sjuhärad",
