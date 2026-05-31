@@ -111,7 +111,6 @@ export function detectCategory(
     text.includes("ica") ||
     text.includes("bolån") ||
     text.includes("bostadsrätt") ||
-    text.includes("invester") ||
     text.includes("omxs30") ||
     text.includes("nasdaq") ||
     text.includes("dow jones") ||
@@ -119,13 +118,8 @@ export function detectCategory(
     text.includes("wall street") ||
     text.includes("ränta") ||
     text.includes("riksbanken") ||
-    text.includes("ekonomi") ||
-    text.includes("företag") ||
-    text.includes("arbetslöshet") ||
     text.includes("recession") ||
     text.includes("konjunktur") ||
-    text.includes("bnp") ||
-    text.includes("kpi") ||
     text.includes("aktie") ||
     text.includes("fond") ||
     text.includes("rapport") ||
@@ -133,10 +127,8 @@ export function detectCategory(
     text.includes("ethereum") ||
     text.includes("krypto") ||
     text.includes("volvo") ||
-    text.includes("ericsson") ||
     text.includes("swedbank") ||
     text.includes("handelsbanken") ||
-    text.includes("seb") ||
     text.includes("nordea") ||
     text.includes("oljepris") ||
     text.includes("elpris") ||
