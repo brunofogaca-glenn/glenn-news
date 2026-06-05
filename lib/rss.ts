@@ -76,7 +76,7 @@ const parser = new Parser({
 
 const FEEDS = [
   { url: "https://www.bt.se/feeds/section/elfsborg/feed.xml", category: "elfsborg" },
-  { url: "http://newsrss.bbc.co.uk/rss/sportonline_uk_edition/football/rss.xml", category: "sport" },
+  { url: "http://newsrss.bbc.co.uk/rss/sportonline_uk_edition/football/rss.xml", category: "fotboll" },
   { url: "http://expressen.se/rss/fotboll", category: "fotboll" },
   { url: "http://www.aftonbladet.se/sportbladet/fotboll/rss.xml", category: "fotboll" },
   { url: "http://www.football-italia.net/rss.xml", category: "fotboll" },
