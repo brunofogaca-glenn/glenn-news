@@ -172,7 +172,7 @@ FORMAT
 4-6 meningar.
 
 🏅 Övrig sport
-4-6 meningar. (Här måste du sortera bort fotbollsnyheter och fokusera på all annan sport som exempelvis vintersport och trav)
+4-6 meningar.
 
 🎭 Kultur, Mat & Livsstil
 4-6 meningar.
