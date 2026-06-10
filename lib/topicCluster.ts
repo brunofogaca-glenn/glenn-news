@@ -8,34 +8,24 @@ type Article = {
 };
 
 const STOP_WORDS = [
-  "och",
-  "att",
-  "den",
-  "det",
-  "som",
-  "för",
-  "med",
-  "till",
-  "från",
-  "har",
-  "om",
-  "på",
-  "av",
-  "i",
-  "the",
-  "a",
-  "an",
-  "is",
-  "are",
-  "of",
-  "to",
-  "in",
-  "for",
+  "och","att","den","det","som","för","med","till","från",
+  "har","om","på","av","i",
+  "the","a","an","is","are","of","to","in","for",
+
+  "fotboll",
+  "allsvenskan",
+  "match",
+  "spelare",
+  "laget",
+  "klubben",
+  "tränaren",
+  "säsongen",
+  "vinst",
+  "förlust",
+  "seger"
 ];
 
-function extractKeywords(
-  text: string
-) {
+function extractKeywords(text: string) {
   return text
     .toLowerCase()
     .replace(/[^\wåäö\s]/g, " ")
@@ -47,22 +37,24 @@ function extractKeywords(
     );
 }
 
-function similarity(
+function jaccardSimilarity(
   a: string[],
   b: string[]
 ) {
   const setA = new Set(a);
   const setB = new Set(b);
 
-  let overlap = 0;
+  const intersection =
+    [...setA].filter(word =>
+      setB.has(word)
+    ).length;
 
-  for (const word of setA) {
-    if (setB.has(word)) {
-      overlap++;
-    }
-  }
+  const union =
+    new Set([...setA, ...setB]).size;
 
-  return overlap;
+  return union === 0
+    ? 0
+    : intersection / union;
 }
 
 export function clusterTopics(
@@ -75,27 +67,40 @@ export function clusterTopics(
   }[] = [];
 
   for (const article of articles) {
-    const keywords =
-      extractKeywords(article.title);
+    const keywords = extractKeywords(
+      `${article.title} ${article.description ?? ""}`
+    );
 
-    let matchedCluster = null;
+    let bestCluster = null;
+    let bestScore = 0;
 
     for (const cluster of clusters) {
-      const score = similarity(
-        keywords,
-        cluster.keywords
-      );
+      const score =
+        jaccardSimilarity(
+          keywords,
+          cluster.keywords
+        );
 
-      if (score >= 2) {
-        matchedCluster = cluster;
-        break;
+      if (
+        score > bestScore &&
+        score > 0.25
+      ) {
+        bestCluster = cluster;
+        bestScore = score;
       }
     }
 
-    if (matchedCluster) {
-      matchedCluster.articles.push(
+    if (bestCluster) {
+      bestCluster.articles.push(
         article
       );
+
+      bestCluster.keywords = [
+        ...new Set([
+          ...bestCluster.keywords,
+          ...keywords,
+        ]),
+      ];
     } else {
       clusters.push({
         topic: article.title,
@@ -109,6 +114,12 @@ export function clusterTopics(
     topic: cluster.topic,
     mentions:
       cluster.articles.length,
+    uniqueSources:
+      new Set(
+        cluster.articles.map(
+          a => a.source
+        )
+      ).size,
     articles: cluster.articles,
   }));
 }
