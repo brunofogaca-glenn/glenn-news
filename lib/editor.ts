@@ -205,12 +205,12 @@ ${JSON.stringify(candidates)}
       })
       .filter(Boolean) ?? [];
 
-  const filteredTopStories =
-    topStories.filter(
-      story =>
-        story?.id !==
-        mainStory?.id
-    );
+const filteredTopStories =
+  topStories.filter(
+    (story: any) =>
+      story?.id !==
+      mainStory?.id
+  );
 
   if (
     mainStory &&
