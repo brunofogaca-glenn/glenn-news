@@ -96,16 +96,37 @@ export default async function Home() {
       category => category.editor?.mainStory
     )?.editor?.mainStory;
 
-  const latestNews = categories
-    .flatMap(category =>
-      category.articles
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.date).getTime() -
-        new Date(a.date).getTime()
-    )
-    .slice(0, 15);
+const latestNews = categories
+  .flatMap(category =>
+    category.articles
+  )
+  .filter(
+    (
+      article,
+      index,
+      self
+    ) =>
+      index ===
+      self.findIndex(
+        a =>
+          a.title
+            .toLowerCase()
+            .slice(0, 40) ===
+          article.title
+            .toLowerCase()
+            .slice(0, 40)
+      )
+  )
+  .sort(
+    (a, b) =>
+      new Date(
+        b.date
+      ).getTime() -
+      new Date(
+        a.date
+      ).getTime()
+  )
+  .slice(0, 15);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
