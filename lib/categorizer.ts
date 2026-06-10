@@ -60,8 +60,6 @@ export function detectCategory(
     text.includes("wimbledon") ||
     text.includes("us open") ||
     text.includes("australian open") ||
-    text.includes("atp") ||
-    text.includes("wta") ||
     text.includes("grand slam") ||
     text.includes("sabalenka") ||
     text.includes("gauff") ||
@@ -89,9 +87,7 @@ export function detectCategory(
     text.includes("allsvenskan") ||
     text.includes("landslaget") ||
     text.includes("fotboll") ||
-    text.includes("roma") ||
     text.includes("olof lundh") ||
-    text.includes("barcelona") ||
     text.includes("graham potter") ||
     text.includes("noa bachner") ||
     text.includes("bayern munchen") ||
@@ -120,7 +116,6 @@ export function detectCategory(
     text.includes("konjunktur") ||
     text.includes("aktie") ||
     text.includes("fond") ||
-    text.includes("rapport") ||
     text.includes("bitcoin") ||
     text.includes("ethereum") ||
     text.includes("krypto") ||
