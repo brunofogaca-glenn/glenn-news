@@ -171,6 +171,13 @@ ${JSON.stringify(candidates)}
       )
       .filter(Boolean) ?? [];
 
+  const filteredTopStories =
+  topStories.filter(
+    story =>
+      story?.id !==
+      mainStory?.id
+  );
+
   if (
     mainStory &&
     !mainStory.image &&
@@ -199,10 +206,11 @@ ${JSON.stringify(candidates)}
     )
   );
 
-  return {
-    summary:
-      result.summary ?? "",
-    mainStory,
-    topStories,
-  };
+return {
+  summary:
+    result.summary ?? "",
+  mainStory,
+  topStories:
+    filteredTopStories,
+};
 }
