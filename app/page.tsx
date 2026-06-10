@@ -172,9 +172,21 @@ const latestNews = categories
                 </h2>
               </a>
 
-              <div className="text-slate-500 mt-3">
-                {biggestStory.source}
-              </div>
+{biggestStory.aiSummary && (
+  <p className="text-lg text-slate-700 mt-4 leading-8">
+    {biggestStory.aiSummary}
+  </p>
+)}
+
+<div className="text-slate-500 mt-4">
+  {biggestStory.source}
+
+  {biggestStory.mentions > 1 && (
+    <span className="ml-2 text-orange-500 font-medium">
+      🔥 {biggestStory.mentions} källor
+    </span>
+  )}
+</div>
             </div>
           </section>
         )}
@@ -290,32 +302,48 @@ const latestNews = categories
                         index: number
                       ) => (
                         <a
-                          key={index}
-                          href={story.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex gap-4 border-b last:border-0 pb-4 hover:text-blue-600 transition"
-                        >
-                          <div className="text-orange-500 font-bold text-xl min-w-[30px]">
-                            #{index + 1}
-                          </div>
+  key={index}
+  href={story.link}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="flex gap-4 border-b last:border-0 pb-4 hover:text-blue-600 transition"
+>
+  <div className="text-orange-500 font-bold text-xl min-w-[30px]">
+    #{index + 1}
+  </div>
 
-                          <div>
-                            <div className="font-medium text-sm md:text-base">
-                              {story.title}
-                            </div>
-
-<div className="text-sm text-slate-500 mt-1">
-  {story.source}
-
-  {story.mentions > 1 && (
-    <span className="ml-2 text-orange-500 font-medium">
-      🔥 {story.mentions} källor
-    </span>
+  {story.image ? (
+    <img
+      src={story.image}
+      alt={story.title}
+      className="w-24 h-24 rounded-xl object-cover flex-shrink-0"
+    />
+  ) : (
+    <div className="w-24 h-24 rounded-xl bg-slate-200 flex-shrink-0" />
   )}
-</div>
-                          </div>
-                        </a>
+
+  <div className="flex-1">
+    <div className="font-medium text-sm md:text-base">
+      {story.title}
+    </div>
+
+    {story.aiSummary && (
+      <div className="text-sm text-slate-600 mt-2 leading-6">
+        {story.aiSummary}
+      </div>
+    )}
+
+    <div className="text-sm text-slate-500 mt-2">
+      {story.source}
+
+      {story.mentions > 1 && (
+        <span className="ml-2 text-orange-500 font-medium">
+          🔥 {story.mentions} källor
+        </span>
+      )}
+    </div>
+  </div>
+</a>
                       )
                     )}
                   </div>
