@@ -324,9 +324,15 @@ const latestNews = categories
                               {story.title}
                             </div>
 
-                            <div className="text-sm text-slate-500 mt-1">
-                              {story.source}
-                            </div>
+<div className="text-sm text-slate-500 mt-1">
+  {story.source}
+
+  {story.mentions > 1 && (
+    <span className="ml-2 text-orange-500 font-medium">
+      🔥 {story.mentions} källor
+    </span>
+  )}
+</div>
                           </div>
                         </a>
                       )
