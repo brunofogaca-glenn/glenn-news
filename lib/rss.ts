@@ -92,6 +92,8 @@ const FEEDS = [
   { url: "https://www.bt.se/feeds/section/naringsliv/feed.xml", category: "ekonomi" },
   { url: "http://www.dn.se/ekonomi/m/rss/senaste-nytt", category: "ekonomi" },
   { url: "https://www.avanza.se/placera/forstasidan.rss.xml", category: "ekonomi" },
+  { url: "https://theanalyst.com/feed", category: "fotboll" },
+  { url: "https://www.decanter.com/feed/", category: "livsstil" },
   { url: "https://www.bt.se/feeds/section/varlden/feed.xml", category: "varlden" },
   { url: "http://www.dn.se/nyheter/varlden/m/rss/senaste-nytt", category: "varlden" },
   { url: "http://newsrss.bbc.co.uk/rss/newsonline_world_edition/front_page/rss.xml", category: "varlden" },
