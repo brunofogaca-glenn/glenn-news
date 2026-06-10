@@ -262,6 +262,21 @@ function calculateRecencyScore(
 
   const ageHours =
     (Date.now() -
+      new Date(
+        article.date
+      ).getTime()) /
+    (1000 * 60 * 60);
+
+  return Math.round(
+    50 *
+      Math.exp(
+        -ageHours / 24
+      )
+  );
+}
+
+  const ageHours =
+    (Date.now() -
       new Date(article.date).getTime()) /
     (1000 * 60 * 60);
 
