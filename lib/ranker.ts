@@ -96,7 +96,6 @@ const TIER_4 = [
   "jordbävning",
   "president",
   "val",
-
   "världshändelse",
   "världsnyheter",
   "breaking news",
@@ -113,22 +112,18 @@ const TIER_4 = [
   "attack",
   "diplomati",
   "säkerhet",
-
   "inflation",
   "recession",
   "börs",
   "oljepris",
   "gaspris",
   "handel",
-  "tull",
   "ekonomi",
-
   "ai",
   "artificiell intelligens",
   "cybersäkerhet",
   "hackare",
   "teknik",
-
   "klimat",
   "storm",
   "orkan",
@@ -136,39 +131,38 @@ const TIER_4 = [
   "vulkan",
   "tsunami",
   "naturkatastrof",
-
   "pandemi",
   "epidemi",
   "virus",
   "who",
-"war",
-"conflict",
-"crisis",
-"attack",
-"missile",
-"election",
-"president",
-"government",
-"military",
-"economy",
-"inflation",
-"recession",
-"earthquake",
-"hurricane",
-"flood",
-"wildfire",
-"climate",
-"artificial intelligence",
-"cybersecurity",
-"united nations",
-"nato",
-"china",
-"russia",
-"ukraine",
-"israel",
-"iran",
-"gaza",
-"taiwan",
+  "war",
+  "conflict",
+  "crisis",
+  "attack",
+  "missile",
+  "election",
+  "president",
+  "government",
+  "military",
+  "economy",
+  "inflation",
+  "recession",
+  "earthquake",
+  "hurricane",
+  "flood",
+  "wildfire",
+  "climate",
+  "artificial intelligence",
+  "cybersecurity",
+  "united nations",
+  "nato",
+  "china",
+  "russia",
+  "ukraine",
+  "israel",
+  "iran",
+  "gaza",
+  "taiwan",
   "fn",
   "un",
   "europa",
@@ -217,40 +211,15 @@ function calculatePersonalScore(
   article: Article
 ) {
   const text =
-    `${article.title} ${article.description ?? ""}`
-      .toLowerCase();
+    `${article.title} ${article.description ?? ""}`.toLowerCase();
 
   let score = 0;
 
-  score += scoreTerms(
-    text,
-    TIER_1,
-    50
-  );
-
-  score += scoreTerms(
-    text,
-    TIER_2,
-    30
-  );
-
-  score += scoreTerms(
-    text,
-    TIER_3,
-    20
-  );
-
-  score += scoreTerms(
-    text,
-    TIER_4,
-    10
-  );
-
-  score += scoreTerms(
-    text,
-    BREAKING_TERMS,
-    15
-  );
+  score += scoreTerms(text, TIER_1, 50);
+  score += scoreTerms(text, TIER_2, 30);
+  score += scoreTerms(text, TIER_3, 20);
+  score += scoreTerms(text, TIER_4, 10);
+  score += scoreTerms(text, BREAKING_TERMS, 15);
 
   return score;
 }
@@ -262,31 +231,12 @@ function calculateRecencyScore(
 
   const ageHours =
     (Date.now() -
-      new Date(
-        article.date
-      ).getTime()) /
-    (1000 * 60 * 60);
-
-  return Math.round(
-    50 *
-      Math.exp(
-        -ageHours / 24
-      )
-  );
-}
-
-  const ageHours =
-    (Date.now() -
       new Date(article.date).getTime()) /
     (1000 * 60 * 60);
 
-  if (ageHours <= 1) return 30;
-  if (ageHours <= 3) return 25;
-  if (ageHours <= 6) return 20;
-  if (ageHours <= 12) return 10;
-  if (ageHours <= 24) return 5;
-
-  return 0;
+  return Math.round(
+    50 * Math.exp(-ageHours / 24)
+  );
 }
 
 export function rankArticles(
@@ -309,25 +259,22 @@ export function rankArticles(
       const mentions =
         cluster?.mentions ?? 1;
 
-const mentions =
-  cluster?.mentions ?? 1;
+      const uniqueSources =
+        cluster?.uniqueSources ?? 1;
 
-const uniqueSources =
-  cluster?.uniqueSources ?? 1;
+      const editorialEchoScore =
+        Math.log2(
+          mentions + 1
+        ) *
+        uniqueSources *
+        25;
 
-const editorialEchoScore =
-  Math.log2(
-    mentions + 1
-  ) *
-  uniqueSources *
-  25;
+      const sourceDiversityScore =
+        uniqueSources * 15;
 
-const sourceDiversityScore =
-  uniqueSources * 15;
-
-const clusterScore =
-  editorialEchoScore +
-  sourceDiversityScore;
+      const clusterScore =
+        editorialEchoScore +
+        sourceDiversityScore;
 
       const personalScore =
         calculatePersonalScore(
