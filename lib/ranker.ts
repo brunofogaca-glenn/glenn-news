@@ -37,6 +37,8 @@ const TIER_1 = [
   "barcelona",
   "hansi flick",
   "roma",
+  "as roma",
+  "serie a",
   "gasperini",
   "italy",
   "italien",
