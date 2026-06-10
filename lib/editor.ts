@@ -112,7 +112,7 @@ ${JSON.stringify(candidates)}
 `,
     });
 
-  let result;
+  let result: any;
 
   try {
     result = JSON.parse(
@@ -185,7 +185,7 @@ ${JSON.stringify(candidates)}
     ) ?? candidates[0];
 
   const topStories =
-    result.topStories
+  result?.topStories
       ?.map((story: any) => {
         const article =
           candidates.find(
@@ -241,7 +241,7 @@ ${JSON.stringify(candidates)}
   );
 
   const mainStorySummary =
-    result.topStories?.find(
+  result?.topStories?.find(
       (story: any) =>
         story.id ===
         mainStory?.id
