@@ -274,12 +274,24 @@ const latestNews = categories
                       </div>
 
                       <h3 className="text-xl md:text-2xl font-bold leading-tight text-slate-900 hover:text-blue-600 transition">
-                        {category.editor.mainStory.title}
-                      </h3>
+  {category.editor.mainStory.title}
+</h3>
 
-                      <div className="text-sm text-slate-500 mt-2">
-                        {category.editor.mainStory.source}
-                      </div>
+{(category.editor.mainStory as any).aiSummary && (
+  <p className="text-slate-700 text-base leading-7 mt-3">
+    {(category.editor.mainStory as any).aiSummary}
+  </p>
+)}
+
+<div className="text-sm text-slate-500 mt-3">
+  {category.editor.mainStory.source}
+
+  {(category.editor.mainStory as any).mentions > 1 && (
+    <span className="ml-2 text-orange-500 font-medium">
+      🔥 {(category.editor.mainStory as any).mentions} källor
+    </span>
+  )}
+</div>
                     </a>
                   )}
 
