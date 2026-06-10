@@ -294,8 +294,25 @@ export function rankArticles(
       const mentions =
         cluster?.mentions ?? 1;
 
-      const clusterScore =
-        mentions * 20;
+const mentions =
+  cluster?.mentions ?? 1;
+
+const uniqueSources =
+  cluster?.uniqueSources ?? 1;
+
+const editorialEchoScore =
+  Math.log2(
+    mentions + 1
+  ) *
+  uniqueSources *
+  25;
+
+const sourceDiversityScore =
+  uniqueSources * 15;
+
+const clusterScore =
+  editorialEchoScore +
+  sourceDiversityScore;
 
       const personalScore =
         calculatePersonalScore(
