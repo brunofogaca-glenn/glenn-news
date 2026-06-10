@@ -172,18 +172,18 @@ const latestNews = categories
                 </h2>
               </a>
 
-{biggestStory.aiSummary && (
+{(biggestStory as any).aiSummary && (
   <p className="text-lg text-slate-700 mt-4 leading-8">
-    {biggestStory.aiSummary}
+    {(biggestStory as any).aiSummary}
   </p>
 )}
 
 <div className="text-slate-500 mt-4">
   {biggestStory.source}
 
-  {biggestStory.mentions > 1 && (
+  {(biggestStory as any).mentions > 1 && (
     <span className="ml-2 text-orange-500 font-medium">
-      🔥 {biggestStory.mentions} källor
+      🔥 {(biggestStory as any).mentions} källor
     </span>
   )}
 </div>
