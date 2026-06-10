@@ -1,7 +1,6 @@
 export const revalidate = 1900;
 import { getArticles } from "@/lib/rss";
 import { createCategorySummary } from "@/lib/editor";
-import { createMorningBrief } from "@/lib/morningBrief";
 
 export default async function Home() {
   const news = await getArticles();
@@ -71,19 +70,15 @@ export default async function Home() {
     0
   );
 
-  const [morningBrief, summaries] = await Promise.all([
-    createMorningBrief(news),
-
-    Promise.all(
-      categoryConfigs.map(category =>
-        createCategorySummary(
-          category.title,
-          category.articles
-        )
-      )
-    ),
-  ]);
-
+const summaries = await Promise.all(
+  categoryConfigs.map(category =>
+    createCategorySummary(
+      category.title,
+      category.articles
+    )
+  )
+);
+  
   const categories = categoryConfigs.map(
     (category, index) => ({
       ...category,
@@ -151,20 +146,6 @@ const latestNews = categories
             </span>
           </div>
         </header>
-
-        <section className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 text-white rounded-3xl p-6 md:p-8 shadow-xl mb-10">
-          <div className="text-sm uppercase tracking-widest text-slate-300 mb-2">
-            ☀️ Morning Brief
-          </div>
-
-          <h2 className="text-3xl font-bold mb-4">
-            God morgon Glenn
-          </h2>
-
-          <div className="leading-7 md:leading-8 text-base md:text-lg whitespace-pre-wrap">
-            {morningBrief}
-          </div>
-        </section>
 
         {biggestStory && (
           <section className="bg-white rounded-3xl shadow-xl border overflow-hidden mb-10">
