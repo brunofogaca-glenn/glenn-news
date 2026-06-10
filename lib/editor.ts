@@ -22,9 +22,8 @@ export async function createCategorySummary(
     articles
   );
 
-  const candidates = rankedArticles
-
-    .map((article, index) => ({
+  const candidates = rankedArticles.map(
+    (article, index) => ({
       id: index,
       title: article.title,
       description:
@@ -35,7 +34,8 @@ export async function createCategorySummary(
       date: article.date,
       score: article.score,
       mentions: article.mentions,
-    }));
+    })
+  );
 
   const response =
     await openai.responses.create({
@@ -82,7 +82,14 @@ Skriv:
 
 1. Ett journalistiskt lägesbildstycke.
 2. Välj dagens huvudstory.
-3. Rangordna de 15 viktigaste artiklarna.
+3. Rangordna de 16 viktigaste artiklarna.
+4. Skriv en kort sammanfattning för varje vald artikel.
+
+Sammanfattningarna ska:
+
+- vara max 2 meningar
+- beskriva vad som hänt
+- inte innehålla clickbait
 
 Lägesbilden ska vara max 6 meningar.
 
@@ -91,7 +98,12 @@ Returnera ENDAST giltig JSON.
 {
   "summary": "...",
   "mainStoryId": 0,
-  "topStoryIds": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]
+  "topStories": [
+    {
+      "id": 0,
+      "summary": "Kort sammanfattning"
+    }
+  ]
 }
 
 Artiklar:
@@ -116,7 +128,13 @@ ${JSON.stringify(candidates)}
       candidates[0];
 
     const fallbackTopStories =
-      candidates.slice(0, 15);
+      candidates
+        .slice(0, 16)
+        .map(story => ({
+          ...story,
+          aiSummary:
+            story.description ?? "",
+        }));
 
     if (
       fallbackMainStory &&
@@ -151,7 +169,11 @@ ${JSON.stringify(candidates)}
       mainStory:
         fallbackMainStory,
       topStories:
-        fallbackTopStories,
+        fallbackTopStories.filter(
+          story =>
+            story.id !==
+            fallbackMainStory?.id
+        ),
     };
   }
 
@@ -163,20 +185,32 @@ ${JSON.stringify(candidates)}
     ) ?? candidates[0];
 
   const topStories =
-    result.topStoryIds
-      ?.map((id: number) =>
-        candidates.find(
-          item => item.id === id
-        )
-      )
+    result.topStories
+      ?.map((story: any) => {
+        const article =
+          candidates.find(
+            item =>
+              item.id === story.id
+          );
+
+        if (!article) {
+          return null;
+        }
+
+        return {
+          ...article,
+          aiSummary:
+            story.summary ?? "",
+        };
+      })
       .filter(Boolean) ?? [];
 
   const filteredTopStories =
-  topStories.filter(
-    story =>
-      story?.id !==
-      mainStory?.id
-  );
+    topStories.filter(
+      story =>
+        story?.id !==
+        mainStory?.id
+    );
 
   if (
     mainStory &&
@@ -190,7 +224,7 @@ ${JSON.stringify(candidates)}
   }
 
   await Promise.all(
-    topStories.map(
+    filteredTopStories.map(
       async (story: any) => {
         if (
           story &&
@@ -206,11 +240,22 @@ ${JSON.stringify(candidates)}
     )
   );
 
-return {
-  summary:
-    result.summary ?? "",
-  mainStory,
-  topStories:
-    filteredTopStories,
-};
+  const mainStorySummary =
+    result.topStories?.find(
+      (story: any) =>
+        story.id ===
+        mainStory?.id
+    )?.summary ?? "";
+
+  return {
+    summary:
+      result.summary ?? "",
+    mainStory: {
+      ...mainStory,
+      aiSummary:
+        mainStorySummary,
+    },
+    topStories:
+      filteredTopStories,
+  };
 }
