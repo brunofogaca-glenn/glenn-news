@@ -146,6 +146,10 @@ const frontPageFeed = categories
           article.title.toLowerCase().slice(0, 40)
       )
   );
+
+  const topStories = frontPageFeed
+  .filter(article => article.link !== biggestStory?.link)
+  .slice(0, 8);
   
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
@@ -242,7 +246,53 @@ const frontPageFeed = categories
             </div>
           </section>
         )}
+<section className="mb-10">
 
+  <h2 className="text-3xl font-black mb-6">
+    📰 Dagens viktigaste
+  </h2>
+
+  <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
+
+    {topStories.map((story: any, index: number) => (
+
+      <a
+        key={index}
+        href={story.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
+      >
+
+        {story.image && (
+
+          <img
+            src={story.image}
+            alt={story.title}
+            className="w-full h-40 object-cover"
+          />
+
+        )}
+
+        <div className="p-4">
+
+          <div className="text-xs uppercase text-orange-500 font-bold mb-2">
+            {story.category}
+          </div>
+
+          <div className="font-bold leading-snug">
+            {story.title}
+          </div>
+
+        </div>
+
+      </a>
+
+    ))}
+
+  </div>
+
+</section>
         <div className="grid lg:grid-cols-[320px_1fr] gap-8 items-start">
 
           <aside className="order-last lg:order-first">
