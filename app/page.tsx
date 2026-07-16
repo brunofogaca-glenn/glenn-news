@@ -160,6 +160,10 @@ const topStories = frontPageFeed
     return true;
   })
   .slice(0, 8);
+
+  const articleFeed = frontPageFeed
+  .filter(article => article.link !== biggestStory?.link)
+  .slice(8, 150);
   
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
@@ -343,146 +347,46 @@ const topStories = frontPageFeed
               </div>
             </section>
           </aside>
+<section className="mt-10">
+  <h2 className="text-3xl font-black mb-6">
+    Fortsätt läsa
+  </h2>
 
-          <div className="grid xl:grid-cols-2 gap-8">
+  <div className="grid md:grid-cols-2 gap-5">
+    {articleFeed.map((story: any, index: number) => (
+      <a
+        key={index}
+        href={story.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex gap-4 bg-white rounded-2xl p-4 border hover:shadow-lg transition"
+      >
+        {story.image && (
+          <img
+            src={story.image}
+            className="w-32 h-24 rounded-xl object-cover flex-shrink-0"
+          />
+        )}
 
-            {categories.map(category => (
-              <section
-                key={category.key}
-                className={`bg-white rounded-3xl shadow-sm border overflow-hidden ${
-                  categoryColors[
-                    category.key as keyof typeof categoryColors
-                  ]
-                }`}
-              >
-                <div className="p-6">
+        <div>
+          <div className="text-xs uppercase text-orange-500 font-bold mb-1">
+            {story.category}
+          </div>
 
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl md:text-3xl font-bold">
-                      {category.title}
-                    </h2>
+          <div className="font-bold">
+            {story.title}
+          </div>
 
-                    <span className="text-sm text-slate-500">
-                      {category.articles.length} artiklar
-                    </span>
-                  </div>
-
-                  {category.editor?.mainStory && (
-                    <a
-                      href={category.editor.mainStory.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block mb-6"
-                    >
-                      {category.editor.mainStory.image ? (
-                        <img
-                          src={
-                            category.editor.mainStory.image
-                          }
-                          alt={
-                            category.editor.mainStory.title
-                          }
-                          className="w-full h-48 md:h-64 object-cover rounded-2xl mb-4"
-                        />
-                      ) : (
-                        <div className="w-full h-64 bg-slate-200 rounded-2xl mb-4 flex items-center justify-center">
-                          Glenn News
-                        </div>
-                      )}
-
-                      <div className="text-xs font-bold uppercase tracking-widest text-orange-500 mb-2">
-                        Huvudstory
-                      </div>
-
-                      <h3 className="text-xl md:text-2xl font-bold leading-tight text-slate-900 hover:text-blue-600 transition">
-  {category.editor.mainStory.title}
-</h3>
-
-{(category.editor.mainStory as any).aiSummary && (
-  <p className="text-slate-700 text-base leading-7 mt-3">
-    {(category.editor.mainStory as any).aiSummary}
-  </p>
-)}
-
-<div className="text-sm text-slate-500 mt-3">
-  {category.editor.mainStory.source}
-
-  {(category.editor.mainStory as any).mentions > 1 && (
-    <span className="ml-2 text-orange-500 font-medium">
-      🔥 {(category.editor.mainStory as any).mentions} källor
-    </span>
-  )}
-</div>
-                    </a>
-                  )}
-
-                  {category.editor?.summary && (
-                    <div className="bg-slate-50 rounded-2xl p-5 mb-6">
-                      <div className="font-semibold mb-2">
-                        Lägesbild
-                      </div>
-
-                      <p className="text-slate-700 text-sm md:text-base leading-7">
-                        {category.editor.summary}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="space-y-4">
-                    {category.editor?.topStories?.map(
-                      (
-                        story: any,
-                        index: number
-                      ) => (
-                        <a
-  key={index}
-  href={story.link}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="flex gap-4 border-b last:border-0 pb-4 hover:text-blue-600 transition"
->
-  <div className="text-orange-500 font-bold text-xl min-w-[30px]">
-    #{index + 1}
+          {story.aiSummary && (
+            <div className="text-sm text-slate-600 mt-2 line-clamp-2">
+              {story.aiSummary}
+            </div>
+          )}
+        </div>
+      </a>
+    ))}
   </div>
-
-  {story.image ? (
-    <img
-      src={story.image}
-      alt={story.title}
-      className="w-24 h-24 rounded-xl object-cover flex-shrink-0"
-    />
-  ) : (
-    <div className="w-24 h-24 rounded-xl bg-slate-200 flex-shrink-0" />
-  )}
-
-  <div className="flex-1">
-    <div className="font-medium text-sm md:text-base">
-      {story.title}
-    </div>
-
-    {story.aiSummary && (
-      <div className="text-sm text-slate-600 mt-2 leading-6">
-        {story.aiSummary}
-      </div>
-    )}
-
-    <div className="text-sm text-slate-500 mt-2">
-      {story.source}
-
-      {story.mentions > 1 && (
-        <span className="ml-2 text-orange-500 font-medium">
-          🔥 {story.mentions} källor
-        </span>
-      )}
-    </div>
-  </div>
-</a>
-                      )
-                    )}
-                  </div>
-
-                </div>
-              </section>
+</section>
             ))}
 
           </div>
