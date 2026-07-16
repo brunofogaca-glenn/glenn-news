@@ -187,6 +187,34 @@ const latestNews = categories
     </span>
   )}
 </div>
+              <div className="mt-8 grid md:grid-cols-3 gap-4">
+
+  {latestNews
+  .filter(article => article.link !== biggestStory.link)
+  .slice(0,3)
+  .map((article,index)=>(
+
+    <a
+      key={index}
+      href={article.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="border-t pt-4 hover:text-blue-600 transition"
+    >
+
+      <div className="text-xs uppercase text-slate-500 mb-2">
+        {article.source}
+      </div>
+
+      <div className="font-semibold leading-snug">
+        {article.title}
+      </div>
+
+    </a>
+
+  ))}
+
+</div>
             </div>
           </section>
         )}
