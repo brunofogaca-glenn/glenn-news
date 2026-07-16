@@ -316,37 +316,9 @@ const topStories = frontPageFeed
   </div>
 
 </section>
-        <div className="grid lg:grid-cols-[320px_1fr] gap-8 items-start">
+        <section className="mt-10">
 
-          <aside className="order-last lg:order-first">
-            <section className="bg-white rounded-3xl p-6 border sticky top-4">
-              <h2 className="text-2xl font-bold mb-5">
-                📰 Senaste nytt
-              </h2>
-
-              <div className="space-y-3">
-                {latestNews.map(
-                  (article, index) => (
-                    <a
-                      key={index}
-                      href={article.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block border-b pb-3 hover:text-blue-600"
-                    >
-                      <div className="font-medium text-sm">
-                        {article.title}
-                      </div>
-
-                      <div className="text-xs text-slate-500 mt-1">
-                        {article.source}
-                      </div>
-                    </a>
-                  )
-                )}
-              </div>
-            </section>
-          </aside>
+         
 <section className="mt-10">
   <h2 className="text-3xl font-black mb-6">
     Fortsätt läsa
@@ -387,9 +359,7 @@ const topStories = frontPageFeed
     ))}
   </div>
 </section>
-            ))}
 
-          </div>
         </div>
       </div>
     </main>
