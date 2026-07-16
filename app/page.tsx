@@ -147,8 +147,18 @@ const frontPageFeed = categories
       )
   );
 
-  const topStories = frontPageFeed
+const usedCategories = new Set<string>();
+
+const topStories = frontPageFeed
   .filter(article => article.link !== biggestStory?.link)
+  .filter(article => {
+    if (usedCategories.has(article.category)) {
+      return false;
+    }
+
+    usedCategories.add(article.category);
+    return true;
+  })
   .slice(0, 8);
   
   return (
