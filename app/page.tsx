@@ -278,13 +278,6 @@ const topStories = frontPageFeed
     }
   >
 
-      <a
-        key={index}
-        href={story.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
-      >
 
         {story.image && (
 
