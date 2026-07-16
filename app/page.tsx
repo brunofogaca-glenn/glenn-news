@@ -132,7 +132,7 @@ const frontPageFeed = categories
         }]
       : []),
 
-    ...(category.editor?.topStories ?? []).map(story => ({
+    ...(category.editor?.topStories ?? []).map((story: any) => ({
       ...story,
       category: category.title,
     })),
