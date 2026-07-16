@@ -266,6 +266,18 @@ const topStories = frontPageFeed
 
     {topStories.map((story: any, index: number) => (
 
+  <a
+    key={index}
+    href={story.link}
+    target="_blank"
+    rel="noopener noreferrer"
+    className={
+      index === 0
+        ? "md:col-span-2 bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
+        : "bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
+    }
+  >
+
       <a
         key={index}
         href={story.link}
