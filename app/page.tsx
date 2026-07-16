@@ -358,10 +358,7 @@ const topStories = frontPageFeed
  </div>
 </section>
 
-      </div>
-    </main>
-  );
-}
+        </div>
     </main>
   );
 }
