@@ -123,20 +123,39 @@ const latestNews = categories
   )
   .slice(0, 15);
 
-const frontPageFeed = categories
-  .flatMap(category => [
+const categoryFeeds = categories.map(category => ({
+  category: category.title,
+  stories: [
     ...(category.editor?.mainStory
-      ? [{
-          ...category.editor.mainStory,
-          category: category.title,
-        }]
+      ? [{ ...category.editor.mainStory, category: category.title }]
       : []),
-
-    ...(category.editor?.topStories ?? []).map((story: any) => ({
+    ...(category.editor?.topStories ?? []).map(story => ({
       ...story,
       category: category.title,
     })),
-  ])
+  ],
+}));
+
+const mixedFeed: any[] = [];
+
+let i = 0;
+
+while (true) {
+  let added = false;
+
+  for (const feed of categoryFeeds) {
+    if (feed.stories[i]) {
+      mixedFeed.push(feed.stories[i]);
+      added = true;
+    }
+  }
+
+  if (!added) break;
+  i++;
+}
+
+const articleFeed = mixedFeed
+  .filter(article => article.link !== biggestStory?.link)
   .filter(
     (article, index, self) =>
       index ===
@@ -146,24 +165,6 @@ const frontPageFeed = categories
           article.title.toLowerCase().slice(0, 40)
       )
   );
-
-const usedCategories = new Set<string>();
-
-const topStories = frontPageFeed
-  .filter(article => article.link !== biggestStory?.link)
-  .filter(article => {
-    if (usedCategories.has(article.category)) {
-      return false;
-    }
-
-    usedCategories.add(article.category);
-    return true;
-  })
-  .slice(0, 11);
-
-  const articleFeed = frontPageFeed
-  .filter(article => article.link !== biggestStory?.link)
-  .slice(8, 150);
   
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
@@ -318,48 +319,34 @@ const topStories = frontPageFeed
 </section>
                
 <section className="mt-10">
-  <h2 className="text-3xl font-black mb-6">
-    Fortsätt läsa
-  </h2>
 
-  <div className="grid md:grid-cols-2 gap-5">
-    {articleFeed.map((story: any, index: number) => (
-      <a
-        key={index}
-        href={story.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`bg-white rounded-2xl border hover:shadow-lg transition overflow-hidden ${
-  index % 7 === 0
-    ? "md:col-span-2"
-    : ""
-}`}
-      >
-        {story.image && (
-          <img
-            src={story.image}
-            className="w-32 h-24 rounded-xl object-cover flex-shrink-0"
-          />
-        )}
+<h2 className="text-3xl font-black mb-6">
+Mer nyheter
+</h2>
 
-        <div>
-          <div className="text-xs uppercase text-orange-500 font-bold mb-1">
-            {story.category}
-          </div>
+<div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
 
-          <div className="font-bold">
-            {story.title}
-          </div>
+{moreStories.map((story,index)=>(
 
-          {story.aiSummary && (
-            <div className="text-sm text-slate-600 mt-2 line-clamp-2">
-              {story.aiSummary}
-            </div>
-          )}
-        </div>
-      </a>
-    ))}
- </div>
+<a
+key={index}
+href={story.link}
+target="_blank"
+rel="noopener noreferrer"
+className={
+index % 9===0
+? "md:col-span-2 bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
+: "bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
+}
+>
+
+...
+</a>
+
+))}
+
+</div>
+
 </section>
 
         </div>
