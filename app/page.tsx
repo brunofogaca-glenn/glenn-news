@@ -123,6 +123,30 @@ const latestNews = categories
   )
   .slice(0, 15);
 
+const frontPageFeed = categories
+  .flatMap(category => [
+    ...(category.editor?.mainStory
+      ? [{
+          ...category.editor.mainStory,
+          category: category.title,
+        }]
+      : []),
+
+    ...(category.editor?.topStories ?? []).map(story => ({
+      ...story,
+      category: category.title,
+    })),
+  ])
+  .filter(
+    (article, index, self) =>
+      index ===
+      self.findIndex(
+        a =>
+          a.title.toLowerCase().slice(0, 40) ===
+          article.title.toLowerCase().slice(0, 40)
+      )
+  );
+  
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
       <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8">
@@ -153,7 +177,7 @@ const latestNews = categories
               <img
                 src={biggestStory.image}
                 alt={biggestStory.title}
-                className="w-full h-56 md:h-[420px] object-cover"
+                className="w-full h-56 md:h-[320px] object-cover"
               />
             )}
 
