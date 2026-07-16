@@ -123,49 +123,6 @@ const latestNews = categories
   )
   .slice(0, 15);
 
-const categoryFeeds = categories.map(category => ({
-  category: category.title,
-  stories: [
-    ...(category.editor?.mainStory
-      ? [{ ...category.editor.mainStory, category: category.title }]
-      : []),
-    ...(category.editor?.topStories ?? []).map(story => ({
-      ...story,
-      category: category.title,
-    })),
-  ],
-}));
-
-const mixedFeed: any[] = [];
-
-let i = 0;
-
-while (true) {
-  let added = false;
-
-  for (const feed of categoryFeeds) {
-    if (feed.stories[i]) {
-      mixedFeed.push(feed.stories[i]);
-      added = true;
-    }
-  }
-
-  if (!added) break;
-  i++;
-}
-
-const articleFeed = mixedFeed
-  .filter(article => article.link !== biggestStory?.link)
-  .filter(
-    (article, index, self) =>
-      index ===
-      self.findIndex(
-        a =>
-          a.title.toLowerCase().slice(0, 40) ===
-          article.title.toLowerCase().slice(0, 40)
-      )
-  );
-  
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
       <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8">
@@ -196,7 +153,7 @@ const articleFeed = mixedFeed
               <img
                 src={biggestStory.image}
                 alt={biggestStory.title}
-                className="w-full h-56 md:h-[320px] object-cover"
+                className="w-full h-56 md:h-[420px] object-cover"
               />
             )}
 
@@ -230,126 +187,186 @@ const articleFeed = mixedFeed
     </span>
   )}
 </div>
-              <div className="mt-8 grid md:grid-cols-3 gap-4">
-
-  {latestNews
-  .filter(article => article.link !== biggestStory.link)
-  .slice(0,3)
-  .map((article,index)=>(
-
-    <a
-      key={index}
-      href={article.link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="border-t pt-4 hover:text-blue-600 transition"
-    >
-
-      <div className="text-xs uppercase text-slate-500 mb-2">
-        {article.source}
-      </div>
-
-      <div className="font-semibold leading-snug">
-        {article.title}
-      </div>
-
-    </a>
-
-  ))}
-
-</div>
             </div>
           </section>
         )}
-<section className="mb-10">
 
-  <h2 className="text-3xl font-black mb-6">
-    📰 Dagens viktigaste
-  </h2>
+        <div className="grid lg:grid-cols-[320px_1fr] gap-8 items-start">
 
-  <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
+          <aside className="order-last lg:order-first">
+            <section className="bg-white rounded-3xl p-6 border sticky top-4">
+              <h2 className="text-2xl font-bold mb-5">
+                📰 Senaste nytt
+              </h2>
 
-    {topStories.map((story: any, index: number) => (
+              <div className="space-y-3">
+                {latestNews.map(
+                  (article, index) => (
+                    <a
+                      key={index}
+                      href={article.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block border-b pb-3 hover:text-blue-600"
+                    >
+                      <div className="font-medium text-sm">
+                        {article.title}
+                      </div>
 
-  <a
-    key={index}
-    href={story.link}
-    target="_blank"
-    rel="noopener noreferrer"
-    className={
-      index === 0
-        ? "md:col-span-2 bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
-        : "bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
-    }
-  >
+                      <div className="text-xs text-slate-500 mt-1">
+                        {article.source}
+                      </div>
+                    </a>
+                  )
+                )}
+              </div>
+            </section>
+          </aside>
 
+          <div className="grid xl:grid-cols-2 gap-8">
 
-        {story.image && (
+            {categories.map(category => (
+              <section
+                key={category.key}
+                className={`bg-white rounded-3xl shadow-sm border overflow-hidden ${
+                  categoryColors[
+                    category.key as keyof typeof categoryColors
+                  ]
+                }`}
+              >
+                <div className="p-6">
 
-          <img
-            src={story.image}
-            alt={story.title}
-            className={
-  index === 0
-    ? "w-full h-64 object-cover"
-    : "w-full h-40 object-cover"
-}
-          />
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl md:text-3xl font-bold">
+                      {category.title}
+                    </h2>
 
-        )}
+                    <span className="text-sm text-slate-500">
+                      {category.articles.length} artiklar
+                    </span>
+                  </div>
 
-        <div className="p-4">
+                  {category.editor?.mainStory && (
+                    <a
+                      href={category.editor.mainStory.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block mb-6"
+                    >
+                      {category.editor.mainStory.image ? (
+                        <img
+                          src={
+                            category.editor.mainStory.image
+                          }
+                          alt={
+                            category.editor.mainStory.title
+                          }
+                          className="w-full h-48 md:h-64 object-cover rounded-2xl mb-4"
+                        />
+                      ) : (
+                        <div className="w-full h-64 bg-slate-200 rounded-2xl mb-4 flex items-center justify-center">
+                          Glenn News
+                        </div>
+                      )}
 
-          <div className="text-xs uppercase text-orange-500 font-bold mb-2">
-            {story.category}
-          </div>
+                      <div className="text-xs font-bold uppercase tracking-widest text-orange-500 mb-2">
+                        Huvudstory
+                      </div>
 
-          <div className="font-bold leading-snug">
-            {story.title}
-          </div>
+                      <h3 className="text-xl md:text-2xl font-bold leading-tight text-slate-900 hover:text-blue-600 transition">
+  {category.editor.mainStory.title}
+</h3>
 
-        </div>
+{(category.editor.mainStory as any).aiSummary && (
+  <p className="text-slate-700 text-base leading-7 mt-3">
+    {(category.editor.mainStory as any).aiSummary}
+  </p>
+)}
 
-      </a>
+<div className="text-sm text-slate-500 mt-3">
+  {category.editor.mainStory.source}
 
-    ))}
+  {(category.editor.mainStory as any).mentions > 1 && (
+    <span className="ml-2 text-orange-500 font-medium">
+      🔥 {(category.editor.mainStory as any).mentions} källor
+    </span>
+  )}
+</div>
+                    </a>
+                  )}
 
+                  {category.editor?.summary && (
+                    <div className="bg-slate-50 rounded-2xl p-5 mb-6">
+                      <div className="font-semibold mb-2">
+                        Lägesbild
+                      </div>
+
+                      <p className="text-slate-700 text-sm md:text-base leading-7">
+                        {category.editor.summary}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    {category.editor?.topStories?.map(
+                      (
+                        story: any,
+                        index: number
+                      ) => (
+                        <a
+  key={index}
+  href={story.link}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="flex gap-4 border-b last:border-0 pb-4 hover:text-blue-600 transition"
+>
+  <div className="text-orange-500 font-bold text-xl min-w-[30px]">
+    #{index + 1}
   </div>
 
-</section>
-               
-<section className="mt-10">
+  {story.image ? (
+    <img
+      src={story.image}
+      alt={story.title}
+      className="w-24 h-24 rounded-xl object-cover flex-shrink-0"
+    />
+  ) : (
+    <div className="w-24 h-24 rounded-xl bg-slate-200 flex-shrink-0" />
+  )}
 
-<h2 className="text-3xl font-black mb-6">
-Mer nyheter
-</h2>
+  <div className="flex-1">
+    <div className="font-medium text-sm md:text-base">
+      {story.title}
+    </div>
 
-<div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
+    {story.aiSummary && (
+      <div className="text-sm text-slate-600 mt-2 leading-6">
+        {story.aiSummary}
+      </div>
+    )}
 
-{moreStories.map((story,index)=>(
+    <div className="text-sm text-slate-500 mt-2">
+      {story.source}
 
-<a
-key={index}
-href={story.link}
-target="_blank"
-rel="noopener noreferrer"
-className={
-index % 9===0
-? "md:col-span-2 bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
-: "bg-white rounded-2xl overflow-hidden border hover:shadow-xl transition"
-}
->
-
-...
+      {story.mentions > 1 && (
+        <span className="ml-2 text-orange-500 font-medium">
+          🔥 {story.mentions} källor
+        </span>
+      )}
+    </div>
+  </div>
 </a>
+                      )
+                    )}
+                  </div>
 
-))}
+                </div>
+              </section>
+            ))}
 
-</div>
-
-</section>
-
+          </div>
         </div>
+      </div>
     </main>
   );
 }
