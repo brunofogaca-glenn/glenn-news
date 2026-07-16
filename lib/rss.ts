@@ -131,7 +131,28 @@ type Article = {
   source: string;
   image: string | null;
 };
+async function parseFeed(url: string) {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(10000),
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; Glenn News/1.0)",
+      Accept:
+        "application/rss+xml, application/xml, text/xml",
+    },
+    cache: "no-store",
+  });
 
+  if (!response.ok) {
+    throw new Error(
+      `${response.status} ${response.statusText}`
+    );
+  }
+
+  const xml = await response.text();
+
+  return parser.parseString(xml);
+}
 export async function getArticles() {
   const result = {
     elfsborg: [] as Article[],
@@ -149,12 +170,12 @@ export async function getArticles() {
     Date.now() -
     24 * 60 * 60 * 1000;
 
-  const feeds =
-    await Promise.allSettled(
-      FEEDS.map(feed =>
-        parser.parseURL(feed.url)
-      )
-    );
+const feeds =
+  await Promise.allSettled(
+    FEEDS.map(feed =>
+      parseFeed(feed.url)
+    )
+  );
 
   feeds.forEach(
     (feedResult, index) => {
@@ -164,9 +185,10 @@ export async function getArticles() {
         feedResult.status !==
         "fulfilled"
       ) {
-        console.log(
-          `RSS misslyckades: ${feed.url}`
-        );
+      console.error(
+  `RSS misslyckades: ${feed.url}`,
+  feedResult.reason
+);
         return;
       }
 
