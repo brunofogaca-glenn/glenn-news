@@ -291,7 +291,11 @@ const topStories = frontPageFeed
           <img
             src={story.image}
             alt={story.title}
-            className="w-full h-40 object-cover"
+            className={
+  index === 0
+    ? "w-full h-64 object-cover"
+    : "w-full h-40 object-cover"
+}
           />
 
         )}
