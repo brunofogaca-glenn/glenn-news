@@ -316,9 +316,7 @@ const topStories = frontPageFeed
   </div>
 
 </section>
-        <section className="mt-10">
-
-         
+               
 <section className="mt-10">
   <h2 className="text-3xl font-black mb-6">
     Fortsätt läsa
@@ -357,11 +355,13 @@ const topStories = frontPageFeed
         </div>
       </a>
     ))}
-  </div>
+ </div>
 </section>
 
-        </div>
       </div>
+    </main>
+  );
+}
     </main>
   );
 }
