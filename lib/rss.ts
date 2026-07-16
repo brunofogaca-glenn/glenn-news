@@ -140,7 +140,7 @@ async function parseFeed(url: string) {
       Accept:
         "application/rss+xml, application/xml, text/xml",
     },
-    cache: "no-store",
+  
   });
 
   if (!response.ok) {
