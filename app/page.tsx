@@ -329,7 +329,11 @@ const topStories = frontPageFeed
         href={story.link}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex gap-4 bg-white rounded-2xl p-4 border hover:shadow-lg transition"
+        className={`bg-white rounded-2xl border hover:shadow-lg transition overflow-hidden ${
+  index % 7 === 0
+    ? "md:col-span-2"
+    : ""
+}`}
       >
         {story.image && (
           <img
