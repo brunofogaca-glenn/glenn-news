@@ -159,7 +159,7 @@ const topStories = frontPageFeed
     usedCategories.add(article.category);
     return true;
   })
-  .slice(0, 8);
+  .slice(0, 11);
 
   const articleFeed = frontPageFeed
   .filter(article => article.link !== biggestStory?.link)
