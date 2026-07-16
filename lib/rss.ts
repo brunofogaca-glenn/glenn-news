@@ -75,7 +75,7 @@ const parser = new Parser({
 });
 
 const FEEDS = [
-  { url: "http://www.dn.se/nyheter/sverige/m/rss/senaste-nytt", category: "sverige" },
+  { url: "https://www.dn.se/nyheter/sverige/m/rss/senaste-nytt", category: "sverige" },
   { url: "https://www.bt.se/feeds/section/elfsborg/feed.xml", category: "elfsborg" },
   { url: "http://expressen.se/rss/fotboll", category: "fotboll" },
   { url: "http://www.aftonbladet.se/sportbladet/fotboll/rss.xml", category: "fotboll" },
@@ -86,12 +86,12 @@ const FEEDS = [
   { url: "http://www.svt.se/nyheter/ekonomi/rss.xml", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/sverige/feed.xml", category: "sverige" },
   { url: "https://www.bt.se/feeds/section/naringsliv/feed.xml", category: "ekonomi" },
-  { url: "http://www.dn.se/ekonomi/m/rss/senaste-nytt", category: "ekonomi" },
+  { url: "https://www.dn.se/ekonomi/m/rss/senaste-nytt", category: "ekonomi" },
   { url: "https://www.avanza.se/placera/forstasidan.rss.xml", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/varlden/feed.xml", category: "varlden" },
-  { url: "http://www.dn.se/nyheter/varlden/m/rss/senaste-nytt", category: "varlden" },
+  { url: "https://www.dn.se/nyheter/varlden/m/rss/senaste-nytt", category: "varlden" },
   { url: "https://www.bt.se/feeds/section/kultur-noje/feed.xml", category: "livsstil" },
-  { url: "http://www.dn.se/film-rss", category: "livsstil" },
+  { url: "https://www.dn.se/film-rss", category: "livsstil" },
   { url: "https://www.bt.se/feeds/section/bollebygd/feed.xml", category: "boras" },
   { url: "https://feeds.expressen.se/nyheter/sverige/", category: "sverige" },
   { url: "https://feeds.expressen.se/sport/tennis/", category: "tennis" },
@@ -102,7 +102,7 @@ const FEEDS = [
   { url: "https://feeds.expressen.se/sport/vintersport/", category: "sport" },
   { url: "https://feeds.expressen.se/sport/os/", category: "sport" },
   { url: "https://www.offside.org/feed/", category: "fotboll" },
-  { url: "http://www.dn.se/musik-rss", category: "livsstil" },
+  { url: "https://www.dn.se/musik-rss", category: "livsstil" },
   { url: "https://feeds.expressen.se/sport/trav/", category: "sport" }, 
   { url: "https://feeds.expressen.se/sport/tennis/", category: "tennis" },
   { url: "https://www.moviezine.se/feed", category: "livsstil" },
@@ -121,7 +121,7 @@ const FEEDS = [
   { url: "http://news.bbc.co.uk/rss/sportonline_world_edition/tennis/rss091.xml", category: "tennis" },
   { url: "http://www.guardian.co.uk/sport/tennis/rss", category: "tennis" },
   { url: "https://feeds.expressen.se/noje/", category: "livsstil" },
-  { url: "http://www.dn.se/sport/m/rss/senaste-nytt", category: "sport" },
+  { url: "https://www.dn.se/sport/m/rss/senaste-nytt", category: "sport" },
 ];
 
 type Article = {
