@@ -107,7 +107,6 @@ const FEEDS = [
   { url: "https://feeds.expressen.se/sport/tennis/", category: "tennis" },
   { url: "https://www.moviezine.se/feed", category: "livsstil" },
   { url: "https://www.transfermarkt.com/rss/news", category: "fotboll" },
-  { url: "https://www.svt.se/nyheter/lokalt/vast/rss.xml", category: "boras" },
   { url: "http://www.svt.se/sport/fotboll/rss.xml", category: "fotboll" },
   { url: "http://feeds.guardian.co.uk/theguardian/football/manchester-united/rss", category: "fotboll" },
   { url: "http://www1.skysports.com/feeds/11667/news.xml", category: "fotboll" },  
