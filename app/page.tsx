@@ -250,7 +250,7 @@ export default async function Home() {
                   </h2>
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  2 texter
+                  4 texter
                 </span>
               </div>
 
