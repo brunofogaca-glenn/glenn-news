@@ -82,7 +82,7 @@ const FEEDS = [
   { url: "http://www.football-italia.net/rss.xml", category: "fotboll" },
   { url: "https://feeds.expressen.se/dinapengar/", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/boras/feed.xml", category: "boras" },
-  { url: "https://www.bt.se/feeds/section/kronikor/feed.xml", category: "livsstil" },
+  { url: "https://www.bt.se/feeds/section/kronikor/feed.xml", category: "livsstil", articleType: "krönika" },
   { url: "http://www.svt.se/nyheter/ekonomi/rss.xml", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/sverige/feed.xml", category: "sverige" },
   { url: "https://www.bt.se/feeds/section/naringsliv/feed.xml", category: "ekonomi" },
@@ -101,7 +101,7 @@ const FEEDS = [
   { url: "http://guliganerna.se/feed/", category: "elfsborg" },
   { url: "https://feeds.expressen.se/sport/vintersport/", category: "sport" },
   { url: "https://feeds.expressen.se/sport/os/", category: "sport" },
-  { url: "https://www.offside.org/feed/", category: "fotboll" },
+  { url: "https://www.offside.org/feed/", category: "fotboll", articleType: "reportage" },
   { url: "https://www.dn.se/musik-rss", category: "livsstil" },
   { url: "https://feeds.expressen.se/sport/trav/", category: "sport" }, 
   { url: "https://feeds.expressen.se/sport/tennis/", category: "tennis" },
@@ -130,6 +130,7 @@ type Article = {
   date: string;
   source: string;
   image: string | null;
+  articleType?: string;
 };
 async function parseFeed(url: string) {
   const response = await fetch(url, {
@@ -204,6 +205,7 @@ const feeds =
               feedResult.value.title ??
               "",
             image: extractImage(item),
+            articleType: feed.articleType,
           }))
           .filter(article => {
             const date = new Date(
