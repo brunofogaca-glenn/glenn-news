@@ -373,6 +373,10 @@ export default async function Home() {
           </section>
         )}
 
+        {elfsborg && (
+          <QuoteDivider sectionKey="elfsborg" index={0} />
+        )}
+
         <div className="mt-9 grid gap-9">
           {otherSections.map((section, sectionIndex) => (
             <div key={section.key}>
