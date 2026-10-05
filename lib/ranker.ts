@@ -230,7 +230,7 @@ function calculateReadingScore(
   article: Article
 ) {
   const text =
-    `\${article.title} \${article.description ?? ""}`.toLowerCase();
+    (article.title + " " + (article.description ?? "")).toLowerCase();
 
   let score = 30;
 
