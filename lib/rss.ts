@@ -150,7 +150,7 @@ function isTravArticle(article: {
   ].some(term => text.includes(term));
 }
 
-type Article = {
+export type Article = {
   title: string;
   description: string;
   link: string;
@@ -181,7 +181,7 @@ export async function parseFeed(url: string) {
 
   return parser.parseString(xml);
 }
-export async function getArticles() {
+export async function getArticles(daysBack = 1) {
   const result = {
     elfsborg: [] as Article[],
     boras: [] as Article[],
@@ -194,9 +194,9 @@ export async function getArticles() {
     livsstil: [] as Article[],
   };
 
-  const yesterday =
+  const cutoff =
     Date.now() -
-    24 * 60 * 60 * 1000;
+    daysBack * 24 * 60 * 60 * 1000;
 
 const [feeds, webArticles] =
   await Promise.all([
@@ -244,7 +244,7 @@ const [feeds, webArticles] =
 
             return (
               !isNaN(date) &&
-              date > yesterday
+              date > cutoff
             );
           })
           .sort((a, b) => {
@@ -300,7 +300,7 @@ const [feeds, webArticles] =
           !article.title ||
           !article.link ||
           isNaN(date) ||
-          date <= yesterday ||
+          date <= cutoff ||
           seen.has(article.link)
         ) {
           return;
