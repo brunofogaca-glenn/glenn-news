@@ -3,11 +3,14 @@
 import { revalidateTag } from "next/cache";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { addWeeklyReadLink } from "@/lib/weeklyRead";
+import { getCachedEditionMeta } from "@/lib/editionMeta";
 
 export async function refreshNews() {
   revalidateTag("glenn-news-articles", { expire: 0 });
   await getCachedArticles();
-  return { refreshedAt: new Date().toISOString() };
+  revalidateTag("glenn-news-edition-meta", { expire: 0 });
+  const editionMeta = await getCachedEditionMeta();
+  return { refreshedAt: editionMeta.updatedAt };
 }
 
 
