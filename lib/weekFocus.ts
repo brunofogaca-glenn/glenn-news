@@ -22,7 +22,11 @@ export type WeeklyFocus = {
   periodEnd: string;
 };
 
-function inferArticleType(article: Article) {
+function inferArticleType(article: {
+  title: string;
+  description?: string;
+  articleType?: string;
+}) {
   if (article.articleType) return article.articleType;
 
   const text = (article.title + " " + (article.description ?? "")).toLowerCase();
