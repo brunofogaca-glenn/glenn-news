@@ -297,6 +297,7 @@ export function rankArticles(
         ...article,
         score,
         mentions,
+        uniqueSources,
         topic:
           cluster?.topic ??
           article.title,
