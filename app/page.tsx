@@ -9,6 +9,7 @@ import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedWeather } from "@/lib/weather";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { SportDayPanel } from "./components/SportDayPanel";
+import { QuoteDivider } from "./components/QuoteDivider";
 
 export const dynamic = "force-dynamic";
 
@@ -373,11 +374,11 @@ export default async function Home() {
         )}
 
         <div className="mt-9 grid gap-9">
-          {otherSections.map(section => (
-            <section
-              key={section.key}
-              className="border-b-2 border-slate-950 pb-9"
-            >
+          {otherSections.map((section, sectionIndex) => (
+            <div key={section.key}>
+              <section
+                className="border-b-2 border-slate-950 pb-9"
+              >
               <div className="mb-4 flex items-end justify-between gap-4 border-b border-slate-300 pb-2">
                 <div>
                   <div
@@ -471,7 +472,14 @@ export default async function Home() {
                   </div>
                 ))}
               </div>
-            </section>
+              </section>
+              {sectionIndex < otherSections.length - 1 && (
+                <QuoteDivider
+                  sectionKey={section.key}
+                  index={sectionIndex}
+                />
+              )}
+            </div>
           ))}
         </div>
 
