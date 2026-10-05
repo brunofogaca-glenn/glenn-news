@@ -415,7 +415,7 @@ async function enrichElfsborg(
   }
 }
 
-async function fetchSportDay(): Promise<SportDayData> {
+export async function fetchSportDay(): Promise<SportDayData> {
   if (!process.env.API_FOOTBALL_KEY) {
     return { results: [], upcoming: [], provider: { apiFootball: false, sportmonks: false }, fetchedAt: new Date().toISOString() };
   }
@@ -488,11 +488,3 @@ async function fetchSportDay(): Promise<SportDayData> {
   }
 }
 
-export const getCachedSportDay = unstable_cache(
-  async () => fetchSportDay(),
-  ["glenn-news-sport-day-v1"],
-  {
-    revalidate: 60 * 60,
-    tags: ["glenn-news-sport-day"],
-  }
-);
