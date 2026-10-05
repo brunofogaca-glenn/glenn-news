@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { getCachedArticles } from "@/lib/articlesCache";
+import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 
 export const dynamic = "force-dynamic";
 
@@ -63,11 +64,15 @@ export async function GET(request: Request) {
   revalidateTag("glenn-news-articles", { expire: 0 });
   const news = await getCachedArticles();
 
+  revalidateTag("glenn-news-feed-health", { expire: 0 });
+  const feedHealth = await getCachedFeedHealth();
+
   return Response.json({
     ok: true,
     refreshed: true,
     localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
     refreshedAt: now.toISOString(),
     totalArticles: totalArticles(news),
+    feedHealth: feedHealth.totals,
   });
 }
