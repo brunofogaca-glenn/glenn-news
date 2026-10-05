@@ -6,6 +6,7 @@ import { getReaderProfile } from "@/lib/readerProfile";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
+import { getCachedWeather } from "@/lib/weather";
 
 export const dynamic = "force-dynamic";
 
@@ -69,12 +70,13 @@ function ArticleImage({
 }
 
 export default async function Home() {
-  const [news, profile, feedHealth, editionMeta, dailyHeader] = await Promise.all([
+  const [news, profile, feedHealth, editionMeta, dailyHeader, weather] = await Promise.all([
     getCachedArticles(),
     getReaderProfile(),
     getCachedFeedHealth(),
     getCachedEditionMeta(),
     getDailyHeaderInfo(),
+    getCachedWeather(),
   ]);
 
   const articleBuckets = {
@@ -195,6 +197,59 @@ export default async function Home() {
           <span>07:01 · Din edition</span>
           <span>{profile.totalClicks} lästa länkar · redaktören lär sig</span>
         </div>
+
+        {weather.days.length > 0 && (
+          <section className="mt-7 border-y border-slate-300 py-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                Väder · Borås
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 md:min-w-[520px]">
+                {weather.days.map(day => (
+                  <div
+                    key={day.date}
+                    className="flex items-center justify-between border-l-2 border-slate-950 pl-4"
+                  >
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                        {day.label}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-2xl" aria-hidden="true">
+                          {day.weatherCode === 0 || day.weatherCode === 1
+                            ? "☀"
+                            : day.weatherCode === 2
+                              ? "⛅"
+                              : day.weatherCode === 3
+                                ? "☁"
+                                : day.weatherCode >= 71 && day.weatherCode <= 77
+                                  ? "❄"
+                                  : day.weatherCode >= 95
+                                    ? "⛈"
+                                    : "🌧"}
+                        </span>
+                        <div>
+                          <div className="font-serif text-lg font-black">
+                            {day.maxTemp}° / {day.minTemp}°
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {day.description}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right text-xs leading-5 text-slate-500">
+                      <div>Regnrisk {day.precipitationProbability}%</div>
+                      <div>{day.precipitationMm} mm · {day.windKmh} km/h</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="mt-7 border-b-2 border-slate-950 pb-7 md:mt-9">
           <div className="grid gap-6 md:grid-cols-[1.5fr_0.9fr] md:items-end">
