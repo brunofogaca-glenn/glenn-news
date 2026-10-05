@@ -4,11 +4,20 @@ import { detectCategory } from "./categorizer";
 function extractImageFromContent(
   html: string
 ) {
-  const match = html.match(
-    /<img[^>]+src="([^"]+)"/i
-  );
+  const patterns = [
+    /<img[^>]+(?:src|data-src|data-lazy-src)=["']([^"']+)["']/i,
+    /<img[^>]+(?:src|data-src|data-lazy-src)\\s*=\\s*["']([^"']+)["']/i,
+  ];
 
-  return match?.[1] ?? null;
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 function extractImage(item: any) {
@@ -17,43 +26,36 @@ function extractImage(item: any) {
       return item.enclosure.url;
     }
 
-    const mediaContent =
-      item["media:content"];
+    const mediaContent = item["media:content"];
+    const mediaContentUrl =
+      Array.isArray(mediaContent)
+        ? mediaContent[0]?.$?.url
+        : mediaContent?.$?.url ?? mediaContent?.url;
 
-    if (Array.isArray(mediaContent)) {
-      const url =
-        mediaContent[0]?.$?.url;
-
-      if (url) return url;
+    if (mediaContentUrl) {
+      return mediaContentUrl;
     }
 
-    const mediaThumbnail =
-      item["media:thumbnail"];
+    const mediaThumbnail = item["media:thumbnail"];
+    const mediaThumbnailUrl =
+      Array.isArray(mediaThumbnail)
+        ? mediaThumbnail[0]?.$?.url
+        : mediaThumbnail?.$?.url ?? mediaThumbnail?.url;
 
-    if (Array.isArray(mediaThumbnail)) {
-      const url =
-        mediaThumbnail[0]?.$?.url;
-
-      if (url) return url;
+    if (mediaThumbnailUrl) {
+      return mediaThumbnailUrl;
     }
 
-    if (
-      typeof item["content:encoded"] ===
-      "string"
-    ) {
-      const image =
-        extractImageFromContent(
-          item["content:encoded"]
-        );
+    if (typeof item["content:encoded"] === "string") {
+      const image = extractImageFromContent(
+        item["content:encoded"]
+      );
 
       if (image) return image;
     }
 
     if (typeof item.content === "string") {
-      const image =
-        extractImageFromContent(
-          item.content
-        );
+      const image = extractImageFromContent(item.content);
 
       if (image) return image;
     }
