@@ -124,14 +124,14 @@ export default async function Home() {
             <div className="font-serif text-sm md:text-right">
               <div className="capitalize font-bold">{formatDate()}</div>
               <div className="mt-1 text-slate-500">
-                {totalArticles} artiklar från senaste 24 timmarna
+                {totalArticles} artiklar · dagens 07:01-edition
               </div>
             </div>
           </div>
         </header>
 
         <div className="flex items-center justify-between border-b border-slate-400 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
-          <span>Nummer 1 · Din edition</span>
+          <span>07:01 · Din edition</span>
           <span>{profile.totalClicks} lästa länkar · redaktören lär sig</span>
         </div>
 
