@@ -18,6 +18,7 @@ type Article = {
   date?: string;
   link?: string;
   image?: string | null;
+  articleType?: string;
   score?: number;
   mentions?: number;
   uniqueSources?: number;
@@ -54,6 +55,10 @@ const ARTICLE_TYPES = [
 function inferArticleType(
   article: Article
 ): string {
+  if (article.articleType) {
+    return article.articleType;
+  }
+
   const text = (
     `${article.title} ${article.description ?? ""}`
   ).toLowerCase();
@@ -404,10 +409,7 @@ export async function createEditorialSection(
       stories: mainStory
         ? [mainStory]
         : [],
-      allArticles:
-        await ensureImages(
-          allArticles
-        ),
+      allArticles,
     };
   }
 
