@@ -5,8 +5,7 @@ function extractImageFromContent(
   html: string
 ) {
   const patterns = [
-    /<img[^>]+(?:src|data-src|data-lazy-src)=["']([^"']+)["']/i,
-    /<img[^>]+(?:src|data-src|data-lazy-src)\\s*=\\s*["']([^"']+)["']/i,
+    /<(?:img|source)[^>]+(?:src|data-src|data-lazy-src|srcset)=["']([^"']+)["']/i,
   ];
 
   for (const pattern of patterns) {
