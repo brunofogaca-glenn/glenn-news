@@ -8,7 +8,7 @@ type WebArticle = {
   articleType?: string;
 };
 
-type WebSourceConfig = {
+export type WebSourceConfig = {
   url: string;
   domain: string;
   category:
@@ -25,7 +25,7 @@ type WebSourceConfig = {
   defaultArticleType?: string;
 };
 
-const WEB_SOURCES: WebSourceConfig[] = [
+export const WEB_SOURCES: WebSourceConfig[] = [
   {
     url: "https://www.fotbollskanalen.se/lag/if-elfsborg-herr",
     domain: "www.fotbollskanalen.se",
@@ -259,7 +259,7 @@ function extractArticles(html: string, source: WebSourceConfig) {
   return results;
 }
 
-async function fetchWebSource(source: WebSourceConfig) {
+export async function fetchWebSource(source: WebSourceConfig) {
   const response = await fetch(source.url, {
     signal: AbortSignal.timeout(10000),
     headers: {
