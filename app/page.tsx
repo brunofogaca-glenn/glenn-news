@@ -4,6 +4,8 @@ import { createEditorialSection, createSportEditorialSection } from "@/lib/edito
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getReaderProfile } from "@/lib/readerProfile";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
+import { getCachedEditionMeta } from "@/lib/editionMeta";
+import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -67,10 +69,12 @@ function ArticleImage({
 }
 
 export default async function Home() {
-  const [news, profile, feedHealth] = await Promise.all([
+  const [news, profile, feedHealth, editionMeta, dailyHeader] = await Promise.all([
     getCachedArticles(),
     getReaderProfile(),
     getCachedFeedHealth(),
+    getCachedEditionMeta(),
+    getDailyHeaderInfo(),
   ]);
 
   const articleBuckets = {
@@ -153,8 +157,34 @@ export default async function Home() {
               </div>
               <div>
                 <div className="capitalize font-bold">{formatDate()}</div>
-                <div className="mt-1 text-slate-500">
-                  {totalArticles} artiklar · dagens 07:01-edition
+                <div className="mt-1 text-slate-600">
+                  Namnsdag:{" "}
+                  <span className="font-bold">
+                    {dailyHeader.namedays.length > 0
+                      ? dailyHeader.namedays.join(", ")
+                      : "–"}
+                  </span>
+                </div>
+                {dailyHeader.historicalEvent && (
+                  <div className="mt-2 max-w-xl font-serif text-xs leading-5 text-slate-500 md:max-w-md">
+                    <span className="font-bold uppercase tracking-[0.12em] text-slate-400">
+                      Denna dag i historien · {dailyHeader.historicalEvent.year}
+                    </span>
+                    <span className="ml-1">
+                      {dailyHeader.historicalEvent.text}
+                    </span>
+                  </div>
+                )}
+                <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Uppdaterad {new Intl.DateTimeFormat("sv-SE", {
+                    timeZone: "Europe/Stockholm",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hourCycle: "h23",
+                  }).format(new Date(editionMeta.updatedAt))}
+                  {" · "}
+                  {totalArticles} artiklar
                 </div>
               </div>
             </div>
