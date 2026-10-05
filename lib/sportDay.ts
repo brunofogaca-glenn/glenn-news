@@ -18,6 +18,41 @@ type ApiFootballFixture = {
   }>;
 };
 
+type SportmonksFixture = {
+  id?: number;
+  name?: string;
+  starting_at?: string;
+  result_info?: string;
+  participants?: Array<{
+    id?: number;
+    name?: string;
+    meta?: { location?: "home" | "away" };
+  }>;
+  scores?: Array<{
+    score?: { goals?: number | null };
+    description?: string;
+    participant?: string;
+  }>;
+  events?: Array<{
+    minute?: number;
+    extra_minute?: number | null;
+    player_name?: string;
+    related_player_name?: string | null;
+    participant_id?: number;
+    type_id?: number;
+  }>;
+  statistics?: Array<{
+    type?: string;
+    type_id?: number;
+    location?: "home" | "away";
+    data?: { value?: number | string | null };
+  }>;
+  xgfixture?: Array<{
+    location?: "home" | "away";
+    data?: { value?: number | string | null };
+  }>;
+};
+
 export type SportGoal = {
   minute: string;
   player: string;
@@ -37,7 +72,8 @@ export type SportResult = {
   awayLogo?: string;
   goals: SportGoal[];
   cards: Array<{ minute: string; player: string; team: string; red: boolean }>;
-  source: "API-Football";
+  facts: string[];
+  source: "API-Football" | "Sportmonks";
 };
 
 export type SportUpcoming = {
@@ -50,7 +86,7 @@ export type SportUpcoming = {
   homeLogo?: string;
   awayLogo?: string;
   importance: number;
-  source: "API-Football";
+  source: "API-Football" | "Sportmonks";
 };
 
 export type SportDayData = {
@@ -220,6 +256,7 @@ function mapFixture(fixture: ApiFootballFixture): SportResult | null {
     awayLogo: fixture.teams?.away?.logo,
     goals,
     cards,
+    facts: [],
     source: "API-Football",
   };
 }
@@ -231,6 +268,151 @@ function isFinished(fixture: ApiFootballFixture) {
 function isWithinLast24Hours(fixture: ApiFootballFixture) {
   const value = new Date(fixture.fixture?.date ?? "").getTime();
   return !isNaN(value) && value >= Date.now() - 24 * 60 * 60 * 1000 && value <= Date.now();
+}
+
+async function sportmonksGet(path: string) {
+  const token = process.env.SPORTMONKS_TOKEN;
+  if (!token) return null;
+
+  const response = await fetch("https://api.sportmonks.com/v3/football" + path, {
+    signal: AbortSignal.timeout(8000),
+    headers: {
+      Authorization: token,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Sportmonks " + response.status + " " + response.statusText);
+  }
+
+  const payload = (await response.json()) as { data?: SportmonksFixture[] | SportmonksFixture };
+  return payload.data ?? null;
+}
+
+async function findElfsborgTeamId() {
+  const data = await sportmonksGet("/teams/search/Elfsborg");
+  if (!Array.isArray(data)) return null;
+
+  const team = data.find(item =>
+    (item.name ?? "").toLowerCase().includes("elfsborg")
+  );
+
+  return team?.id ?? null;
+}
+
+function sportmonksName(fixture: SportmonksFixture, location: "home" | "away") {
+  return fixture.participants?.find(
+    participant => participant.meta?.location === location
+  )?.name;
+}
+
+function sportmonksScore(fixture: SportmonksFixture, location: "home" | "away") {
+  const score = fixture.scores?.find(
+    item => (item.participant ?? "").toLowerCase() === location
+  );
+
+  return typeof score?.score?.goals === "number" ? score.score.goals : null;
+}
+
+function enrichFromSportmonks(
+  result: SportResult,
+  fixture: SportmonksFixture
+) {
+  const goals = (fixture.events ?? [])
+    .filter(event => event.type_id === 14 && event.player_name)
+    .map(event => ({
+      minute:
+        event.extra_minute
+          ? String(event.minute ?? "?") + "+" + String(event.extra_minute)
+          : String(event.minute ?? "?"),
+      player: event.player_name ?? "Okänd",
+      assist: event.related_player_name ?? undefined,
+      team:
+        fixture.participants?.find(participant => participant.id === event.participant_id)?.name ??
+        "",
+    }));
+
+  const homeName = sportmonksName(fixture, "home");
+  const awayName = sportmonksName(fixture, "away");
+  const homeScore = sportmonksScore(fixture, "home");
+  const awayScore = sportmonksScore(fixture, "away");
+
+  const facts: string[] = [];
+
+  if (fixture.xgfixture?.length) {
+    const homeXg = fixture.xgfixture.find(item => item.location === "home")?.data?.value;
+    const awayXg = fixture.xgfixture.find(item => item.location === "away")?.data?.value;
+    if (homeXg !== undefined && awayXg !== undefined) {
+      facts.push("xG " + homeXg + "–" + awayXg);
+    }
+  }
+
+  const possession = fixture.statistics ?? [];
+  const homePossession = possession.find(
+    item =>
+      (item.type ?? "").toLowerCase().includes("possession") &&
+      item.location === "home"
+  )?.data?.value;
+  const awayPossession = possession.find(
+    item =>
+      (item.type ?? "").toLowerCase().includes("possession") &&
+      item.location === "away"
+  )?.data?.value;
+
+  if (homePossession !== undefined && awayPossession !== undefined) {
+    facts.push("bollinnehav " + homePossession + "%–" + awayPossession + "%");
+  }
+
+  return {
+    ...result,
+    home: homeName ?? result.home,
+    away: awayName ?? result.away,
+    homeScore: homeScore ?? result.homeScore,
+    awayScore: awayScore ?? result.awayScore,
+    goals: goals.length > 0 ? goals : result.goals,
+    facts,
+    source: "Sportmonks" as const,
+  };
+}
+
+async function enrichElfsborg(
+  results: SportResult[],
+  startDate: string,
+  endDate: string
+) {
+  if (!process.env.SPORTMONKS_TOKEN) return results;
+
+  try {
+    const teamId = await findElfsborgTeamId();
+    if (!teamId) return results;
+
+    const data = await sportmonksGet(
+      `/fixtures/between/${startDate}/${endDate}/${teamId}?include=participants;scores;events:player_name,related_player_name,minute,extra_minute,participant_id;statistics;xgfixture`
+    );
+
+    if (!Array.isArray(data)) return results;
+
+    return results.map(result => {
+      if (!(result.home + " " + result.away).toLowerCase().includes("elfsborg")) {
+        return result;
+      }
+
+      const match = data.find(fixture => {
+        const home = (sportmonksName(fixture, "home") ?? "").toLowerCase();
+        const away = (sportmonksName(fixture, "away") ?? "").toLowerCase();
+        return (
+          home === result.home.toLowerCase() &&
+          away === result.away.toLowerCase()
+        );
+      });
+
+      return match ? enrichFromSportmonks(result, match) : result;
+    });
+  } catch (error) {
+    console.error("Sportmonks enrichment misslyckades:", error);
+    return results;
+  }
 }
 
 async function fetchSportDay(): Promise<SportDayData> {
@@ -288,8 +470,14 @@ async function fetchSportDay(): Promise<SportDayData> {
       .sort((a, b) => b.importance - a.importance || new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 6);
 
-    return {
+    const enrichedResults = await enrichElfsborg(
       results,
+      localYesterday(),
+      localToday()
+    );
+
+    return {
+      results: enrichedResults,
       upcoming,
       provider: { apiFootball: true, sportmonks: Boolean(process.env.SPORTMONKS_TOKEN) },
       fetchedAt: new Date().toISOString(),
