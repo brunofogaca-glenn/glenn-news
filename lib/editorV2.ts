@@ -347,6 +347,11 @@ ${categoryTitle}
 ARTIKELTYPER:
 Krönika, analys, intervju, reportage, kommentar och annan fördjupning ska normalt väga tyngre för läsning än vanliga nyhetsnotiser.
 
+POÄNGSIGNALER:
+- newsScore uppskattar nyhetsvärde: aktualitet, betydelse, personlig relevans och hur brett en händelse bevakas.
+- readingScore uppskattar läsvärde: fördjupning, perspektiv och sannolikheten att texten är värd Glenns lästid.
+- Använd readingScore extra tydligt när du väljer "Dagens läsning", men låt högt nyhetsvärde vinna när en nyhet är exceptionellt viktig.
+
 GLENNS GRUNDPREFERENSER:
 - Elfsborg ska ha full täckning; materialet ska inte filtreras bort på grund av mängd.
 - I alla andra områden ska Glenn hellre få få riktigt bra texter än många vanliga nyhetsartiklar.
