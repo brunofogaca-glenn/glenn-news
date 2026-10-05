@@ -74,7 +74,13 @@ const parser = new Parser({
   },
 });
 
-const FEEDS = [
+type FeedConfig = {
+  url: string;
+  category: string;
+  articleType?: string;
+};
+
+const FEEDS: FeedConfig[] = [
   { url: "https://www.dn.se/nyheter/sverige/m/rss/senaste-nytt", category: "sverige" },
   { url: "https://www.bt.se/feeds/section/elfsborg/feed.xml", category: "elfsborg" },
   { url: "http://expressen.se/rss/fotboll", category: "fotboll" },
