@@ -444,9 +444,10 @@ export async function createEditorialSection(
       ai.stories[0];
 
     const allArticles =
-      ranked.map((article, index) => ({
-        id: index,
-        ...article,
+      await ensureImages(
+        ranked.map((article, index) => ({
+          id: index,
+          ...article,
         aiSummary:
           article.title ===
           mainStory?.title
@@ -457,9 +458,10 @@ export async function createEditorialSection(
           mainStory?.title
             ? mainStory.selectionReason
             : "",
-        articleType:
-          inferArticleType(article),
-      }));
+          articleType:
+            inferArticleType(article),
+        }))
+      );
 
     return {
       key: categoryKey,
