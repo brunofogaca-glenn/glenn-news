@@ -1,6 +1,8 @@
 import { revalidateTag } from "next/cache";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
+import { getCachedEditionMeta } from "@/lib/editionMeta";
+import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +69,10 @@ export async function GET(request: Request) {
   revalidateTag("glenn-news-feed-health", { expire: 0 });
   const feedHealth = await getCachedFeedHealth();
 
+  revalidateTag("glenn-news-edition-meta", { expire: 0 });
+  const editionMeta = await getCachedEditionMeta();
+  const dailyHeader = await getDailyHeaderInfo();
+
   return Response.json({
     ok: true,
     refreshed: true,
@@ -74,5 +80,7 @@ export async function GET(request: Request) {
     refreshedAt: now.toISOString(),
     totalArticles: totalArticles(news),
     feedHealth: feedHealth.totals,
+    editionUpdatedAt: editionMeta.updatedAt,
+    dailyHeader,
   });
 }
