@@ -159,20 +159,45 @@ export function detectCategory(
     return "varlden";
   }
 
-  // KULTUR
+  // KULTUR / MAT / LIVSSTIL
 
   if (
-    text.includes("spotify") ||
+    text.includes("recension") ||
+    text.includes("recenserar") ||
+    text.includes("betyg") ||
     text.includes("konsert") ||
+    text.includes("spelning") ||
+    text.includes("livegig") ||
+    text.includes("musik") ||
+    text.includes("punk") ||
+    text.includes("rock") ||
+    text.includes("indie") ||
+    text.includes("artist") ||
+    text.includes("album") ||
+    text.includes("singel") ||
+    text.includes("festival") ||
+    text.includes("teater") ||
+    text.includes("film") ||
+    text.includes("bio") ||
+    text.includes("serie") ||
+    text.includes("bok") ||
+    text.includes("författare") ||
+    text.includes("kultur") ||
+    text.includes("spotify") ||
     text.includes("netflix") ||
     text.includes("avantgardet") ||
-    text.includes("indiepop") ||
-    text.includes("festival") ||
     text.includes("melodifestivalen") ||
     text.includes("eurovision") ||
     text.includes("way out west") ||
     text.includes("håkan hellström") ||
-    text.includes("laleh")
+    text.includes("laleh") ||
+    text.includes("restaurang") ||
+    text.includes("krog") ||
+    text.includes("recept") ||
+    text.includes("mat") ||
+    text.includes("bakning") ||
+    text.includes("vin") ||
+    text.includes("öl")
   ) {
     return "livsstil";
   }
