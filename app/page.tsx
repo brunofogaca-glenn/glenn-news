@@ -8,6 +8,8 @@ import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedWeather } from "@/lib/weather";
 import { getCachedSportDay } from "@/lib/sportDayCache";
+import { getCachedMarketDay } from "@/lib/marketDay";
+import { MarketDayPanel } from "./components/MarketDayPanel";
 import { SportDayPanel } from "./components/SportDayPanel";
 import { QuoteDivider } from "./components/QuoteDivider";
 
@@ -82,7 +84,7 @@ function ArticleImage({
 }
 
 export default async function Home() {
-  const [news, profile, feedHealth, editionMeta, dailyHeader, weather, sportDay] = await Promise.all([
+  const [news, profile, feedHealth, editionMeta, dailyHeader, weather, sportDay, marketDay] = await Promise.all([
     getCachedArticles(),
     getReaderProfile(),
     getCachedFeedHealth(),
@@ -90,6 +92,7 @@ export default async function Home() {
     getDailyHeaderInfo(),
     getCachedWeather(),
     getCachedSportDay(),
+    getCachedMarketDay(),
   ]);
 
   const articleBuckets = {
@@ -403,6 +406,12 @@ export default async function Home() {
 
               {section.key === "sport" && (
                 <SportDayPanel data={sportDay} />
+              )}
+
+              {section.key === "ekonomi" && (
+                <div className="mb-6">
+                  <MarketDayPanel data={marketDay} />
+                </div>
               )}
 
               {section.summary && (
