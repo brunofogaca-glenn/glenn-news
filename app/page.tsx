@@ -140,7 +140,7 @@ export default async function Home() {
                 hittade senaste 24 h
               </div>
               <div className="mt-1">
-                {profile.totalClicks} lästa länkar
+                {profile.totalClicks} artikelklick
                 har hittills lärt redaktören känna
                 dig
               </div>
