@@ -43,7 +43,10 @@ function inferArticleType(article: {
   return "nyhet";
 }
 
-function articleCategory(article: Article) {
+function articleCategory(article: {
+  title: string;
+  description?: string;
+}) {
   const text = (article.title + " " + (article.description ?? "")).toLowerCase();
 
   if (/elfsborg|if elfsborg|guligan/.test(text)) return "elfsborg";
