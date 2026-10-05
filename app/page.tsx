@@ -1,371 +1,343 @@
-export const revalidate = 1900;
+import { TrackableLink } from "./components/TrackableLink";
+import { createEditorialSection } from "@/lib/editorV2";
 import { getArticles } from "@/lib/rss";
-import { createCategorySummary } from "@/lib/editor";
+import { getReaderProfile } from "@/lib/readerProfile";
+
+export const dynamic = "force-dynamic";
+
+const CATEGORY_CONFIG = [
+  {
+    key: "elfsborg",
+    title: "🔥 Elfsborg",
+  },
+  {
+    key: "boras",
+    title: "📍 Lokalt",
+  },
+  {
+    key: "sverige",
+    title: "🇸🇪 Sverige",
+  },
+  {
+    key: "varlden",
+    title: "🌍 Världen",
+  },
+  {
+    key: "ekonomi",
+    title: "💼 Ekonomi",
+  },
+  {
+    key: "fotboll",
+    title: "⚽ Fotboll",
+  },
+  {
+    key: "sport",
+    title: "🏅 Övrig sport",
+  },
+  {
+    key: "livsstil",
+    title: "🎭 Kultur, Mat & Livsstil",
+  },
+] as const;
+
+const CATEGORY_COLORS = {
+  elfsborg: "border-yellow-400",
+  boras: "border-orange-400",
+  sverige: "border-blue-500",
+  varlden: "border-green-500",
+  ekonomi: "border-amber-700",
+  fotboll: "border-slate-900",
+  sport: "border-cyan-500",
+  livsstil: "border-pink-500",
+} as const;
+
+function formatDate() {
+  return new Intl.DateTimeFormat(
+    "sv-SE",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }
+  ).format(new Date());
+}
 
 export default async function Home() {
-  const news = await getArticles();
+  const [news, profile] =
+    await Promise.all([
+      getArticles(),
+      getReaderProfile(),
+    ]);
 
-  const categoryConfigs = [
-    {
-      key: "elfsborg",
-      title: "🔥 Elfsborg",
-      articles: news.elfsborg,
-    },
-    {
-      key: "boras",
-      title: "📍 Borås & Sjuhärad",
-      articles: news.boras,
-    },
-    {
-      key: "sverige",
-      title: "🇸🇪 Sverige",
-      articles: news.sverige,
-    },
-    {
-      key: "varlden",
-      title: "🌍 Världen",
-      articles: news.varlden,
-    },
-    {
-      key: "ekonomi",
-      title: "💼 Ekonomi & Näringsliv",
-      articles: news.ekonomi,
-    },
-    {
-      key: "fotboll",
-      title: "⚽ Fotboll",
-      articles: news.fotboll,
-    },
-    {
-      key: "tennis",
-      title: "🎾 Tennis",
-      articles: news.tennis,
-    },
-    {
-      key: "sport",
-      title: "🏅 Övrig sport",
-      articles: news.sport,
-    },
-    {
-      key: "livsstil",
-      title: "🎭 Kultur, Mat & Livsstil",
-      articles: news.livsstil,
-    },
-  ];
-
-  const categoryColors = {
-    elfsborg: "border-t-4 border-yellow-400",
-    boras: "border-t-4 border-orange-400",
-    sverige: "border-t-4 border-blue-500",
-    varlden: "border-t-4 border-green-500",
-    ekonomi: "border-t-4 border-amber-700",
-    fotboll: "border-t-4 border-slate-900",
-    tennis: "border-t-4 border-purple-500",
-    sport: "border-t-4 border-cyan-500",
-    livsstil: "border-t-4 border-pink-500",
+  const articleBuckets = {
+    ...news,
+    sport: [
+      ...news.sport,
+      ...news.tennis,
+    ],
   };
 
-  const totalArticles = categoryConfigs.reduce(
-    (sum, category) => sum + category.articles.length,
-    0
-  );
-
-const summaries = await Promise.all(
-  categoryConfigs.map(category =>
-    createCategorySummary(
-      category.title,
-      category.articles
-    )
-  )
-);
-  
-  const categories = categoryConfigs.map(
-    (category, index) => ({
-      ...category,
-      editor: summaries[index],
-    })
-  );
-
-  const biggestStory =
-    categories.find(
-      category => category.editor?.mainStory
-    )?.editor?.mainStory;
-
-const latestNews = categories
-  .flatMap(category =>
-    category.articles
-  )
-  .filter(
-    (
-      article,
-      index,
-      self
-    ) =>
-      index ===
-      self.findIndex(
-        a =>
-          a.title
-            .toLowerCase()
-            .slice(0, 40) ===
-          article.title
-            .toLowerCase()
-            .slice(0, 40)
+  const sections =
+    await Promise.all(
+      CATEGORY_CONFIG.map(
+        category =>
+          createEditorialSection(
+            category.key,
+            category.title,
+            articleBuckets[
+              category.key
+            ],
+            profile
+          )
       )
-  )
-  .sort(
-    (a, b) =>
-      new Date(
-        b.date
-      ).getTime() -
-      new Date(
-        a.date
-      ).getTime()
-  )
-  .slice(0, 15);
+    );
+
+  const totalArticles =
+    CATEGORY_CONFIG.reduce(
+      (sum, category) =>
+        sum +
+        articleBuckets[
+          category.key
+        ].length,
+      0
+    );
+
+  const elfsborg =
+    sections.find(
+      section =>
+        section.key ===
+        "elfsborg"
+    );
+
+  const otherSections =
+    sections.filter(
+      section =>
+        section.key !==
+        "elfsborg"
+    );
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-200">
-      <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8">
+    <main className="min-h-screen bg-slate-100">
+      <div className="max-w-6xl mx-auto px-4 py-8 md:py-10">
+        <header className="mb-8 md:mb-10">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="text-sm font-bold uppercase tracking-[0.2em] text-orange-500">
+                Personlig morgontidning
+              </div>
+              <h1 className="mt-2 text-5xl md:text-7xl font-black tracking-tight text-slate-950">
+                Glenn News
+              </h1>
+              <p className="mt-3 text-lg md:text-xl text-slate-600">
+                {formatDate()} · redigerad för dig
+              </p>
+            </div>
 
-        <header className="mb-8">
-          <h1 className="text-4xl md:text-6xl font-black tracking-tight">
-            Glenn News
-          </h1>
-
-          <p className="text-slate-500 text-lg mt-3">
-            Din personliga AI-redigerade morgontidning
-          </p>
-
-          <div className="flex flex-wrap gap-4 mt-4 text-sm text-slate-500">
-            <span>
-              {totalArticles} artiklar senaste 24h
-            </span>
-
-            <span>
-              {new Date().toLocaleDateString("sv-SE")}
-            </span>
+            <div className="text-sm text-slate-500 md:text-right">
+              <div>
+                {totalArticles} artiklar
+                hittade senaste 24 h
+              </div>
+              <div className="mt-1">
+                {profile.totalClicks} lästa länkar
+                har hittills lärt redaktören känna
+                dig
+              </div>
+            </div>
           </div>
         </header>
 
-        {biggestStory && (
-          <section className="bg-white rounded-3xl shadow-xl border overflow-hidden mb-10">
-            {biggestStory.image && (
-              <img
-                src={biggestStory.image}
-                alt={biggestStory.title}
-                className="w-full h-56 md:h-[420px] object-cover"
-              />
-            )}
-
-            <div className="p-8">
-              <div className="text-orange-500 font-bold uppercase tracking-widest mb-3">
-                🔥 Dagens största nyhet
+        {elfsborg && (
+          <section className="mb-10 overflow-hidden rounded-3xl border border-yellow-300 bg-white shadow-sm">
+            <div className="border-b border-yellow-100 bg-yellow-50 px-6 py-5">
+              <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-3xl font-black text-slate-950">
+                    🔥 Elfsborg
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Här filtrerar vi inte bort något.
+                    Alla aktuella Elfsborgsartiklar
+                    finns kvar.
+                  </p>
+                </div>
+                <span className="text-sm font-semibold text-slate-500">
+                  {elfsborg.allArticles?.length ?? 0} artiklar
+                </span>
               </div>
+            </div>
 
-              <a
-                href={biggestStory.link}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <h2 className="text-3xl md:text-5xl font-black leading-tight text-slate-900 hover:text-blue-600 transition">
-                  {biggestStory.title}
-                </h2>
-              </a>
+            <div className="divide-y">
+              {elfsborg.allArticles?.map(
+                (article, index) => (
+                  <TrackableLink
+                    key={`${article.link}-${index}`}
+                    href={
+                      article.link ?? "#"
+                    }
+                    category="elfsborg"
+                    articleType={
+                      article.articleType
+                    }
+                    source={
+                      article.source ??
+                      "Okänd källa"
+                    }
+                    topic={
+                      article.topic
+                    }
+                    className="flex gap-4 px-6 py-5 transition hover:bg-slate-50"
+                  >
+                    <div className="w-8 shrink-0 pt-0.5 text-lg font-black text-orange-500">
+                      {index + 1}
+                    </div>
 
-{(biggestStory as any).aiSummary && (
-  <p className="text-lg text-slate-700 mt-4 leading-8">
-    {(biggestStory as any).aiSummary}
-  </p>
-)}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        {article.articleType}
+                        {" · "}
+                        {article.source}
+                      </div>
 
-<div className="text-slate-500 mt-4">
-  {biggestStory.source}
+                      <h3 className="mt-1 text-lg md:text-xl font-bold leading-tight text-slate-950">
+                        {article.title}
+                      </h3>
 
-  {(biggestStory as any).mentions > 1 && (
-    <span className="ml-2 text-orange-500 font-medium">
-      🔥 {(biggestStory as any).mentions} källor
-    </span>
-  )}
-</div>
+                      {article.aiSummary && (
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {article.aiSummary}
+                        </p>
+                      )}
+                    </div>
+                  </TrackableLink>
+                )
+              )}
             </div>
           </section>
         )}
 
-        <div className="grid lg:grid-cols-[320px_1fr] gap-8 items-start">
+        <section className="mb-10 rounded-3xl bg-slate-950 px-6 py-7 text-white md:px-8">
+          <div className="text-sm font-bold uppercase tracking-[0.2em] text-orange-400">
+            AI-redaktören
+          </div>
 
-          <aside className="order-last lg:order-first">
-            <section className="bg-white rounded-3xl p-6 border sticky top-4">
-              <h2 className="text-2xl font-bold mb-5">
-                📰 Senaste nytt
-              </h2>
+          <h2 className="mt-2 text-3xl md:text-4xl font-black">
+            Färre nyheter. Bättre läsning.
+          </h2>
 
-              <div className="space-y-3">
-                {latestNews.map(
-                  (article, index) => (
-                    <a
-                      key={index}
-                      href={article.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block border-b pb-3 hover:text-blue-600"
-                    >
-                      <div className="font-medium text-sm">
-                        {article.title}
-                      </div>
+          <p className="mt-3 max-w-3xl text-base md:text-lg leading-8 text-slate-300">
+            Du får redan dagens stora nyheter som
+            pushnotiser. Därför sammanfattar Glenn News
+            läget kort och väljer sedan två texter per
+            område som redaktören bedömer är mest värda
+            din tid.
+          </p>
+        </section>
 
-                      <div className="text-xs text-slate-500 mt-1">
-                        {article.source}
-                      </div>
-                    </a>
-                  )
-                )}
-              </div>
-            </section>
-          </aside>
-
-          <div className="grid xl:grid-cols-2 gap-8">
-
-            {categories.map(category => (
+        <div className="grid gap-8">
+          {otherSections.map(
+            section => (
               <section
-                key={category.key}
-                className={`bg-white rounded-3xl shadow-sm border overflow-hidden ${
-                  categoryColors[
-                    category.key as keyof typeof categoryColors
-                  ]
-                }`}
+                key={section.key}
+                className={`overflow-hidden rounded-3xl border-t-4 bg-white shadow-sm ${CATEGORY_COLORS[section.key as keyof typeof CATEGORY_COLORS]}`}
               >
-                <div className="p-6">
-
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl md:text-3xl font-bold">
-                      {category.title}
+                <div className="p-6 md:p-8">
+                  <div className="flex items-start justify-between gap-4">
+                    <h2 className="text-2xl md:text-3xl font-black text-slate-950">
+                      {section.title}
                     </h2>
 
-                    <span className="text-sm text-slate-500">
-                      {category.articles.length} artiklar
+                    <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                      2 läsningar
                     </span>
                   </div>
 
-                  {category.editor?.mainStory && (
-                    <a
-                      href={category.editor.mainStory.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block mb-6"
-                    >
-                      {category.editor.mainStory.image ? (
-                        <img
-                          src={
-                            category.editor.mainStory.image
-                          }
-                          alt={
-                            category.editor.mainStory.title
-                          }
-                          className="w-full h-48 md:h-64 object-cover rounded-2xl mb-4"
-                        />
-                      ) : (
-                        <div className="w-full h-64 bg-slate-200 rounded-2xl mb-4 flex items-center justify-center">
-                          Glenn News
-                        </div>
-                      )}
-
-                      <div className="text-xs font-bold uppercase tracking-widest text-orange-500 mb-2">
-                        Huvudstory
+                  {section.summary && (
+                    <div className="mt-5 rounded-2xl bg-slate-50 p-5">
+                      <div className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                        Nyhetsläget
                       </div>
 
-                      <h3 className="text-xl md:text-2xl font-bold leading-tight text-slate-900 hover:text-blue-600 transition">
-  {category.editor.mainStory.title}
-</h3>
-
-{(category.editor.mainStory as any).aiSummary && (
-  <p className="text-slate-700 text-base leading-7 mt-3">
-    {(category.editor.mainStory as any).aiSummary}
-  </p>
-)}
-
-<div className="text-sm text-slate-500 mt-3">
-  {category.editor.mainStory.source}
-
-  {(category.editor.mainStory as any).mentions > 1 && (
-    <span className="ml-2 text-orange-500 font-medium">
-      🔥 {(category.editor.mainStory as any).mentions} källor
-    </span>
-  )}
-</div>
-                    </a>
-                  )}
-
-                  {category.editor?.summary && (
-                    <div className="bg-slate-50 rounded-2xl p-5 mb-6">
-                      <div className="font-semibold mb-2">
-                        Lägesbild
-                      </div>
-
-                      <p className="text-slate-700 text-sm md:text-base leading-7">
-                        {category.editor.summary}
+                      <p className="mt-2 text-base md:text-lg leading-8 text-slate-700">
+                        {section.summary}
                       </p>
                     </div>
                   )}
 
-                  <div className="space-y-4">
-                    {category.editor?.topStories?.map(
-                      (
-                        story: any,
-                        index: number
-                      ) => (
-                        <a
-  key={index}
-  href={story.link}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="flex gap-4 border-b last:border-0 pb-4 hover:text-blue-600 transition"
->
-  <div className="text-orange-500 font-bold text-xl min-w-[30px]">
-    #{index + 1}
-  </div>
+                  <div className="mt-6 grid gap-5 md:grid-cols-2">
+                    {section.stories.map(
+                      (story, index) => (
+                        <TrackableLink
+                          key={`${story.link}-${index}`}
+                          href={
+                            story.link ?? "#"
+                          }
+                          category={
+                            section.key
+                          }
+                          articleType={
+                            story.articleType
+                          }
+                          source={
+                            story.source ??
+                            "Okänd källa"
+                          }
+                          topic={
+                            story.topic
+                          }
+                          className="group rounded-2xl border border-slate-200 p-5 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                        >
+                          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-500">
+                            <span>
+                              #{index + 1}
+                            </span>
+                            <span>·</span>
+                            <span>
+                              {story.articleType}
+                            </span>
+                          </div>
 
-  {story.image ? (
-    <img
-      src={story.image}
-      alt={story.title}
-      className="w-24 h-24 rounded-xl object-cover flex-shrink-0"
-    />
-  ) : (
-    <div className="w-24 h-24 rounded-xl bg-slate-200 flex-shrink-0" />
-  )}
+                          <h3 className="mt-3 text-xl md:text-2xl font-black leading-tight text-slate-950 group-hover:text-orange-600">
+                            {story.title}
+                          </h3>
 
-  <div className="flex-1">
-    <div className="font-medium text-sm md:text-base">
-      {story.title}
-    </div>
+                          {story.aiSummary && (
+                            <p className="mt-3 text-sm md:text-base leading-7 text-slate-600">
+                              {story.aiSummary}
+                            </p>
+                          )}
 
-    {story.aiSummary && (
-      <div className="text-sm text-slate-600 mt-2 leading-6">
-        {story.aiSummary}
-      </div>
-    )}
+                          {story.selectionReason && (
+                            <div className="mt-5 border-t border-slate-100 pt-4">
+                              <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                                Varför Glenn bör läsa
+                              </div>
+                              <p className="mt-1 text-sm leading-6 text-slate-600">
+                                {story.selectionReason}
+                              </p>
+                            </div>
+                          )}
 
-    <div className="text-sm text-slate-500 mt-2">
-      {story.source}
-
-      {story.mentions > 1 && (
-        <span className="ml-2 text-orange-500 font-medium">
-          🔥 {story.mentions} källor
-        </span>
-      )}
-    </div>
-  </div>
-</a>
+                          <div className="mt-4 text-xs text-slate-400">
+                            {story.source}
+                          </div>
+                        </TrackableLink>
                       )
                     )}
                   </div>
-
                 </div>
               </section>
-            ))}
-
-          </div>
+            )
+          )}
         </div>
+
+        <footer className="mt-10 border-t border-slate-200 pt-6 text-sm leading-6 text-slate-500">
+          Glenn News lär sig av vilka texter du väljer
+          att öppna. Enstaka klick ändrar inte hela
+          profilen; mönster över tid ska göra redaktören
+          bättre.
+        </footer>
       </div>
     </main>
   );
