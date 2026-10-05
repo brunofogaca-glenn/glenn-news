@@ -3,6 +3,7 @@ import { TrackableLink } from "./components/TrackableLink";
 import { createEditorialSection, createSportEditorialSection } from "@/lib/editorV2";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getReaderProfile } from "@/lib/readerProfile";
+import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 
 export const dynamic = "force-dynamic";
 
@@ -66,9 +67,10 @@ function ArticleImage({
 }
 
 export default async function Home() {
-  const [news, profile] = await Promise.all([
+  const [news, profile, feedHealth] = await Promise.all([
     getCachedArticles(),
     getReaderProfile(),
+    getCachedFeedHealth(),
   ]);
 
   const articleBuckets = {
@@ -126,9 +128,20 @@ export default async function Home() {
               <div className="flex items-center gap-3">
                 <a
                   href="/health"
-                  className="border border-slate-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-950 hover:text-slate-950"
+                  className={
+                    "inline-flex items-center gap-2 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition " +
+                    (feedHealth.totals.errors > 0
+                      ? "border-red-600 bg-red-50 text-red-700 hover:border-red-800 hover:text-red-900"
+                      : "border-slate-400 text-slate-600 hover:border-slate-950 hover:text-slate-950")
+                  }
                 >
+                  {feedHealth.totals.errors > 0 && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+                  )}
                   Flödesstatus
+                  {feedHealth.totals.errors > 0
+                    ? " · " + feedHealth.totals.errors + " fel"
+                    : ""}
                 </a>
                 <ManualRefreshButton />
               </div>
