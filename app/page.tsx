@@ -1,3 +1,4 @@
+import { ManualRefreshButton } from "./components/ManualRefreshButton";
 import { TrackableLink } from "./components/TrackableLink";
 import { createEditorialSection, createSportEditorialSection } from "@/lib/editorV2";
 import { getCachedArticles } from "@/lib/articlesCache";
@@ -121,10 +122,13 @@ export default async function Home() {
               </h1>
             </div>
 
-            <div className="font-serif text-sm md:text-right">
-              <div className="capitalize font-bold">{formatDate()}</div>
-              <div className="mt-1 text-slate-500">
-                {totalArticles} artiklar · dagens 07:01-edition
+            <div className="flex flex-col items-start gap-3 font-serif text-sm md:items-end md:text-right">
+              <ManualRefreshButton />
+              <div>
+                <div className="capitalize font-bold">{formatDate()}</div>
+                <div className="mt-1 text-slate-500">
+                  {totalArticles} artiklar · dagens 07:01-edition
+                </div>
               </div>
             </div>
           </div>
