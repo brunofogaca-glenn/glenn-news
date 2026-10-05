@@ -139,10 +139,12 @@ function profileForPrompt(
 }
 
 function buildCandidates(
-  articles: Article[]
+  articles: Article[],
+  excludeTrav = false
 ) {
   const filteredArticles =
-    articles.filter(article => {
+    excludeTrav
+      ? articles.filter(article => {
       const text =
         (article.title + " " + (article.description ?? "")).toLowerCase();
 
@@ -160,7 +162,8 @@ function buildCandidates(
         ].some(term => text.includes(term));
 
       return isTrav ? false : true;
-    });
+        })
+      : articles;
 
   const ranked = rankArticles(filteredArticles);
 
@@ -314,7 +317,10 @@ async function runEditorialAI(
   selectCount: number
 ) {
   const candidates =
-    buildCandidates(articles);
+    buildCandidates(
+      articles,
+      categoryKey === "sport"
+    );
 
   if (!candidates.length) {
     return {
