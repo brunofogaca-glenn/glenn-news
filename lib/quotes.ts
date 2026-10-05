@@ -60,6 +60,11 @@ const QUOTES: Quote[] = [
     person: "Graham Potter",
     context: "2018",
   },
+  {
+    text: "Som ledare är du ledare för en grupp bara om människor faktiskt vill följa dig.",
+    person: "Michael Carrick",
+    context: "Manchester United",
+  },
 ];
 
 function dateSeed() {
