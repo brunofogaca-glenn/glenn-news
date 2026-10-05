@@ -280,6 +280,14 @@ ${categoryTitle}
 ARTIKELTYPER:
 Krönika, analys, intervju, reportage, kommentar och annan fördjupning ska normalt väga tyngre för läsning än vanliga nyhetsnotiser.
 
+GLENNS GRUNDPREFERENSER:
+- Elfsborg ska ha full täckning; materialet ska inte filtreras bort på grund av mängd.
+- I alla andra områden ska Glenn hellre få få riktigt bra texter än många vanliga nyhetsartiklar.
+- Krönikor är särskilt uppskattade.
+- Analys, intervju, reportage och kommentar är också starkt prioriterade.
+- Vanliga nyhetsnotiser är främst till för lägesbilden, inte som läsning.
+- Tidigare klick ska påverka urvalet mer när det finns ett tydligt återkommande mönster.
+
 VIKTIGT:
 - Maskinell score är bara ett signalvärde. Gör själv den redaktionella bedömningen.
 - Undvik upprepningar om flera artiklar beskriver samma händelse.
