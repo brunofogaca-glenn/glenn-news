@@ -123,7 +123,15 @@ export default async function Home() {
             </div>
 
             <div className="flex flex-col items-start gap-3 font-serif text-sm md:items-end md:text-right">
-              <ManualRefreshButton />
+              <div className="flex items-center gap-3">
+                <a
+                  href="/health"
+                  className="border border-slate-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-950 hover:text-slate-950"
+                >
+                  Flödesstatus
+                </a>
+                <ManualRefreshButton />
+              </div>
               <div>
                 <div className="capitalize font-bold">{formatDate()}</div>
                 <div className="mt-1 text-slate-500">
