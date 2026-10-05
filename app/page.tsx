@@ -42,6 +42,15 @@ function formatDate() {
   }).format(new Date());
 }
 
+function isWeekend() {
+  const weekday = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    weekday: "short",
+  }).format(new Date());
+
+  return weekday === "lör" || weekday === "sön";
+}
+
 function ArticleImage({
   src,
   alt,
@@ -465,6 +474,39 @@ export default async function Home() {
             </section>
           ))}
         </div>
+
+        <section className="pt-1">
+          <TrackableLink
+            href="/veckofokus"
+            category="veckofokus"
+            articleType="veckofokus"
+            source="Glenn News"
+            topic="Veckofokus"
+            className={
+              "group block border-2 border-slate-950 bg-[#ece7d8] px-5 py-6 transition hover:-translate-y-0.5 hover:bg-white md:px-8 md:py-8 " +
+              (isWeekend() ? "shadow-[8px_8px_0_0_#0f172a]" : "")
+            }
+          >
+            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-orange-700">
+                  {isWeekend() ? "Helgens läsning" : "När veckan är över"}
+                </div>
+                <h2 className="mt-2 font-serif text-3xl font-black leading-none tracking-[-0.03em] md:text-5xl">
+                  {isWeekend() ? "VECKOFOKUS" : "Veckofokus"}
+                </h2>
+                <p className="mt-3 max-w-2xl font-serif text-base leading-7 text-slate-600 md:text-lg">
+                  {isWeekend()
+                    ? "Nu har du tid för det som inte behöver läsas direkt. Här hittar du veckans viktigaste och mest läsvärda texter samlade på ett ställe."
+                    : "När du har mer tid: veckans viktigaste och mest läsvärda texter samlade på ett ställe."}
+                </p>
+              </div>
+              <div className="shrink-0 text-sm font-bold uppercase tracking-[0.16em] text-slate-500 group-hover:text-slate-950">
+                Läs veckofokus →
+              </div>
+            </div>
+          </TrackableLink>
+        </section>
 
         <footer className="pt-6">
           <div className="border-t-2 border-slate-950 pt-4 text-sm leading-6 text-slate-500 md:flex md:justify-between md:gap-8">
