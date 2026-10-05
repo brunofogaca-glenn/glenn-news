@@ -3,6 +3,7 @@ import { getCachedArticles } from "@/lib/articlesCache";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
+import { getCachedSportDay } from "@/lib/sportDayCache";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,9 @@ export async function GET(request: Request) {
   revalidateTag("glenn-news-feed-health", { expire: 0 });
   const feedHealth = await getCachedFeedHealth();
 
+  revalidateTag("glenn-news-sport-day", { expire: 0 });
+  const sportDay = await getCachedSportDay();
+
   revalidateTag("glenn-news-edition-meta", { expire: 0 });
   const editionMeta = await getCachedEditionMeta();
   const dailyHeader = await getDailyHeaderInfo();
@@ -82,5 +86,10 @@ export async function GET(request: Request) {
     feedHealth: feedHealth.totals,
     editionUpdatedAt: editionMeta.updatedAt,
     dailyHeader,
+    sport: {
+      results: sportDay.results.length,
+      upcoming: sportDay.upcoming.length,
+      provider: sportDay.provider,
+    },
   });
 }
