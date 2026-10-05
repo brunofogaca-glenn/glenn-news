@@ -480,7 +480,7 @@ export async function createEditorialSection(
       categoryTitle,
       ranked,
       profile,
-      2
+      4
     );
 
   return {
