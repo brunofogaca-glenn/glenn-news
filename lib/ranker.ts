@@ -232,23 +232,29 @@ function calculateReadingScore(
   const text =
     (article.title + " " + (article.description ?? "")).toLowerCase();
 
+  const articleType =
+    (article.articleType ?? "").toLowerCase();
+
+  const scoringText =
+    articleType + " " + text;
+
   let score = 30;
 
-  if (/krönika|krönikör|kolumn/.test(text)) {
+  if (/krönika|krönikör|kolumn/.test(scoringText)) {
     score = 100;
-  } else if (/analys|expert|därför|bedömer/.test(text)) {
+  } else if (/analys|expert|därför|bedömer/.test(scoringText)) {
     score = 90;
-  } else if (/intervju|intervjuar/.test(text)) {
+  } else if (/intervju|intervjuar/.test(scoringText)) {
     score = 85;
-  } else if (/reportage|på plats|möter|berättar/.test(text)) {
+  } else if (/reportage|på plats|möter|berättar/.test(scoringText)) {
     score = 80;
-  } else if (/kommentar|ledare|opinion/.test(text)) {
+  } else if (/kommentar|ledare|opinion/.test(scoringText)) {
     score = 75;
-  } else if (/recension|recenserar|betyg/.test(text)) {
+  } else if (/recension|recenserar|betyg/.test(scoringText)) {
     score = 70;
-  } else if (/guide|tips|så fungerar/.test(text)) {
+  } else if (/guide|tips|så fungerar/.test(scoringText)) {
     score = 55;
-  } else if (/notis|i korthet/.test(text)) {
+  } else if (/notis|i korthet/.test(scoringText)) {
     score = 15;
   }
 
