@@ -1,6 +1,6 @@
 import { TrackableLink } from "./components/TrackableLink";
 import { createEditorialSection, createSportEditorialSection } from "@/lib/editorV2";
-import { getArticles } from "@/lib/rss";
+import { getCachedArticles } from "@/lib/articlesCache";
 import { getReaderProfile } from "@/lib/readerProfile";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +66,7 @@ function ArticleImage({
 
 export default async function Home() {
   const [news, profile] = await Promise.all([
-    getArticles(),
+    getCachedArticles(),
     getReaderProfile(),
   ]);
 
