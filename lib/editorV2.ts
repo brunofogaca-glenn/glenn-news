@@ -444,7 +444,8 @@ export async function createEditorialSection(
       ai.stories[0];
 
     const allArticles =
-      ranked.map(article => ({
+      ranked.map((article, index) => ({
+        id: index,
         ...article,
         aiSummary:
           article.title ===
