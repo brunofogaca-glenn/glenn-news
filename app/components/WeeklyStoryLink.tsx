@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { markWeeklyRead } from "@/app/actions";
 
 type WeeklyStoryLinkProps = {
   href: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 };
 
