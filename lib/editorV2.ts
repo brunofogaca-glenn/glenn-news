@@ -20,6 +20,8 @@ type Article = {
   image?: string | null;
   articleType?: string;
   score?: number;
+  newsScore?: number;
+  readingScore?: number;
   mentions?: number;
   uniqueSources?: number;
   topic?: string;
@@ -30,6 +32,7 @@ type SelectedStory = Article & {
   aiSummary: string;
   selectionReason: string;
   articleType: string;
+  sportGroup?: "fotboll" | "övrig sport";
 };
 
 export type EditorialSection = {
@@ -161,11 +164,39 @@ function buildCandidates(
 
   const ranked = rankArticles(filteredArticles);
 
+  const rankedByNews =
+    [...ranked].sort(
+      (a, b) =>
+        (b.newsScore ?? b.score ?? 0) -
+        (a.newsScore ?? a.score ?? 0)
+    );
+
+  const rankedByReading =
+    [...ranked].sort(
+      (a, b) =>
+        (b.readingScore ?? 0) -
+        (a.readingScore ?? 0)
+    );
+
   const typed = ranked.map(article => ({
     ...article,
     articleType:
       inferArticleType(article),
   }));
+
+  const typedByNews =
+    rankedByNews.map(article => ({
+      ...article,
+      articleType:
+        inferArticleType(article),
+    }));
+
+  const typedByReading =
+    rankedByReading.map(article => ({
+      ...article,
+      articleType:
+        inferArticleType(article),
+    }));
 
   const preferredTypes = new Set([
     "krönika",
@@ -191,11 +222,15 @@ function buildCandidates(
     selected.push(article);
   }
 
-  typed
+  typedByNews
     .slice(0, 20)
     .forEach(add);
 
-  typed
+  typedByReading
+    .slice(0, 20)
+    .forEach(add);
+
+  typedByReading
     .filter(article =>
       preferredTypes.has(
         article.articleType
@@ -205,7 +240,7 @@ function buildCandidates(
     .forEach(add);
 
   typed
-    .slice(20, 50)
+    .slice(0, 10)
     .forEach(add);
 
   return selected
@@ -221,6 +256,10 @@ function buildCandidates(
       image: article.image ?? null,
       date: article.date ?? "",
       score: article.score ?? 0,
+      newsScore:
+        article.newsScore ?? article.score ?? 0,
+      readingScore:
+        article.readingScore ?? 0,
       mentions: article.mentions ?? 1,
       uniqueSources:
         article.uniqueSources ?? 1,
@@ -432,6 +471,88 @@ ${JSON.stringify(
           })),
     };
   }
+}
+
+function combineSportSummaries(
+  footballSummary: string,
+  otherSummary: string
+) {
+  function firstSentences(value: string) {
+    const sentences =
+      value.match(/[^.!?]+[.!?]+/g) ?? [];
+
+    return sentences
+      .slice(0, 2)
+      .join(" ")
+      .trim();
+  }
+
+  return [
+    firstSentences(footballSummary),
+    firstSentences(otherSummary),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export async function createSportEditorialSection(
+  footballArticles: Article[],
+  otherSportArticles: Article[],
+  profile: ReaderProfile
+): Promise<EditorialSection> {
+  const [footballAI, otherAI] =
+    await Promise.all([
+      runEditorialAI(
+        "fotboll",
+        "Fotboll",
+        footballArticles,
+        profile,
+        4
+      ),
+      runEditorialAI(
+        "sport",
+        "Övrig sport",
+        otherSportArticles,
+        profile,
+        2
+      ),
+    ]);
+
+  const footballStories =
+    footballAI.stories.map(
+      (story, index) => ({
+        ...story,
+        id: index,
+        sportGroup:
+          "fotboll" as const,
+      })
+    );
+
+  const otherStories =
+    otherAI.stories.map(
+      (story, index) => ({
+        ...story,
+        id: 1000 + index,
+        sportGroup:
+          "övrig sport" as const,
+      })
+    );
+
+  const stories =
+    await ensureImages([
+      ...footballStories,
+      ...otherStories,
+    ]);
+
+  return {
+    key: "sport",
+    title: "Sport",
+    summary: combineSportSummaries(
+      footballAI.summary,
+      otherAI.summary
+    ),
+    stories,
+  };
 }
 
 export async function createEditorialSection(
