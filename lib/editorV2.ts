@@ -137,8 +137,57 @@ function profileForPrompt(
 function buildCandidates(
   articles: Article[]
 ) {
-  return rankArticles(articles)
-    .slice(0, 35)
+  const ranked = rankArticles(articles);
+
+  const typed = ranked.map(article => ({
+    ...article,
+    articleType:
+      inferArticleType(article),
+  }));
+
+  const preferredTypes = new Set([
+    "krönika",
+    "analys",
+    "intervju",
+    "reportage",
+    "kommentar",
+  ]);
+
+  const selected: typeof typed = [];
+  const seen = new Set<string>();
+
+  function add(article: typeof typed[number]) {
+    const key =
+      article.link ||
+      article.title;
+
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    selected.push(article);
+  }
+
+  typed
+    .slice(0, 20)
+    .forEach(add);
+
+  typed
+    .filter(article =>
+      preferredTypes.has(
+        article.articleType
+      )
+    )
+    .slice(0, 15)
+    .forEach(add);
+
+  typed
+    .slice(20, 50)
+    .forEach(add);
+
+  return selected
+    .slice(0, 40)
     .map((article, index) => ({
       id: index,
       title: article.title,
@@ -156,7 +205,7 @@ function buildCandidates(
       topic:
         article.topic ?? article.title,
       articleType:
-        inferArticleType(article),
+        article.articleType,
     }));
 }
 
