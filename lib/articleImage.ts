@@ -12,7 +12,7 @@ export async function getOgImage(
 
     const html = await response.text();
     const metaTags =
-      html.match(/<meta\\b[^>]*>/gi) ?? [];
+      html.match(/<meta[^>]*>/gi) ?? [];
 
     for (const tag of metaTags) {
       const propertyMatch =
