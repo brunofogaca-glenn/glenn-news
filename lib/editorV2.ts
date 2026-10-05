@@ -138,7 +138,28 @@ function profileForPrompt(
 function buildCandidates(
   articles: Article[]
 ) {
-  const ranked = rankArticles(articles);
+  const filteredArticles =
+    articles.filter(article => {
+      const text =
+        (article.title + " " + (article.description ?? "")).toLowerCase();
+
+      const isTrav =
+        [
+          "trav",
+          "v75",
+          "v86",
+          "atg",
+          "kusk",
+          "travhäst",
+          "travlopp",
+          "sulkylopp",
+          "riks toto",
+        ].some(term => text.includes(term));
+
+      return isTrav ? false : true;
+    });
+
+  const ranked = rankArticles(filteredArticles);
 
   const typed = ranked.map(article => ({
     ...article,
@@ -288,6 +309,7 @@ GLENNS GRUNDPREFERENSER:
 - Analys, intervju, reportage och kommentar är också starkt prioriterade.
 - Vanliga nyhetsnotiser är främst till för lägesbilden, inte som läsning.
 - Tidigare klick ska påverka urvalet mer när det finns ett tydligt återkommande mönster.
+- Trav och hästkapplöpning ska normalt inte väljas till Övrig sport. Prioritera tennis och andra sporter framför trav.
 
 VIKTIGT:
 - Maskinell score är bara ett signalvärde. Gör själv den redaktionella bedömningen.
