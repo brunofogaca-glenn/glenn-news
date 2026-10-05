@@ -26,6 +26,7 @@ type Article = {
 };
 
 type SelectedStory = Article & {
+  id: number;
   aiSummary: string;
   selectionReason: string;
   articleType: string;
