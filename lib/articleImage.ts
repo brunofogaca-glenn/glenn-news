@@ -15,17 +15,12 @@ export async function getOgImage(
       html.match(/<meta[^>]*>/gi) ?? [];
 
     for (const tag of metaTags) {
-      const propertyMatch =
-        tag.match(
-          /(?:property|name)=[\"']([^\"']+)[\"']/i
+      const isImageMeta =
+        /(?:property|name)=[\"'](?:og:image|twitter:image)[\"']/i.test(
+          tag
         );
 
-      if (
-        !propertyMatch ||
-        !/^(og:image|twitter:image)$/i.test(
-          propertyMatch[1]
-        )
-      ) {
+      if (!isImageMeta) {
         continue;
       }
 
