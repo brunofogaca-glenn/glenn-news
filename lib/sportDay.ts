@@ -270,10 +270,20 @@ function isWithinLast24Hours(fixture: ApiFootballFixture) {
   return !isNaN(value) && value >= Date.now() - 24 * 60 * 60 * 1000 && value <= Date.now();
 }
 
-function isSwedenSeniorFixture(fixture: ApiFootballFixture) {
-  const home = fixture.teams?.home?.name?.trim().toLowerCase();
-  const away = fixture.teams?.away?.name?.trim().toLowerCase();
-  return home === "sweden" || away === "sweden";
+function isPreferredFixture(fixture: ApiFootballFixture) {
+  const teams = [
+    fixture.teams?.home?.name?.trim().toLowerCase() ?? "",
+    fixture.teams?.away?.name?.trim().toLowerCase() ?? "",
+  ];
+
+  const preferredTeams = [
+    "sweden",
+    ...IMPORTANT_TEAMS,
+  ];
+
+  return preferredTeams.some(preferred =>
+    teams.some(team => team === preferred || team.includes(preferred))
+  );
 }
 
 async function sportmonksGet(path: string) {
@@ -438,7 +448,7 @@ export async function fetchSportDay(): Promise<SportDayData> {
       fixture =>
         !isFinished(fixture) &&
         new Date(fixture.fixture?.date ?? "").getTime() > Date.now() &&
-        isSwedenSeniorFixture(fixture)
+        isPreferredFixture(fixture)
     );
 
     const detailIds = recentFixtures
