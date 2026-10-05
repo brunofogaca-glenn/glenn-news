@@ -190,6 +190,16 @@ function parsePublishedDate(context: string, now = new Date()) {
   return parsed.toISOString();
 }
 
+function cleanTitle(value: string) {
+  return value
+    .replace(
+      /^(?:idag|i går|\d{1,2}\s+(?:januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december))\s*(?:\d{1,2}[.:]\d{2})?\s*(?:krönika|ledare|kolumn|min ekonomi)?\s*/i,
+      ""
+    )
+    .replace(/^\s+|\s+$/g, "")
+    .trim();
+}
+
 function inferArticleType(context: string, fallback?: string) {
   const clean = stripTags(context).toLowerCase();
 
@@ -216,7 +226,9 @@ function extractArticles(html: string, source: WebSourceConfig) {
 
     if (!href || !isArticleUrl(href, source)) continue;
 
-    const title = stripTags(match[2]);
+    const title = cleanTitle(
+      stripTags(match[2])
+    );
 
     if (
       !title ||
