@@ -1,5 +1,5 @@
 import { TrackableLink } from "./components/TrackableLink";
-import { createEditorialSection } from "@/lib/editorV2";
+import { createEditorialSection, createSportEditorialSection } from "@/lib/editorV2";
 import { getArticles } from "@/lib/rss";
 import { getReaderProfile } from "@/lib/readerProfile";
 
@@ -11,8 +11,7 @@ const CATEGORY_CONFIG = [
   { key: "sverige", title: "Sverige" },
   { key: "varlden", title: "Världen" },
   { key: "ekonomi", title: "Ekonomi" },
-  { key: "fotboll", title: "Fotboll" },
-  { key: "sport", title: "Övrig sport" },
+  { key: "sport", title: "Sport" },
   { key: "livsstil", title: "Kultur, Mat & Livsstil" },
 ] as const;
 
@@ -73,17 +72,30 @@ export default async function Home() {
 
   const articleBuckets = {
     ...news,
-    sport: [...news.sport, ...news.tennis],
+    sport: [
+      ...news.fotboll,
+      ...news.sport,
+      ...news.tennis,
+    ],
   };
 
   const sections = await Promise.all(
     CATEGORY_CONFIG.map(category =>
-      createEditorialSection(
-        category.key,
-        category.title,
-        articleBuckets[category.key],
-        profile
-      )
+      category.key === "sport"
+        ? createSportEditorialSection(
+            news.fotboll,
+            [
+              ...news.sport,
+              ...news.tennis,
+            ],
+            profile
+          )
+        : createEditorialSection(
+            category.key,
+            category.title,
+            articleBuckets[category.key],
+            profile
+          )
     )
   );
 
@@ -250,7 +262,9 @@ export default async function Home() {
                   </h2>
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  4 texter
+                  {section.key === "sport"
+                    ? "6 texter · 4 fotboll · 2 övrig sport"
+                    : "4 texter"}
                 </span>
               </div>
 
@@ -267,48 +281,62 @@ export default async function Home() {
 
               <div className="mt-6 grid gap-6 md:grid-cols-2">
                 {section.stories.map((story, index) => (
-                  <TrackableLink
+                  <div
                     key={String(story.link ?? "") + "-" + String(index)}
-                    href={story.link ?? "#"}
-                    category={section.key}
-                    articleType={story.articleType}
-                    source={story.source ?? "Okänd källa"}
-                    topic={story.topic}
-                    className="group overflow-hidden border-b border-slate-300 pb-6"
+                    className="contents"
                   >
-                    <div className="overflow-hidden bg-slate-200">
-                      <ArticleImage
-                        src={story.image}
-                        alt={story.title}
-                      />
-                    </div>
+                    {section.key === "sport" && index === 4 && (
+                      <div className="col-span-full mt-3 border-y border-slate-300 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-700">
+                        Övrig sport · 2 texter
+                      </div>
+                    )}
 
-                    <div className="pt-4">
-                      <div
-                        className={"text-[10px] font-bold uppercase tracking-[0.18em] " + CATEGORY_ACCENTS[section.key as keyof typeof CATEGORY_ACCENTS]}
-                      >
-                        {index + 1 === 1 ? "Dagens läsning" : "Också läsvärd"} ·{" "}
-                        {story.articleType}
+                    <TrackableLink
+                      href={story.link ?? "#"}
+                      category={section.key}
+                      articleType={story.articleType}
+                      source={story.source ?? "Okänd källa"}
+                      topic={story.topic}
+                      className="group overflow-hidden border-b border-slate-300 pb-6"
+                    >
+                      <div className="overflow-hidden bg-slate-200">
+                        <ArticleImage
+                          src={story.image}
+                          alt={story.title}
+                        />
                       </div>
 
-                      <h3 className="mt-2 font-serif text-2xl font-black leading-tight tracking-[-0.015em] md:text-3xl group-hover:underline">
-                        {story.title}
-                      </h3>
+                      <div className="pt-4">
+                        <div
+                          className={"text-[10px] font-bold uppercase tracking-[0.18em] " + CATEGORY_ACCENTS[section.key as keyof typeof CATEGORY_ACCENTS]}
+                        >
+                          {section.key === "sport"
+                            ? story.sportGroup
+                            : index === 0
+                              ? "Dagens läsning"
+                              : "Också läsvärd"}{" "}
+                          · {story.articleType}
+                        </div>
 
-                      {story.aiSummary && (
-                        <p className="mt-3 font-serif text-base leading-7 text-slate-600">
-                          {story.aiSummary}
-                        </p>
-                      )}
+                        <h3 className="mt-2 font-serif text-2xl font-black leading-tight tracking-[-0.015em] md:text-3xl group-hover:underline">
+                          {story.title}
+                        </h3>
 
-                      <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        <span>{story.source}</span>
-                        <span className="group-hover:text-slate-700">
-                          Läs →
-                        </span>
+                        {story.aiSummary && (
+                          <p className="mt-3 font-serif text-base leading-7 text-slate-600">
+                            {story.aiSummary}
+                          </p>
+                        )}
+
+                        <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                          <span>{story.source}</span>
+                          <span className="group-hover:text-slate-700">
+                            Läs →
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </TrackableLink>
+                    </TrackableLink>
+                  </div>
                 ))}
               </div>
             </section>
