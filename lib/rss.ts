@@ -1,5 +1,6 @@
 import Parser from "rss-parser";
 import { detectCategory } from "./categorizer";
+import { getWebArticles } from "./webSources";
 
 function extractImageFromContent(
   html: string
@@ -178,12 +179,15 @@ export async function getArticles() {
     Date.now() -
     24 * 60 * 60 * 1000;
 
-const feeds =
-  await Promise.allSettled(
-    FEEDS.map(feed =>
-      parseFeed(feed.url)
-    )
-  );
+const [feeds, webArticles] =
+  await Promise.all([
+    Promise.allSettled(
+      FEEDS.map(feed =>
+        parseFeed(feed.url)
+      )
+    ),
+    getWebArticles(),
+  ]);
 
   feeds.forEach(
     (feedResult, index) => {
@@ -250,6 +254,45 @@ const feeds =
       });
     }
   );
+
+  const seen = new Set<string>();
+
+  Object.values(result).forEach(articles => {
+    articles.forEach(article => {
+      if (article.link) {
+        seen.add(article.link);
+      }
+    });
+  });
+
+  (Object.keys(webArticles) as Array<keyof typeof webArticles>).forEach(
+    category => {
+      webArticles[category].forEach(article => {
+        const date = new Date(article.date).getTime();
+
+        if (
+          !article.title ||
+          !article.link ||
+          isNaN(date) ||
+          date <= yesterday ||
+          seen.has(article.link)
+        ) {
+          return;
+        }
+
+        seen.add(article.link);
+        result[category].push(article);
+      });
+    }
+  );
+
+  Object.values(result).forEach(articles => {
+    articles.sort(
+      (a, b) =>
+        new Date(b.date).getTime() -
+        new Date(a.date).getTime()
+    );
+  });
 
   return result;
 }
