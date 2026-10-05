@@ -111,7 +111,6 @@ const FEEDS: FeedConfig[] = [
   { url: "https://feeds.expressen.se/sport/os/", category: "sport" },
   { url: "https://www.offside.org/feed/", category: "fotboll", articleType: "reportage" },
   { url: "https://www.dn.se/musik-rss", category: "livsstil" },
-  { url: "https://feeds.expressen.se/sport/trav/", category: "sport" }, 
   { url: "https://feeds.expressen.se/sport/tennis/", category: "tennis" },
   { url: "https://www.moviezine.se/feed", category: "livsstil" },
   { url: "https://www.transfermarkt.com/rss/news", category: "fotboll" },
@@ -130,6 +129,26 @@ const FEEDS: FeedConfig[] = [
   { url: "https://feeds.expressen.se/noje/", category: "livsstil" },
   { url: "https://www.dn.se/sport/m/rss/senaste-nytt", category: "sport" },
 ];
+
+function isTravArticle(article: {
+  title: string;
+  description?: string;
+}) {
+  const text =
+    (article.title + " " + (article.description ?? "")).toLowerCase();
+
+  return [
+    "trav",
+    "v75",
+    "v86",
+    "atg",
+    "kusk",
+    "travhäst",
+    "travlopp",
+    "sulkylopp",
+    "riks toto",
+  ].some(term => text.includes(term));
+}
 
 type Article = {
   title: string;
@@ -248,6 +267,13 @@ const [feeds, webArticles] =
           detectedCategory ??
           feed.category;
 
+        if (
+          finalCategory === "sport" &&
+          isTravArticle(article)
+        ) {
+          return;
+        }
+
         result[
           finalCategory as keyof typeof result
         ].push(article);
@@ -276,6 +302,13 @@ const [feeds, webArticles] =
           isNaN(date) ||
           date <= yesterday ||
           seen.has(article.link)
+        ) {
+          return;
+        }
+
+        if (
+          category === "sport" &&
+          isTravArticle(article)
         ) {
           return;
         }
