@@ -76,13 +76,13 @@ const parser = new Parser({
   },
 });
 
-type FeedConfig = {
+export type FeedConfig = {
   url: string;
   category: string;
   articleType?: string;
 };
 
-const FEEDS: FeedConfig[] = [
+export const FEEDS: FeedConfig[] = [
   { url: "https://www.dn.se/nyheter/sverige/m/rss/senaste-nytt", category: "sverige" },
   { url: "https://www.bt.se/feeds/section/elfsborg/feed.xml", category: "elfsborg" },
   { url: "http://expressen.se/rss/fotboll", category: "fotboll" },
@@ -159,7 +159,7 @@ type Article = {
   image: string | null;
   articleType?: string;
 };
-async function parseFeed(url: string) {
+export async function parseFeed(url: string) {
   const response = await fetch(url, {
     signal: AbortSignal.timeout(10000),
     headers: {
