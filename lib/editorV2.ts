@@ -376,8 +376,8 @@ ${JSON.stringify(
         .filter(
           (
             story
-          ): story is SelectedStory =>
-            Boolean(story)
+          ): story is NonNullable<typeof story> =>
+            story !== null
         )
         .slice(0, selectCount);
 
