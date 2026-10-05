@@ -7,6 +7,8 @@ import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedWeather } from "@/lib/weather";
+import { getCachedSportDay } from "@/lib/sportDayCache";
+import { SportDayPanel } from "./components/SportDayPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -70,13 +72,14 @@ function ArticleImage({
 }
 
 export default async function Home() {
-  const [news, profile, feedHealth, editionMeta, dailyHeader, weather] = await Promise.all([
+  const [news, profile, feedHealth, editionMeta, dailyHeader, weather, sportDay] = await Promise.all([
     getCachedArticles(),
     getReaderProfile(),
     getCachedFeedHealth(),
     getCachedEditionMeta(),
     getDailyHeaderInfo(),
     getCachedWeather(),
+    getCachedSportDay(),
   ]);
 
   const articleBuckets = {
@@ -383,6 +386,10 @@ export default async function Home() {
                     : "4 texter"}
                 </span>
               </div>
+
+              {section.key === "sport" && (
+                <SportDayPanel data={sportDay} />
+              )}
 
               {section.summary && (
                 <div className="grid gap-5 border-b border-slate-300 pb-6 md:grid-cols-[0.22fr_1fr]">
