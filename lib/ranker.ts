@@ -7,6 +7,7 @@ type Article = {
   date?: string;
   link?: string;
   image?: string | null;
+  articleType?: string;
 };
 
 const TIER_1 = [
@@ -19,7 +20,6 @@ const TIER_1 = [
   "gyökeres",
   "alexander isak",
   "besfort zeneli",
-  "trav",
   "elitloppet",
   "björn hamberg",
   "borås",
@@ -226,6 +226,42 @@ function calculatePersonalScore(
   return score;
 }
 
+function calculateReadingScore(
+  article: Article
+) {
+  const text =
+    `\${article.title} \${article.description ?? ""}`.toLowerCase();
+
+  let score = 30;
+
+  if (/krönika|krönikör|kolumn/.test(text)) {
+    score = 100;
+  } else if (/analys|expert|därför|bedömer/.test(text)) {
+    score = 90;
+  } else if (/intervju|intervjuar/.test(text)) {
+    score = 85;
+  } else if (/reportage|på plats|möter|berättar/.test(text)) {
+    score = 80;
+  } else if (/kommentar|ledare|opinion/.test(text)) {
+    score = 75;
+  } else if (/recension|recenserar|betyg/.test(text)) {
+    score = 70;
+  } else if (/guide|tips|så fungerar/.test(text)) {
+    score = 55;
+  } else if (/notis|i korthet/.test(text)) {
+    score = 15;
+  }
+
+  const descriptionLength =
+    (article.description ?? "").length;
+
+  return Math.min(
+    120,
+    score +
+      Math.min(20, Math.round(descriptionLength / 120))
+  );
+}
+
 function calculateRecencyScore(
   article: Article
 ) {
@@ -288,14 +324,23 @@ export function rankArticles(
           article
         );
 
-      const score =
+      const newsScore =
         clusterScore +
         personalScore +
         recencyScore;
 
+      const readingScore =
+        calculateReadingScore(article);
+
+      const score =
+        newsScore +
+        readingScore * 0.4;
+
       return {
         ...article,
         score,
+        newsScore,
+        readingScore,
         mentions,
         uniqueSources,
         topic:
