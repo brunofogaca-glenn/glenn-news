@@ -23,8 +23,8 @@ function getLocalClock(date: Date) {
   return { hour, minute };
 }
 
-function totalArticles(news: Record<string, unknown>) {
-  return Object.values(news).reduce((sum, value) => {
+function totalArticles(news: Record<string, unknown>): number {
+  return Object.values(news).reduce<number>((sum, value) => {
     return sum + (Array.isArray(value) ? value.length : 0);
   }, 0);
 }
