@@ -169,6 +169,13 @@ const IMPORTANT_LEAGUES = new Map<string, number>([
 const IMPORTANT_TEAM_PRIORITIES = new Map<string, number>([
   ["if elfsborg", 180],
   ["sweden", 170],
+  ["england", 85],
+  ["spain", 82],
+  ["france", 82],
+  ["italy", 84],
+  ["germany", 80],
+  ["croatia", 78],
+  ["czech republic", 70],
   ["manchester united", 130],
   ["liverpool", 115],
   ["arsenal", 110],
@@ -335,6 +342,13 @@ function normalizeText(value: string) {
 
 const TEAM_ARTICLE_ALIASES: Record<string, string[]> = {
   "sweden": ["sweden", "sverige", "svenska landslaget", "herrlandslaget", "landslaget"],
+  "england": ["england", "engelska landslaget"],
+  "spain": ["spain", "spanien", "spanska landslaget"],
+  "france": ["france", "frankrike", "franska landslaget"],
+  "italy": ["italy", "italien", "italienska landslaget"],
+  "germany": ["germany", "tyskland", "tyska landslaget"],
+  "croatia": ["croatia", "kroatien"],
+  "czech republic": ["czech republic", "czechia", "tjeckien"],
   "if elfsborg": ["if elfsborg", "elfsborg"],
   "manchester united": ["manchester united", "man united", "man utd"],
   "manchester city": ["manchester city", "man city"],
@@ -386,8 +400,13 @@ function teamArticleScore(teamName: string, articleText: string) {
   const aliases = teamArticleAliases(teamName);
   if (!aliases.length) return 0;
 
+  const paddedText = " " + articleText + " ";
+
   return aliases.reduce((score, alias) => {
-    return articleText.includes(normalizeText(alias)) ? score + 1 : score;
+    const normalizedAlias = normalizeText(alias);
+    return paddedText.includes(" " + normalizedAlias + " ")
+      ? score + 1
+      : score;
   }, 0);
 }
 
@@ -557,27 +576,12 @@ export async function fetchSportDay(): Promise<SportDayData> {
 
     const yesterdayFinished = (yesterday ?? []).filter(isFinished);
 
-    const detailIds = yesterdayFinished
-      .filter(fixture => fixture.fixture?.id)
-      .sort(
-        (a, b) =>
-          fixtureImportance(b, articleMentionsFixture(b, sportArticles)) -
-          fixtureImportance(a, articleMentionsFixture(a, sportArticles))
-      )
-      .slice(0, 12)
-      .map(fixture => String(fixture.fixture?.id))
-      .join("-");
+    const relevantYesterday = yesterdayFinished.filter(fixture =>
+      isPreferredFixture(fixture) ||
+      articleMentionsFixture(fixture, sportArticles) > 0
+    );
 
-    let detailed = yesterdayFinished;
-    if (detailIds) {
-      const response = await apiFootballGet("/fixtures", {
-        ids: detailIds,
-        timezone: STOCKHOLM_TIME_ZONE,
-      });
-      if (response) detailed = response;
-    }
-
-    const results = detailed
+    const results = relevantYesterday
       .map(mapFixture)
       .filter((item): item is SportResult => item !== null)
       .sort((a, b) => {
@@ -619,7 +623,7 @@ export async function fetchSportDay(): Promise<SportDayData> {
           );
         return bImportance - aImportance || new Date(b.date).getTime() - new Date(a.date).getTime();
       })
-      .slice(0, 8);
+      .slice(0, 6);
 
     const todayUpcoming = (today ?? []).filter(
       fixture =>
