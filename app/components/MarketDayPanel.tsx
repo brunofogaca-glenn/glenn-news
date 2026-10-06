@@ -5,6 +5,10 @@ function changeLabel(value: number) {
 }
 
 export function MarketDayPanel({ data }: { data: MarketDay }) {
+  if (data.indices.length === 0) {
+    return null;
+  }
+
   const orderedNames = ["Stockholm", "DAX", "S&P 500", "Nasdaq"];
   const ordered = orderedNames
     .map(name => data.indices.find(index => index.name === name))
