@@ -9,6 +9,14 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(value));
+}
+
 export function SportDayPanel({ data }: { data: SportDayData }) {
   if (!data.provider.apiFootball) {
     return (
@@ -28,14 +36,15 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
       <div className="grid gap-6 md:grid-cols-2">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
-            Senaste 24 timmarna
+            Resultat igår
           </div>
+          <div className="mb-1 text-xs text-slate-400">Färdiga matcher från föregående kalenderdag</div>
           <div className="mt-3 space-y-4">
             {data.results.length > 0 ? data.results.slice(0, 4).map(result => (
               <div key={result.id} className="border-b border-slate-200 pb-3 last:border-b-0">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">{result.league}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">{result.league} · {formatDate(result.date)}</div>
                     <div className="mt-1 font-serif text-lg font-black">{result.home} <span className="text-slate-400">–</span> {result.away}</div>
                   </div>
                   <div className="shrink-0 font-serif text-2xl font-black">{result.homeScore}–{result.awayScore}</div>
@@ -51,15 +60,16 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
                 )}
               </div>
             )) : (
-              <p className="font-serif text-sm text-slate-500">Inga utvalda färdiga matcher senaste 24 timmarna.</p>
+              <p className="font-serif text-sm text-slate-500">Inga utvalda resultat från igår.</p>
             )}
           </div>
         </div>
 
         <div className="border-l-0 border-slate-300 md:border-l md:pl-6">
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-700">
-            Dagens matcher
+            Utvalda matcher idag
           </div>
+          <div className="mb-1 text-xs text-slate-400">Prioriterar Elfsborg, Sverige och stora europeiska matcher</div>
           <div className="mt-3 space-y-3">
             {data.upcoming.length > 0 ? data.upcoming.slice(0, 5).map(match => (
               <div key={match.id} className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 last:border-b-0">
