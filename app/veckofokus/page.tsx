@@ -40,7 +40,7 @@ export default async function WeekFocusPage() {
             <div className="text-sm md:text-right">
               <div className="font-bold">{formatDate(focus.periodStart)}–{formatDate(focus.periodEnd)}</div>
               <div className="mt-1 text-slate-500">
-                {focus.stories.length} texter kvar att läsa
+                {focus.editionCount} sparade morgoneditioner · {focus.stories.length} texter kvar att läsa
               </div>
             </div>
           </div>
@@ -131,7 +131,7 @@ export default async function WeekFocusPage() {
         )}
 
         <footer className="pt-6 text-sm leading-6 text-slate-500">
-          Veckofokus bygger just nu på artiklar från de senaste sju dagarna. Nästa steg är att spara morgonens editioner så att veckoredaktören kan använda exakt vad som valdes och sammanfattades varje morgon som historiskt underlag.
+          Veckofokus byggs från Glenn News sparade morgoneditioner. Det betyder att veckoredaktören arbetar med det som faktiskt valdes ut under veckan, medan din lässtatus fortsatt sparas separat i en cookie.
         </footer>
       </div>
     </main>
