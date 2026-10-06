@@ -27,10 +27,10 @@ export type MarketDay = {
 };
 
 const INDICES = [
-  { symbol: "^OMX", name: "Stockholm" },
-  { symbol: "^GDAXI", name: "DAX" },
-  { symbol: "^GSPC", name: "S&P 500" },
-  { symbol: "^IXIC", name: "Nasdaq" },
+  { symbol: "^OMX", name: "Stockholm", timeZone: "Europe/Stockholm" },
+  { symbol: "^GDAXI", name: "DAX", timeZone: "Europe/Berlin" },
+  { symbol: "^GSPC", name: "S&P 500", timeZone: "America/New_York" },
+  { symbol: "^IXIC", name: "Nasdaq", timeZone: "America/New_York" },
 ] as const;
 
 function stockholmDate(date = new Date()) {
@@ -114,7 +114,7 @@ async function fetchAllYahooIndices(cutoffDate: string) {
 
     const timestamps = responseData.timestamp ?? [];
     const closes = responseData.indicators?.quote?.[0]?.close ?? [];
-    const exchangeTimeZone = responseData.meta?.timezone ?? "UTC";
+    const exchangeTimeZone = index.timeZone;
 
     const rows = timestamps
       .map((timestamp, position) => ({
@@ -199,7 +199,7 @@ async function getMarketDayInternal(): Promise<MarketDay> {
 
 const getCachedMarketDayInternal = unstable_cache(
   getMarketDayInternal,
-  ["glenn-news-market-day-v6"],
+  ["glenn-news-market-day-v7"],
   {
     revalidate: 24 * 60 * 60,
     tags: ["glenn-news-market-day"],
