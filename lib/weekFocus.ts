@@ -91,8 +91,15 @@ function buildCandidates(
     }
   }
 
-  const categoryByLink = new Map(
-    stories.map(story => [story.link, story.category])
+  const metadataByLink = new Map(
+    stories.map(story => [
+      story.link,
+      {
+        category: story.category,
+        aiSummary: story.aiSummary,
+        selectionReason: story.selectionReason,
+      },
+    ])
   );
 
   const ranked = rankArticles(stories);
@@ -142,13 +149,13 @@ function buildCandidates(
     title: article.title,
     description: article.description ?? "",
     source: article.source ?? "Okänd källa",
-    category: categoryByLink.get(article.link ?? "") ?? "okänd",
+    category: metadataByLink.get(article.link ?? "")?.category ?? "okänd",
     link: article.link ?? "",
     image: article.image ?? null,
     date: article.date ?? "",
     articleType: article.articleType ?? "nyhet",
-    aiSummary: article.aiSummary ?? "",
-    selectionReason: article.selectionReason ?? "",
+    aiSummary: metadataByLink.get(article.link ?? "")?.aiSummary ?? "",
+    selectionReason: metadataByLink.get(article.link ?? "")?.selectionReason ?? "",
     newsScore: article.newsScore,
     readingScore: article.readingScore,
     topic: article.topic,
