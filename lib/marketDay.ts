@@ -56,15 +56,20 @@ function formatIndexDate(timestamp: number, timeZone: string) {
   }).format(new Date(timestamp * 1000));
 }
 
-type YahooSparkResponse = Record<
-  string,
-  {
-    symbol?: string;
+type YahooSparkResult = {
+  symbol?: string;
+  response?: Array<{
     timestamp?: number[];
-    close?: Array<number | null>;
-    meta?: { timezone?: string };
-  }
->;
+    indicators?: {
+      quote?: Array<{
+        close?: Array<number | null>;
+      }>;
+    };
+    meta?: {
+      timezone?: string;
+    };
+  }>;
+};
 
 async function fetchAllYahooIndices(cutoffDate: string) {
   const symbols = INDICES.map(index => index.symbol).join(",");
@@ -86,26 +91,29 @@ async function fetchAllYahooIndices(cutoffDate: string) {
     throw new Error("Yahoo Finance spark HTTP " + response.status);
   }
 
-  const payload = (await response.json()) as { spark?: { result?: YahooSparkResponse } };
-  const result = payload.spark?.result;
+  const payload = (await response.json()) as {
+    spark?: { result?: YahooSparkResult[] };
+  };
+  const result = payload.spark?.result ?? [];
 
-  if (!result) {
+  if (!result.length) {
     throw new Error("Yahoo Finance spark returned no data");
   }
 
   const markets: Array<MarketIndex & { date: string }> = [];
 
   for (const index of INDICES) {
-    const item = result[index.symbol];
+    const item = result.find(resultItem => resultItem.symbol === index.symbol);
+    const responseData = item?.response?.[0];
 
-    if (!item) {
+    if (!responseData) {
       console.error("Yahoo Finance saknar", index.name);
       continue;
     }
 
-    const timestamps = item.timestamp ?? [];
-    const closes = item.close ?? [];
-    const exchangeTimeZone = item.meta?.timezone ?? "UTC";
+    const timestamps = responseData.timestamp ?? [];
+    const closes = responseData.indicators?.quote?.[0]?.close ?? [];
+    const exchangeTimeZone = responseData.meta?.timezone ?? "UTC";
 
     const rows = timestamps
       .map((timestamp, position) => ({
@@ -185,7 +193,7 @@ async function getMarketDayInternal(): Promise<MarketDay> {
 
 const getCachedMarketDayInternal = unstable_cache(
   getMarketDayInternal,
-  ["glenn-news-market-day-v5"],
+  ["glenn-news-market-day-v6"],
   {
     revalidate: 24 * 60 * 60,
     tags: ["glenn-news-market-day"],
