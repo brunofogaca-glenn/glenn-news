@@ -127,7 +127,7 @@ async function getMarketDayInternal(): Promise<MarketDay> {
 
 const getCachedMarketDayInternal = unstable_cache(
   getMarketDayInternal,
-  ["glenn-news-market-day-v1"],
+  ["glenn-news-market-day-v2"],
   {
     revalidate: 24 * 60 * 60,
     tags: ["glenn-news-market-day"],
