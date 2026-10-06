@@ -43,6 +43,7 @@ function stockholmDate(date = new Date()) {
   const year = parts.find(part => part.type === "year")?.value ?? "0000";
   const month = parts.find(part => part.type === "month")?.value ?? "00";
   const day = parts.find(part => part.type === "day")?.value ?? "00";
+
   return year + "-" + month + "-" + day;
 }
 
@@ -55,125 +56,136 @@ function formatIndexDate(timestamp: number, timeZone: string) {
   }).format(new Date(timestamp * 1000));
 }
 
-async function fetchYahooIndex(
-  symbol: string,
-  name: string,
-  cutoffDate: string
-): Promise<MarketIndex & { date: string }> {
-  const hosts = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
+type YahooSparkResponse = Record<
+  string,
+  {
+    symbol?: string;
+    timestamp?: number[];
+    close?: Array<number | null>;
+    meta?: { timezone?: string };
+  }
+>;
 
-  let lastError: unknown = null;
+async function fetchAllYahooIndices(cutoffDate: string) {
+  const symbols = INDICES.map(index => index.symbol).join(",");
+  const url = new URL("https://query1.finance.yahoo.com/v7/finance/spark");
+  url.searchParams.set("symbols", symbols);
+  url.searchParams.set("range", "1mo");
+  url.searchParams.set("interval", "1d");
 
-  for (const host of hosts) {
-    try {
-      const url = new URL(
-        "https://" + host + "/v8/finance/chart/" + encodeURIComponent(symbol)
-      );
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(10000),
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; Glenn-News/1.0)",
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
 
-      url.searchParams.set("range", "10d");
-      url.searchParams.set("interval", "1d");
-      url.searchParams.set("events", "history");
-
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(10000),
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; Glenn-News/1.0)",
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error("Yahoo Finance " + symbol + " HTTP " + response.status);
-      }
-
-      const payload = (await response.json()) as YahooChart;
-      const result = payload.chart?.result?.[0];
-
-      if (!result) {
-        throw new Error("Yahoo Finance " + symbol + " returned no chart data");
-      }
-
-      const timestamps = result.timestamp ?? [];
-      const closes = result.indicators?.quote?.[0]?.close ?? [];
-      const exchangeTimeZone = result.meta?.timezone ?? "UTC";
-
-      const rows = timestamps
-        .map((timestamp, index) => ({
-          timestamp,
-          date: formatIndexDate(timestamp, exchangeTimeZone),
-          close: closes[index] ?? null,
-        }))
-        .filter(row => row.close != null && row.date < cutoffDate)
-        .sort((a, b) => b.timestamp - a.timestamp);
-
-      const latest = rows[0];
-      const previous = rows[1];
-
-      if (!latest || !previous) {
-        throw new Error("Yahoo Finance " + symbol + " returned fewer than two completed sessions");
-      }
-
-      const latestClose = Number(latest.close);
-      const previousClose = Number(previous.close);
-
-      if (!Number.isFinite(latestClose) || !Number.isFinite(previousClose) || previousClose === 0) {
-        throw new Error("Yahoo Finance " + symbol + " returned invalid closes");
-      }
-
-      return {
-        symbol,
-        name,
-        value: latestClose,
-        changePct: ((latestClose / previousClose) - 1) * 100,
-        date: latest.date,
-      };
-    } catch (error) {
-      lastError = error;
-    }
+  if (!response.ok) {
+    throw new Error("Yahoo Finance spark HTTP " + response.status);
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Kunde inte hämta " + name);
+  const payload = (await response.json()) as { spark?: { result?: YahooSparkResponse } };
+  const result = payload.spark?.result;
+
+  if (!result) {
+    throw new Error("Yahoo Finance spark returned no data");
+  }
+
+  const markets: Array<MarketIndex & { date: string }> = [];
+
+  for (const index of INDICES) {
+    const item = result[index.symbol];
+
+    if (!item) {
+      console.error("Yahoo Finance saknar", index.name);
+      continue;
+    }
+
+    const timestamps = item.timestamp ?? [];
+    const closes = item.close ?? [];
+    const exchangeTimeZone = item.meta?.timezone ?? "UTC";
+
+    const rows = timestamps
+      .map((timestamp, position) => ({
+        timestamp,
+        date: formatIndexDate(timestamp, exchangeTimeZone),
+        close: closes[position] ?? null,
+      }))
+      .filter(row =>
+        row.close != null &&
+        row.date < cutoffDate &&
+        Number.isFinite(Number(row.close))
+      )
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    const latest = rows[0];
+    const previous = rows[1];
+
+    if (!latest || !previous) {
+      console.error("Yahoo Finance saknar två färdiga handelsdagar för", index.name);
+      continue;
+    }
+
+    const latestClose = Number(latest.close);
+    const previousClose = Number(previous.close);
+
+    if (!Number.isFinite(latestClose) || !Number.isFinite(previousClose) || previousClose === 0) {
+      continue;
+    }
+
+    markets.push({
+      symbol: index.symbol,
+      name: index.name,
+      value: latestClose,
+      changePct: ((latestClose / previousClose) - 1) * 100,
+      date: latest.date,
+    });
+  }
+
+  return markets;
 }
 
 async function getMarketDayInternal(): Promise<MarketDay> {
   const cutoffDate = stockholmDate();
-  const successful: Array<MarketIndex & { date: string }> = [];
 
-  // Keep requests sequential: this avoids dropping markets when the public
-  // Yahoo endpoint throttles concurrent requests.
-  for (const index of INDICES) {
-    try {
-      successful.push(
-        await fetchYahooIndex(index.symbol, index.name, cutoffDate)
-      );
-    } catch (error) {
-      console.error("Marketdata misslyckades för", index.name, error);
+  try {
+    const indices = await fetchAllYahooIndices(cutoffDate);
+
+    if (!indices.length) {
+      return {
+        date: cutoffDate,
+        indices: [],
+        source: "Yahoo Finance · historiska stängningar",
+      };
     }
+
+    const date =
+      indices
+        .map(index => index.date)
+        .sort()
+        .at(-1) ?? cutoffDate;
+
+    return {
+      date,
+      indices: indices.map(({ date: _date, ...index }) => index),
+      source: "Yahoo Finance · historiska stängningar",
+    };
+  } catch (error) {
+    console.error("Marketdata misslyckades:", error);
+
+    return {
+      date: cutoffDate,
+      indices: [],
+      source: "Yahoo Finance · historiska stängningar",
+    };
   }
-
-  if (successful.length === 0) {
-    throw new Error("No market indices could be fetched");
-  }
-
-  const date =
-    successful
-      .map(item => item.date)
-      .sort()
-      .at(-1) ?? cutoffDate;
-
-  return {
-    date,
-    indices: successful.map(({ date: _date, ...index }) => index),
-    source: "Yahoo Finance · historiska stängningar",
-  };
 }
 
 const getCachedMarketDayInternal = unstable_cache(
   getMarketDayInternal,
-  ["glenn-news-market-day-v4"],
+  ["glenn-news-market-day-v5"],
   {
     revalidate: 24 * 60 * 60,
     tags: ["glenn-news-market-day"],
