@@ -1,7 +1,5 @@
 import { ManualRefreshButton } from "./components/ManualRefreshButton";
 import { TrackableLink } from "./components/TrackableLink";
-import { createEditorialSection, createSportEditorialSection } from "@/lib/editorV2";
-import { getCachedArticles } from "@/lib/articlesCache";
 import { getReaderProfile } from "@/lib/readerProfile";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { getCachedEditionMeta } from "@/lib/editionMeta";
@@ -9,6 +7,7 @@ import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedWeather } from "@/lib/weather";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
+import { getTodayDailyEdition } from "@/lib/dailyEdition";
 import { MarketDayPanel } from "./components/MarketDayPanel";
 import { SportDayPanel } from "./components/SportDayPanel";
 import { QuoteDivider } from "./components/QuoteDivider";
@@ -84,8 +83,7 @@ function ArticleImage({
 }
 
 export default async function Home() {
-  const [news, profile, feedHealth, editionMeta, dailyHeader, weather, sportDay, marketDay] = await Promise.all([
-    getCachedArticles(),
+  const [profile, feedHealth, editionMeta, dailyHeader, weather, sportDay, marketDay] = await Promise.all([
     getReaderProfile(),
     getCachedFeedHealth(),
     getCachedEditionMeta(),
@@ -95,39 +93,9 @@ export default async function Home() {
     getCachedMarketDay(),
   ]);
 
-  const articleBuckets = {
-    ...news,
-    sport: [
-      ...news.fotboll,
-      ...news.sport,
-      ...news.tennis,
-    ],
-  };
-
-  const sections = await Promise.all(
-    CATEGORY_CONFIG.map(category =>
-      category.key === "sport"
-        ? createSportEditorialSection(
-            news.fotboll,
-            [
-              ...news.sport,
-              ...news.tennis,
-            ],
-            profile
-          )
-        : createEditorialSection(
-            category.key,
-            category.title,
-            articleBuckets[category.key],
-            profile
-          )
-    )
-  );
-
-  const totalArticles = CATEGORY_CONFIG.reduce(
-    (sum, category) => sum + articleBuckets[category.key].length,
-    0
-  );
+  const edition = await getTodayDailyEdition(profile);
+  const sections = edition.sections;
+  const totalArticles = edition.totalArticles;
 
   const elfsborg = sections.find(section => section.key === "elfsborg");
   const otherSections = sections.filter(section => section.key !== "elfsborg");
