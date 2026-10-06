@@ -299,6 +299,20 @@ function isPreferredFixture(fixture: ApiFootballFixture) {
   );
 }
 
+function isRelevantUpcomingFixture(fixture: ApiFootballFixture) {
+  const home = fixture.teams?.home?.name ?? "";
+  const away = fixture.teams?.away?.name ?? "";
+  const leagueScore = IMPORTANT_LEAGUES.get(fixture.league?.name ?? "") ?? 0;
+  const bothTeamsAreImportant =
+    teamPriority(home) > 0 && teamPriority(away) > 0;
+
+  return (
+    isPreferredFixture(fixture) ||
+    ["Allsvenskan", "Svenska Cupen"].includes(fixture.league?.name ?? "") ||
+    (leagueScore >= 82 && bothTeamsAreImportant)
+  );
+}
+
 async function sportmonksGet(path: string) {
   const token = process.env.SPORTMONKS_TOKEN;
   if (!token) return null;
@@ -502,8 +516,7 @@ export async function fetchSportDay(): Promise<SportDayData> {
       fixture =>
         !isFinished(fixture) &&
         new Date(fixture.fixture?.date ?? "").getTime() > Date.now() &&
-        (isPreferredFixture(fixture) ||
-          (IMPORTANT_LEAGUES.get(fixture.league?.name ?? "") ?? 0) >= 82)
+        isRelevantUpcomingFixture(fixture)
     );
 
     const upcoming = todayUpcoming
