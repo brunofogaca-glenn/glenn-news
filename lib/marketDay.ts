@@ -26,22 +26,26 @@ export type MarketDay = {
 };
 
 const INDICES = [
-  { symbol: "^OMXS30", name: "OMXS30" },
+  { symbol: "^OMX", name: "OMX Stockholm 30" },
   { symbol: "^GDAXI", name: "DAX" },
-  { symbol: "^FCHI", name: "CAC 40" },
-  { symbol: "^FTSE", name: "FTSE 100" },
   { symbol: "^GSPC", name: "S&P 500" },
   { symbol: "^IXIC", name: "Nasdaq" },
   { symbol: "^N225", name: "Nikkei 225" },
 ] as const;
 
 function stockholmDate(date = new Date()) {
-  return new Intl.DateTimeFormat("sv-SE", {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(date).split(".").reverse().join("-");
+  }).formatToParts(date);
+
+  const year = parts.find(part => part.type === "year")?.value ?? "0000";
+  const month = parts.find(part => part.type === "month")?.value ?? "00";
+  const day = parts.find(part => part.type === "day")?.value ?? "00";
+
+  return year + "-" + month + "-" + day;
 }
 
 function formatIndexDate(timestamp: number, timeZone: string) {
@@ -112,7 +116,7 @@ async function getMarketDayInternal(): Promise<MarketDay> {
   }
 
   const dates = successful.map(item => item.date);
-  const date = dates.sort()[0];
+  const date = dates.sort().at(-1) ?? stockholmDate();
 
   return {
     date,
