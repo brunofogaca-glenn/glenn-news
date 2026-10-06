@@ -22,15 +22,14 @@ export type MarketIndex = {
 export type MarketDay = {
   date: string;
   indices: MarketIndex[];
-  source: "Yahoo Finance";
+  source: "Nasdaq + Yahoo Finance";
 };
 
-const INDICES = [
-  { symbol: "^OMX", name: "OMX Stockholm 30" },
+const FOREIGN_INDICES = [
   { symbol: "^GDAXI", name: "DAX" },
   { symbol: "^GSPC", name: "S&P 500" },
   { symbol: "^IXIC", name: "Nasdaq" },
-  { symbol: "^N225", name: "Nikkei 225" },
+  { symbol: "^FTSE", name: "FTSE 100" },
 ] as const;
 
 function stockholmDate(date = new Date()) {
@@ -56,6 +55,50 @@ function formatIndexDate(timestamp: number, timeZone: string) {
     day: "2-digit",
   }).format(new Date(timestamp * 1000));
 }
+type NasdaqQuotePayload = {
+  data?: {
+    primaryData?: {
+      lastSalePrice?: string;
+      netChange?: string;
+      percentageChange?: string;
+    };
+  };
+};
+
+async function fetchOmxs30(): Promise<MarketIndex & { date: string }> {
+  const url = "https://api.nasdaq.com/api/quote/basic?symbol=omxs30%7Cindex";
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; Glenn-News/1.0)",
+      Accept: "application/json, text/plain, */*",
+      Referer: "https://www.nasdaq.com/",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Nasdaq OMXS30: HTTP " + response.status);
+  }
+
+  const payload = (await response.json()) as NasdaqQuotePayload;
+  const primary = payload.data?.primaryData;
+  const last = Number(String(primary?.lastSalePrice ?? "").replace(/,/g, ""));
+  const pctText = String(primary?.percentageChange ?? "").replace("%", "").replace(",", ".");
+  const changePct = Number(pctText);
+
+  if (!Number.isFinite(last) || !Number.isFinite(changePct)) {
+    throw new Error("Nasdaq OMXS30: incomplete quote data");
+  }
+
+  return {
+    symbol: "OMXS30",
+    name: "Stockholm",
+    value: last,
+    changePct,
+    date: stockholmDate(),
+  };
+}
+
 
 async function fetchIndex(symbol: string, name: string, cutoffDate: string): Promise<MarketIndex & { date: string }> {
   const url = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`);
@@ -103,9 +146,10 @@ async function fetchIndex(symbol: string, name: string, cutoffDate: string): Pro
 
 async function getMarketDayInternal(): Promise<MarketDay> {
   const cutoffDate = stockholmDate();
-  const results = await Promise.allSettled(
-    INDICES.map(index => fetchIndex(index.symbol, index.name, cutoffDate))
-  );
+  const results = await Promise.allSettled([
+    fetchOmxs30(),
+    ...FOREIGN_INDICES.map(index => fetchIndex(index.symbol, index.name, cutoffDate)),
+  ]);
 
   const successful = results
     .filter((result): result is PromiseFulfilledResult<MarketIndex & { date: string }> => result.status === "fulfilled")
@@ -121,7 +165,7 @@ async function getMarketDayInternal(): Promise<MarketDay> {
   return {
     date,
     indices: successful.map(({ date: _date, ...index }) => index),
-    source: "Yahoo Finance",
+    source: "Nasdaq + Yahoo Finance",
   };
 }
 
