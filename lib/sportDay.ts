@@ -165,36 +165,63 @@ const IMPORTANT_LEAGUES = new Map<string, number>([
   ["Svenska Cupen", 84],
 ]);
 
-const IMPORTANT_TEAMS = [
-  "if elfsborg",
-  "manchester united",
-  "liverpool",
-  "arsenal",
-  "chelsea",
-  "manchester city",
-  "tottenham",
-  "barcelona",
-  "real madrid",
-  "atletico madrid",
-  "roma",
-  "juventus",
-  "inter",
-  "milan",
-  "bayern",
-  "borussia dortmund",
-];
+const IMPORTANT_TEAM_PRIORITIES = new Map<string, number>([
+  ["if elfsborg", 180],
+  ["sweden", 170],
+  ["manchester united", 130],
+  ["liverpool", 115],
+  ["arsenal", 110],
+  ["chelsea", 105],
+  ["manchester city", 105],
+  ["tottenham hotspur", 100],
+  ["barcelona", 110],
+  ["real madrid", 115],
+  ["atletico madrid", 105],
+  ["as roma", 100],
+  ["roma", 100],
+  ["juventus", 105],
+  ["inter", 105],
+  ["inter milan", 105],
+  ["ac milan", 105],
+  ["bayern munich", 105],
+  ["borussia dortmund", 100],
+]);
+
+function normalizeTeamName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function teamPriority(name: string) {
+  const normalized = normalizeTeamName(name);
+  return IMPORTANT_TEAM_PRIORITIES.get(normalized) ?? 0;
+}
 
 function fixtureImportance(fixture: ApiFootballFixture) {
   const leagueName = fixture.league?.name ?? "";
-  const home = (fixture.teams?.home?.name ?? "").toLowerCase();
-  const away = (fixture.teams?.away?.name ?? "").toLowerCase();
-  let score = IMPORTANT_LEAGUES.get(leagueName) ?? 20;
+  const home = fixture.teams?.home?.name ?? "";
+  const away = fixture.teams?.away?.name ?? "";
+  const leagueScore = IMPORTANT_LEAGUES.get(leagueName) ?? 20;
 
-  for (const team of IMPORTANT_TEAMS) {
-    if (home.includes(team) || away.includes(team)) score += 40;
-  }
+  return leagueScore + Math.max(teamPriority(home), teamPriority(away));
+}
 
-  return score;
+function isPreferredTeam(name: string) {
+  return teamPriority(name) > 0;
+}
+
+function isRelevantFixture(fixture: ApiFootballFixture) {
+  const leagueScore = IMPORTANT_LEAGUES.get(fixture.league?.name ?? "") ?? 0;
+  return (
+    isPreferredTeam(fixture.teams?.home?.name ?? "") ||
+    isPreferredTeam(fixture.teams?.away?.name ?? "") ||
+    leagueScore >= 76
+  );
 }
 
 async function apiFootballGet(path: string, params: Record<string, string>) {
@@ -265,24 +292,10 @@ function isFinished(fixture: ApiFootballFixture) {
   return ["FT", "AET", "PEN"].includes(fixture.fixture?.status?.short ?? "");
 }
 
-function isWithinLast24Hours(fixture: ApiFootballFixture) {
-  const value = new Date(fixture.fixture?.date ?? "").getTime();
-  return !isNaN(value) && value >= Date.now() - 24 * 60 * 60 * 1000 && value <= Date.now();
-}
-
 function isPreferredFixture(fixture: ApiFootballFixture) {
-  const teams = [
-    fixture.teams?.home?.name?.trim().toLowerCase() ?? "",
-    fixture.teams?.away?.name?.trim().toLowerCase() ?? "",
-  ];
-
-  const preferredTeams = [
-    "sweden",
-    ...IMPORTANT_TEAMS,
-  ];
-
-  return preferredTeams.some(preferred =>
-    teams.some(team => team === preferred || team.includes(preferred))
+  return (
+    isPreferredTeam(fixture.teams?.home?.name ?? "") ||
+    isPreferredTeam(fixture.teams?.away?.name ?? "")
   );
 }
 
@@ -442,25 +455,26 @@ export async function fetchSportDay(): Promise<SportDayData> {
       apiFootballGet("/fixtures", { date: localToday(), timezone: STOCKHOLM_TIME_ZONE }),
     ]);
 
-    const all = [...(yesterday ?? []), ...(today ?? [])];
-    const recentFixtures = all.filter(fixture => isFinished(fixture) && isWithinLast24Hours(fixture));
-    const todayUpcoming = (today ?? []).filter(
-      fixture =>
-        !isFinished(fixture) &&
-        new Date(fixture.fixture?.date ?? "").getTime() > Date.now() &&
-        isPreferredFixture(fixture)
-    );
+    const yesterdayFinished = (yesterday ?? []).filter(isFinished);
+    const relevantYesterday = yesterdayFinished.filter(isRelevantFixture);
+    const rankedYesterday =
+      relevantYesterday.length > 0
+        ? relevantYesterday
+        : yesterdayFinished;
 
-    const detailIds = recentFixtures
+    const detailIds = rankedYesterday
       .filter(fixture => fixture.fixture?.id)
       .sort((a, b) => fixtureImportance(b) - fixtureImportance(a))
       .slice(0, 12)
       .map(fixture => String(fixture.fixture?.id))
       .join("-");
 
-    let detailed = recentFixtures;
+    let detailed = rankedYesterday;
     if (detailIds) {
-      const response = await apiFootballGet("/fixtures", { ids: detailIds, timezone: STOCKHOLM_TIME_ZONE });
+      const response = await apiFootballGet("/fixtures", {
+        ids: detailIds,
+        timezone: STOCKHOLM_TIME_ZONE,
+      });
       if (response) detailed = response;
     }
 
@@ -468,12 +482,29 @@ export async function fetchSportDay(): Promise<SportDayData> {
       .map(mapFixture)
       .filter((item): item is SportResult => item !== null)
       .sort((a, b) => {
-        const aElf = (a.home + " " + a.away).toLowerCase().includes("elfsborg");
-        const bElf = (b.home + " " + b.away).toLowerCase().includes("elfsborg");
-        if (aElf !== bElf) return aElf ? -1 : 1;
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
+        const aImportance =
+          fixtureImportance({
+            fixture: { date: a.date },
+            league: { name: a.league },
+            teams: { home: { name: a.home }, away: { name: a.away } },
+          });
+        const bImportance =
+          fixtureImportance({
+            fixture: { date: b.date },
+            league: { name: b.league },
+            teams: { home: { name: b.home }, away: { name: b.away } },
+          });
+        return bImportance - aImportance || new Date(b.date).getTime() - new Date(a.date).getTime();
       })
       .slice(0, 8);
+
+    const todayUpcoming = (today ?? []).filter(
+      fixture =>
+        !isFinished(fixture) &&
+        new Date(fixture.fixture?.date ?? "").getTime() > Date.now() &&
+        (isPreferredFixture(fixture) ||
+          (IMPORTANT_LEAGUES.get(fixture.league?.name ?? "") ?? 0) >= 82)
+    );
 
     const upcoming = todayUpcoming
       .map(fixture => ({
