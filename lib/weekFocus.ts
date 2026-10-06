@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import { rankArticles } from "./ranker";
-import { getSavedDailyEditions, type DailyEdition } from "./dailyEdition";
+import {
+  getSavedDailyEditions,
+  getTodayDailyEdition,
+  type DailyEdition,
+} from "./dailyEdition";
 import type { ReaderProfile } from "./readerProfile";
 
 const openai = new OpenAI({
@@ -151,7 +155,13 @@ export async function createWeeklyFocus(
   profile: ReaderProfile,
   readLinks: string[]
 ): Promise<WeeklyFocus> {
-  const editions = await getSavedDailyEditions(7);
+  const todayEdition = await getTodayDailyEdition(profile);
+  const savedEditions = await getSavedDailyEditions(7);
+  const editions =
+    savedEditions.some(edition => edition.dateKey === todayEdition.dateKey)
+      ? savedEditions
+      : [todayEdition, ...savedEditions].slice(0, 7);
+
   const readSet = new Set(readLinks);
   const candidates = buildCandidates(editions, readSet);
 
