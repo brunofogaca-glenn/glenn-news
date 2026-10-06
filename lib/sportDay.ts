@@ -639,7 +639,10 @@ export async function fetchSportDay(): Promise<SportDayData> {
         away: fixture.teams?.away?.name ?? "Bortalag",
         homeLogo: fixture.teams?.home?.logo,
         awayLogo: fixture.teams?.away?.logo,
-        importance: fixtureImportance(fixture),
+        importance: fixtureImportance(
+          fixture,
+          articleMentionsFixture(fixture, sportArticles)
+        ),
         source: "API-Football" as const,
       }))
       .sort((a, b) => b.importance - a.importance || new Date(a.date).getTime() - new Date(b.date).getTime())
