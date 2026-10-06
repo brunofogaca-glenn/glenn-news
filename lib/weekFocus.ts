@@ -91,6 +91,10 @@ function buildCandidates(
     }
   }
 
+  const categoryByLink = new Map(
+    stories.map(story => [story.link, story.category])
+  );
+
   const ranked = rankArticles(stories);
 
   const preferredTypes = new Set([
@@ -138,7 +142,7 @@ function buildCandidates(
     title: article.title,
     description: article.description ?? "",
     source: article.source ?? "Okänd källa",
-    category: article.category ?? "okänd",
+    category: categoryByLink.get(article.link ?? "") ?? "okänd",
     link: article.link ?? "",
     image: article.image ?? null,
     date: article.date ?? "",
