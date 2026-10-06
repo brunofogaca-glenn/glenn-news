@@ -23,6 +23,7 @@ export type MarketDay = {
   date: string;
   indices: MarketIndex[];
   source: "Yahoo Finance · historiska stängningar";
+  error?: string;
 };
 
 const INDICES = [
@@ -166,6 +167,7 @@ async function getMarketDayInternal(): Promise<MarketDay> {
         date: cutoffDate,
         indices: [],
         source: "Yahoo Finance · historiska stängningar",
+        error: "Yahoo Finance returnerade ingen användbar marknadsdata.",
       };
     }
 
@@ -181,12 +183,16 @@ async function getMarketDayInternal(): Promise<MarketDay> {
       source: "Yahoo Finance · historiska stängningar",
     };
   } catch (error) {
-    console.error("Marketdata misslyckades:", error);
+    const message =
+      error instanceof Error ? error.message : "Okänt fel från marknadskällan.";
+
+    console.error("Marketdata misslyckades:", message);
 
     return {
       date: cutoffDate,
       indices: [],
       source: "Yahoo Finance · historiska stängningar",
+      error: message,
     };
   }
 }
