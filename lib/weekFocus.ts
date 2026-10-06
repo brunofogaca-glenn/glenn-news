@@ -1,17 +1,31 @@
 import OpenAI from "openai";
 import { rankArticles } from "./ranker";
-import { getArticles, type Article } from "./rss";
+import { getSavedDailyEditions, type DailyEdition } from "./dailyEdition";
 import type { ReaderProfile } from "./readerProfile";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-type WeeklyStory = Article & {
+type WeeklyCandidate = {
   id: number;
+  title: string;
+  description: string;
+  source: string;
+  category: string;
+  link: string;
+  image: string | null;
+  date: string;
   articleType: string;
   aiSummary: string;
   selectionReason: string;
+  newsScore?: number;
+  readingScore?: number;
+  topic?: string;
+};
+
+type WeeklyStory = WeeklyCandidate & {
+  id: number;
 };
 
 export type WeeklyFocus = {
@@ -20,90 +34,8 @@ export type WeeklyFocus = {
   stories: WeeklyStory[];
   periodStart: string;
   periodEnd: string;
+  editionCount: number;
 };
-
-function inferArticleType(article: {
-  title: string;
-  description?: string;
-  articleType?: string;
-}) {
-  if (article.articleType) return article.articleType;
-
-  const text = (article.title + " " + (article.description ?? "")).toLowerCase();
-
-  if (/krönika|krönikor|krönikör|kolumn/.test(text)) return "krönika";
-  if (/analys|expert|bedömer|därför/.test(text)) return "analys";
-  if (/intervju|intervjuar|säger till/.test(text)) return "intervju";
-  if (/reportage|på plats|möter|berättar/.test(text)) return "reportage";
-  if (/kommentar|ledare|opinion/.test(text)) return "kommentar";
-  if (/recension|recenserar|betyg/.test(text)) return "recension";
-  if (/guide|tips|så fungerar/.test(text)) return "guide";
-  if (/notis|i korthet/.test(text)) return "notis";
-
-  return "nyhet";
-}
-
-function articleCategory(article: {
-  title: string;
-  description?: string;
-}) {
-  const text = (article.title + " " + (article.description ?? "")).toLowerCase();
-
-  if (/elfsborg|if elfsborg|guligan/.test(text)) return "elfsborg";
-  if (/borås|sjuhärad|frista/.test(text)) return "lokalt";
-  if (/regeringen|riksdagen|sverige|socialdemokrat|vänsterpart/.test(text)) return "sverige";
-  if (/ukraina|ryssland|trump|usa|kina|gaza|iran|israel|nato/.test(text)) return "världen";
-  if (/börs|ränta|inflation|riksbanken|bolån|ekonomi|cervenka/.test(text)) return "ekonomi";
-  if (/fotboll|allsvenskan|premier league|champions league|tennis|skidor/.test(text)) return "sport";
-
-  return "kultur, mat & livsstil";
-}
-
-function buildWeeklyCandidates(articles: Article[], readLinks: Set<string>) {
-  const unread = articles.filter(article => article.link && !readLinks.has(article.link));
-  const ranked = rankArticles(unread);
-
-  const byNews = [...ranked].sort((a, b) =>
-    (b.newsScore ?? b.score ?? 0) - (a.newsScore ?? a.score ?? 0)
-  );
-
-  const byReading = [...ranked].sort(
-    (a, b) => (b.readingScore ?? 0) - (a.readingScore ?? 0)
-  );
-
-  const preferred = new Set(["krönika", "analys", "intervju", "reportage", "kommentar", "recension"]);
-  const selected: Array<ReturnType<typeof rankArticles>[number]> = [];
-  const seen = new Set<string>();
-
-  function add(article: ReturnType<typeof rankArticles>[number]) {
-    const key = article.link || article.title;
-    if (seen.has(key)) return;
-    seen.add(key);
-    selected.push(article);
-  }
-
-  byReading.slice(0, 30).forEach(add);
-  byNews.slice(0, 30).forEach(add);
-  ranked.filter(article => preferred.has(inferArticleType(article))).slice(0, 25).forEach(add);
-  ranked.slice(0, 20).forEach(add);
-
-  return selected.slice(0, 60).map((article, index) => ({
-    id: index,
-    title: article.title,
-    description: article.description ?? "",
-    source: article.source ?? "Okänd källa",
-    category: articleCategory(article),
-    link: article.link ?? "",
-    image: article.image ?? null,
-    date: article.date ?? "",
-    newsScore: article.newsScore ?? article.score ?? 0,
-    readingScore: article.readingScore ?? 0,
-    mentions: article.mentions ?? 1,
-    uniqueSources: article.uniqueSources ?? 1,
-    topic: article.topic ?? article.title,
-    articleType: inferArticleType(article),
-  }));
-}
 
 function profileForPrompt(profile: ReaderProfile) {
   return {
@@ -115,25 +47,149 @@ function profileForPrompt(profile: ReaderProfile) {
   };
 }
 
-export async function createWeeklyFocus(profile: ReaderProfile, readLinks: string[]): Promise<WeeklyFocus> {
-  const now = new Date();
-  const periodStartDate = new Date(now);
-  periodStartDate.setDate(periodStartDate.getDate() - 7);
+function buildCandidates(
+  editions: DailyEdition[],
+  readLinks: Set<string>
+) {
+  const seen = new Set<string>();
+  const stories: WeeklyCandidate[] = [];
 
-  const news = await getArticles(7);
-  const allArticles = Object.values(news).flat() as Article[];
-  const candidates = buildWeeklyCandidates(allArticles, new Set(readLinks));
+  // Newest edition first. If the same article appeared on multiple mornings,
+  // keep the first occurrence so the weekly pool stays clean.
+  for (const edition of editions) {
+    for (const section of edition.sections) {
+      for (const story of section.stories) {
+        const link = story.link ?? "";
 
-  const periodStart = periodStartDate.toISOString();
-  const periodEnd = now.toISOString();
+        if (!link || readLinks.has(link) || seen.has(link)) {
+          continue;
+        }
+
+        seen.add(link);
+
+        stories.push({
+          id: stories.length,
+          title: story.title,
+          description: story.description ?? "",
+          source: story.source ?? "Okänd källa",
+          category: section.key,
+          link,
+          image: story.image ?? null,
+          date: story.date ?? edition.generatedAt,
+          articleType: story.articleType,
+          aiSummary: story.aiSummary ?? "",
+          selectionReason: story.selectionReason ?? "",
+          newsScore: story.newsScore,
+          readingScore: story.readingScore,
+          topic: story.topic,
+        });
+      }
+    }
+  }
+
+  const ranked = rankArticles(stories);
+
+  const preferredTypes = new Set([
+    "krönika",
+    "analys",
+    "intervju",
+    "reportage",
+    "kommentar",
+    "recension",
+  ]);
+
+  const byReading = [...ranked].sort(
+    (a, b) => (b.readingScore ?? 0) - (a.readingScore ?? 0)
+  );
+
+  const byNews = [...ranked].sort(
+    (a, b) =>
+      (b.newsScore ?? b.score ?? 0) -
+      (a.newsScore ?? a.score ?? 0)
+  );
+
+  const selected: typeof ranked = [];
+  const selectedLinks = new Set<string>();
+
+  function add(article: typeof ranked[number]) {
+    const key = article.link || article.title;
+
+    if (!key || selectedLinks.has(key)) {
+      return;
+    }
+
+    selectedLinks.add(key);
+    selected.push(article);
+  }
+
+  byReading.slice(0, 35).forEach(add);
+  byNews.slice(0, 35).forEach(add);
+  ranked
+    .filter(article => preferredTypes.has(article.articleType ?? ""))
+    .slice(0, 30)
+    .forEach(add);
+
+  return selected.slice(0, 60).map((article, index) => ({
+    id: index,
+    title: article.title,
+    description: article.description ?? "",
+    source: article.source ?? "Okänd källa",
+    category: article.category ?? "okänd",
+    link: article.link ?? "",
+    image: article.image ?? null,
+    date: article.date ?? "",
+    articleType: article.articleType ?? "nyhet",
+    aiSummary: article.aiSummary ?? "",
+    selectionReason: article.selectionReason ?? "",
+    newsScore: article.newsScore,
+    readingScore: article.readingScore,
+    topic: article.topic,
+  }));
+}
+
+export async function createWeeklyFocus(
+  profile: ReaderProfile,
+  readLinks: string[]
+): Promise<WeeklyFocus> {
+  const editions = await getSavedDailyEditions(7);
+  const readSet = new Set(readLinks);
+  const candidates = buildCandidates(editions, readSet);
+
+  const dates = editions
+    .map(edition => edition.dateKey)
+    .sort();
+
+  const periodStart =
+    dates[0]
+      ? new Date(dates[0] + "T05:00:00Z").toISOString()
+      : new Date().toISOString();
+
+  const periodEnd =
+    dates.at(-1)
+      ? new Date(dates.at(-1) + "T20:00:00Z").toISOString()
+      : new Date().toISOString();
+
+  if (!editions.length) {
+    return {
+      title: "Veckofokus",
+      summary:
+        "Det finns ännu inga sparade morgoneditioner för veckan.",
+      stories: [],
+      periodStart,
+      periodEnd,
+      editionCount: 0,
+    };
+  }
 
   if (!candidates.length) {
     return {
       title: "Veckofokus",
-      summary: "Du har läst allt i veckans aktuella läskö.",
+      summary:
+        "Du har läst allt som hittills valts ut i veckans morgoneditioner.",
       stories: [],
       periodStart,
       periodEnd,
+      editionCount: editions.length,
     };
   }
 
@@ -142,29 +198,26 @@ export async function createWeeklyFocus(profile: ReaderProfile, readLinks: strin
     input: [
       "Du är Glenns veckoredaktör.",
       "",
-      "Du skapar en personlig läslista med exakt 10 texter från de senaste 7 dagarna.",
+      "Du ska skapa Veckofokus utifrån de senaste sparade morgoneditionerna från Glenn News.",
+      "Detta är INTE en ny sammanställning av RSS-flöden. Kandidaterna nedan är texter som Glenn News faktiskt valde ut under morgonens redaktionella arbete.",
       "",
       "SYFTE:",
-      "Det här är INTE en nyhetssida. Glenn har redan fått morgonens nyheter och pushnotiser. Veckofokus ska hjälpa honom att i efterhand förstå veckan bättre och ge honom texter som är värda att sätta sig ner med.",
+      "Veckofokus ska hjälpa Glenn att förstå veckan i efterhand och ge honom texter som är värda att sätta sig ner med.",
       "",
-      "TÄNK SOM EN REDAKTIONELL VECKOÅTERBLICK:",
-      "- Identifiera berättelser och teman som återkommit under veckan.",
-      "- Välj texter som ger perspektiv, analys, personlighet eller fördjupning.",
-      "- Om flera artiklar handlar om samma sak, välj normalt den som bäst förklarar eller sätter saken i perspektiv.",
-      "- En viktig nyhet kan väljas, men vanliga korta nyhetsnotiser ska normalt inte prioriteras.",
-      "- Krönika, analys, intervju, reportage, kommentar och recension väger normalt tyngre.",
-      "- Använd newsScore som signal om betydelse och aktualitet.",
-      "- Använd readingScore extra mycket för att hitta texter som faktiskt är värda Glenns tid.",
-      "- Glenn uppskattar Elfsborg, men låt inte Elfsborg dominera hela listan om andra veckoberättelser är starkare.",
-      "- Variera ämnen och källor när det förbättrar läsningen.",
-      "- Läsarprofilen bygger på tidigare klick. Ett enstaka klick är bara en svag signal; återkommande mönster är viktigare.",
+      "REDaktionella principer:",
+      "- Identifiera återkommande berättelser, teman och utvecklingar i veckans editioner.",
+      "- Välj normalt den bästa texten när flera editioner länkar till samma berättelse.",
+      "- Prioritera krönika, analys, intervju, reportage, kommentar och recension.",
+      "- En viktig nyhet får ta plats om den är central för veckan.",
+      "- Variera ämnen och källor när det förbättrar listan.",
+      "- Elfsborg är viktigt för Glenn, men ska inte dominera listan utan att förtjäna platserna.",
+      "- Läsarprofilen bygger på tidigare klick. Ett enstaka klick är en svag signal; återkommande mönster väger tyngre.",
+      "- Välj aldrig en artikel som finns i READ-LINKS.",
+      "- Hitta inte på fakta.",
       "",
       "VIKTIGT:",
-      "- Välj exakt 10 texter om det finns minst 10 kandidater.",
-      "- Välj aldrig en artikel vars link finns i READ-LINKS.",
-      "- Hitta inte på fakta.",
-      "- Skriv naturlig och rak svenska.",
-      "- Varje text ska ha en mycket kort sammanfattning och en tydlig anledning till varför den hör hemma i Veckofokus.",
+      "- Välj exakt 10 texter om minst 10 kandidater finns.",
+      "- Kandidaterna innehåller redan Glenn News egna sammanfattningar och urvalsorsaker. Använd dem som kontext.",
       "",
       "LÄSARPROFIL:",
       JSON.stringify(profileForPrompt(profile), null, 2),
@@ -172,18 +225,41 @@ export async function createWeeklyFocus(profile: ReaderProfile, readLinks: strin
       "READ-LINKS:",
       JSON.stringify(readLinks, null, 2),
       "",
-      "RETURNERA ENDAST GILTIG JSON:",
-      JSON.stringify({
-        summary: "4-6 meningar som beskriver vad veckan i stort handlade om och vilka återkommande berättelser som sticker ut.",
-        stories: [{
-          id: 0,
-          articleType: "krönika|analys|intervju|reportage|kommentar|nyhet|notis|guide|recension|övrigt",
-          summary: "1-2 meningar.",
-          selectionReason: "1 kort mening om varför Glenn bör läsa.",
-        }],
-      }, null, 2),
+      "SPARADE MORGONEDITIONER:",
+      JSON.stringify(
+        editions.map(edition => ({
+          dateKey: edition.dateKey,
+          generatedAt: edition.generatedAt,
+          sections: edition.sections.map(section => ({
+            key: section.key,
+            title: section.title,
+            storyCount: section.stories.length,
+          })),
+        })),
+        null,
+        2
+      ),
       "",
-      "ARTIKLAR FRÅN SENASTE 7 DAGARNA:",
+      "RETURNERA ENDAST GILTIG JSON:",
+      JSON.stringify(
+        {
+          summary:
+            "4-6 meningar om vad veckan handlade om och vilka berättelser eller teman som återkom.",
+          stories: [
+            {
+              id: 0,
+              articleType:
+                "krönika|analys|intervju|reportage|kommentar|nyhet|notis|guide|recension|övrigt",
+              summary: "1-2 meningar.",
+              selectionReason: "1 kort mening om varför Glenn bör läsa.",
+            },
+          ],
+        },
+        null,
+        2
+      ),
+      "",
+      "KANDIDATER FRÅN SPARADE EDITIONER:",
       JSON.stringify(candidates, null, 2),
     ].join("\n"),
   });
@@ -191,47 +267,66 @@ export async function createWeeklyFocus(profile: ReaderProfile, readLinks: strin
   try {
     const parsed = JSON.parse(response.output_text) as {
       summary?: string;
-      stories?: Array<{ id?: number; articleType?: string; summary?: string; selectionReason?: string }>;
+      stories?: Array<{
+        id?: number;
+        articleType?: string;
+        summary?: string;
+        selectionReason?: string;
+      }>;
     };
 
     const stories = (parsed.stories ?? [])
       .map(item => {
-        const candidate = candidates.find(article => article.id === item.id);
-        if (!candidate) return null;
+        const candidate = candidates.find(
+          article => article.id === item.id
+        );
+
+        if (!candidate) {
+          return null;
+        }
 
         return {
           ...candidate,
-          aiSummary: item.summary ?? "",
-          selectionReason: item.selectionReason ?? "AI-redaktören bedömer att texten tillför perspektiv och fördjupning.",
+          aiSummary: item.summary ?? candidate.aiSummary,
+          selectionReason:
+            item.selectionReason ?? candidate.selectionReason,
           articleType: item.articleType || candidate.articleType,
         };
       })
-      .filter((story): story is NonNullable<typeof story> => story !== null)
+      .filter(
+        (story): story is NonNullable<typeof story> =>
+          story !== null
+      )
       .slice(0, 10)
-      .map((story, index) => ({ ...story, id: index + 1 }));
+      .map((story, index) => ({
+        ...story,
+        id: index + 1,
+      }));
 
     return {
       title: "Veckofokus",
-      summary: parsed.summary?.trim() || "Veckans bästa fördjupningar och perspektiv samlade på ett ställe.",
+      summary:
+        parsed.summary?.trim() ||
+        "Veckans bästa fördjupningar och perspektiv samlade från Glenn News morgoneditioner.",
       stories,
       periodStart,
       periodEnd,
+      editionCount: editions.length,
     };
   } catch (error) {
     console.error("Weekly focus AI JSON failed:", error);
 
     return {
       title: "Veckofokus",
-      summary: "Veckans bästa läsning, baserad på relevans, fördjupning och personliga signaler.",
+      summary:
+        "Veckans bästa läsning, baserad på Glenn News sparade morgoneditioner.",
       stories: candidates.slice(0, 10).map((article, index) => ({
         ...article,
         id: index + 1,
-        aiSummary: article.description,
-        selectionReason: "Vald utifrån nyhetsvärde, läsvärde och innehållstyp.",
-        articleType: article.articleType,
       })),
       periodStart,
       periodEnd,
+      editionCount: editions.length,
     };
   }
 }
