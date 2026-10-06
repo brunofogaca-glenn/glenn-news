@@ -5,10 +5,6 @@ function changeLabel(value: number) {
 }
 
 export function MarketDayPanel({ data }: { data: MarketDay }) {
-  if (data.indices.length === 0) {
-    return null;
-  }
-
   const orderedNames = ["Stockholm", "DAX", "S&P 500", "Nasdaq"];
   const ordered = orderedNames
     .map(name => data.indices.find(index => index.name === name))
@@ -29,8 +25,9 @@ export function MarketDayPanel({ data }: { data: MarketDay }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:min-w-[520px]">
-          {ordered.map((index, position) => (
+        {ordered.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:min-w-[520px]">
+            {ordered.map((index, position) => (
             <div
               key={index.symbol}
               className={
@@ -48,8 +45,13 @@ export function MarketDayPanel({ data }: { data: MarketDay }) {
                 {changeLabel(index.changePct)}
               </div>
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="border-l-2 border-slate-950 pl-4 text-sm font-serif text-slate-500">
+            Marknadsdata kunde inte hämtas just nu.
+          </div>
+        )}
       </div>
 
       <div className="mt-3 border-t border-slate-300 pt-2 text-[9px] uppercase tracking-[0.14em] text-slate-400">
