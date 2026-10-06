@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { getCachedArticles } from "./articlesCache";
 
 type ApiFootballFixture = {
   fixture?: { id?: number; date?: string; status?: { short?: string }; };
@@ -202,13 +203,17 @@ function teamPriority(name: string) {
   return IMPORTANT_TEAM_PRIORITIES.get(normalized) ?? 0;
 }
 
-function fixtureImportance(fixture: ApiFootballFixture) {
+function fixtureImportance(fixture: ApiFootballFixture, articleScore = 0) {
   const leagueName = fixture.league?.name ?? "";
   const home = fixture.teams?.home?.name ?? "";
   const away = fixture.teams?.away?.name ?? "";
   const leagueScore = IMPORTANT_LEAGUES.get(leagueName) ?? 20;
 
-  return leagueScore + Math.max(teamPriority(home), teamPriority(away));
+  return (
+    leagueScore +
+    Math.max(teamPriority(home), teamPriority(away)) +
+    articleScore * 140
+  );
 }
 
 function isPreferredTeam(name: string) {
@@ -311,6 +316,79 @@ function isRelevantUpcomingFixture(fixture: ApiFootballFixture) {
     ["Allsvenskan", "Svenska Cupen"].includes(fixture.league?.name ?? "") ||
     (leagueScore >= 82 && bothTeamsAreImportant)
   );
+}
+
+type SportArticle = {
+  title: string;
+  description?: string;
+  category?: string;
+};
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const TEAM_ARTICLE_ALIASES: Record<string, string[]> = {
+  "sweden": ["sweden", "sverige", "svenska landslaget", "herrlandslaget", "landslaget"],
+  "if elfsborg": ["if elfsborg", "elfsborg"],
+  "manchester united": ["manchester united", "man united", "man utd"],
+  "manchester city": ["manchester city", "man city"],
+  "tottenham hotspur": ["tottenham", "spurs"],
+  "atletico madrid": ["atletico madrid", "atletico"],
+  "real madrid": ["real madrid"],
+  "bayern munich": ["bayern munich", "bayern munchen", "bayern"],
+  "borussia dortmund": ["borussia dortmund", "dortmund"],
+  "as roma": ["as roma", "roma"],
+  "inter": ["inter", "inter milan"],
+  "ac milan": ["ac milan", "milan"],
+  "juventus": ["juventus"],
+  "barcelona": ["barcelona", "barca"],
+  "liverpool": ["liverpool"],
+  "arsenal": ["arsenal"],
+  "chelsea": ["chelsea"],
+};
+
+function teamArticleAliases(teamName: string) {
+  const normalized = normalizeText(teamName);
+  const aliases = new Set<string>([
+    normalized,
+    ...(TEAM_ARTICLE_ALIASES[normalized] ?? []),
+  ]);
+
+  return [...aliases].filter(Boolean);
+}
+
+function articleMentionsFixture(
+  fixture: ApiFootballFixture,
+  articles: SportArticle[]
+) {
+  const text = normalizeText(
+    articles
+      .map(article => article.title + " " + (article.description ?? ""))
+      .join(" ")
+  );
+
+  const home = fixture.teams?.home?.name ?? "";
+  const away = fixture.teams?.away?.name ?? "";
+
+  return Math.max(
+    teamArticleScore(home, text),
+    teamArticleScore(away, text)
+  );
+}
+
+function teamArticleScore(teamName: string, articleText: string) {
+  const aliases = teamArticleAliases(teamName);
+  if (!aliases.length) return 0;
+
+  return aliases.reduce((score, alias) => {
+    return articleText.includes(normalizeText(alias)) ? score + 1 : score;
+  }, 0);
 }
 
 async function sportmonksGet(path: string) {
@@ -464,26 +542,33 @@ export async function fetchSportDay(): Promise<SportDayData> {
   }
 
   try {
-    const [yesterday, today] = await Promise.all([
+    const [yesterday, today, articleBuckets] = await Promise.all([
       apiFootballGet("/fixtures", { date: localYesterday(), timezone: STOCKHOLM_TIME_ZONE }),
       apiFootballGet("/fixtures", { date: localToday(), timezone: STOCKHOLM_TIME_ZONE }),
+      getCachedArticles(),
     ]);
 
-    const yesterdayFinished = (yesterday ?? []).filter(isFinished);
-    const relevantYesterday = yesterdayFinished.filter(isRelevantFixture);
-    const rankedYesterday =
-      relevantYesterday.length > 0
-        ? relevantYesterday
-        : yesterdayFinished;
+    const sportArticles: SportArticle[] = [
+      ...(articleBuckets.elfsborg ?? []),
+      ...(articleBuckets.fotboll ?? []),
+      ...(articleBuckets.sport ?? []),
+      ...(articleBuckets.tennis ?? []),
+    ];
 
-    const detailIds = rankedYesterday
+    const yesterdayFinished = (yesterday ?? []).filter(isFinished);
+
+    const detailIds = yesterdayFinished
       .filter(fixture => fixture.fixture?.id)
-      .sort((a, b) => fixtureImportance(b) - fixtureImportance(a))
+      .sort(
+        (a, b) =>
+          fixtureImportance(b, articleMentionsFixture(b, sportArticles)) -
+          fixtureImportance(a, articleMentionsFixture(a, sportArticles))
+      )
       .slice(0, 12)
       .map(fixture => String(fixture.fixture?.id))
       .join("-");
 
-    let detailed = rankedYesterday;
+    let detailed = yesterdayFinished;
     if (detailIds) {
       const response = await apiFootballGet("/fixtures", {
         ids: detailIds,
@@ -497,17 +582,41 @@ export async function fetchSportDay(): Promise<SportDayData> {
       .filter((item): item is SportResult => item !== null)
       .sort((a, b) => {
         const aImportance =
-          fixtureImportance({
-            fixture: { date: a.date },
-            league: { name: a.league },
-            teams: { home: { name: a.home }, away: { name: a.away } },
-          });
+          fixtureImportance(
+            {
+              fixture: { date: a.date },
+              league: { name: a.league },
+              teams: { home: { name: a.home }, away: { name: a.away } },
+            },
+            articleMentionsFixture(
+              {
+                teams: {
+                  home: { name: a.home },
+                  away: { name: a.away },
+                },
+                league: { name: a.league },
+              },
+              sportArticles
+            )
+          );
         const bImportance =
-          fixtureImportance({
-            fixture: { date: b.date },
-            league: { name: b.league },
-            teams: { home: { name: b.home }, away: { name: b.away } },
-          });
+          fixtureImportance(
+            {
+              fixture: { date: b.date },
+              league: { name: b.league },
+              teams: { home: { name: b.home }, away: { name: b.away } },
+            },
+            articleMentionsFixture(
+              {
+                teams: {
+                  home: { name: b.home },
+                  away: { name: b.away },
+                },
+                league: { name: b.league },
+              },
+              sportArticles
+            )
+          );
         return bImportance - aImportance || new Date(b.date).getTime() - new Date(a.date).getTime();
       })
       .slice(0, 8);
@@ -516,7 +625,8 @@ export async function fetchSportDay(): Promise<SportDayData> {
       fixture =>
         !isFinished(fixture) &&
         new Date(fixture.fixture?.date ?? "").getTime() > Date.now() &&
-        isRelevantUpcomingFixture(fixture)
+        isRelevantUpcomingFixture(fixture) ||
+        articleMentionsFixture(fixture, sportArticles) > 0
     );
 
     const upcoming = todayUpcoming
