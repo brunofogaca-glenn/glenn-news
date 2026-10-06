@@ -48,8 +48,13 @@ export function MarketDayPanel({ data }: { data: MarketDay }) {
             ))}
           </div>
         ) : (
-          <div className="border-l-2 border-slate-950 pl-4 text-sm font-serif text-slate-500">
-            Marknadsdata kunde inte hämtas just nu.
+          <div className="border-l-2 border-red-700 bg-red-50 px-4 py-3 text-sm">
+            <div className="font-bold text-red-800">
+              Marknadsdata kunde inte läsas in.
+            </div>
+            <div className="mt-1 font-serif text-red-900">
+              {data.error ?? "Okänt fel från marknadskällan."}
+            </div>
           </div>
         )}
       </div>
