@@ -500,9 +500,9 @@ export default async function Home() {
         <footer className="pt-6">
           <div className="border-t-2 border-slate-950 pt-4 text-sm leading-6 text-slate-500 md:flex md:justify-between md:gap-8">
             <p>
-              Glenn News lär sig av vilka texter du öppnar. Enstaka klick
-              ändrar inte hela profilen; mönster över tid gör redaktören
-              bättre.
+              Glenn News sparar varje morgonedition så att veckofokus kan
+              bygga på det som faktiskt valdes. Din personliga lässtatus
+              sparas separat och påverkar kommande redaktionella urval.
             </p>
             <p className="mt-2 md:mt-0 md:text-right">
               Din personliga morgontidning · Glenn News
