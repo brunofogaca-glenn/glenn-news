@@ -201,7 +201,10 @@ async function apiFootballGet<T>(
   const payload = (await response.json()) as ApiWrapper<T>;
 
   if (payload.errors && Object.keys(payload.errors as object).length > 0) {
-    throw new Error("API-Football returnerade ett API-fel.");
+    const details = Object.entries(payload.errors as Record<string, unknown>)
+      .map(([name, value]) => name + ": " + String(value))
+      .join("; ");
+    throw new Error("API-Football: " + (details || "okänt API-fel"));
   }
 
   return payload.response ?? null;
