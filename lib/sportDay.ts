@@ -386,27 +386,32 @@ function normalizeDailyTableRows(
 function normalizeDailyScorers(
   response: TopScorerForDailyTable[] | null | undefined
 ): SportLeagueScorer[] {
-  return (response ?? [])
-    .map(item => {
-      const statistic = item.statistics?.find(
-        entry =>
-          typeof entry.goals?.total === "number" &&
-          Boolean(entry.team?.name)
-      );
+  const scorers: SportLeagueScorer[] = [];
 
-      if (!item.player?.name || !statistic?.team?.name) {
-        return null;
-      }
+  for (const item of response ?? []) {
+    const statistic = item.statistics?.find(
+      entry =>
+        typeof entry.goals?.total === "number" &&
+        Boolean(entry.team?.name)
+    );
 
-      return {
-        name: item.player.name,
-        team: statistic.team.name,
-        goals: statistic.goals?.total ?? 0,
-        photo: item.player.photo,
-      };
-    })
-    .filter((item): item is SportLeagueScorer => item !== null)
-    .slice(0, 3);
+    if (!item.player?.name || !statistic?.team?.name) {
+      continue;
+    }
+
+    scorers.push({
+      name: item.player.name,
+      team: statistic.team.name,
+      goals: statistic.goals?.total ?? 0,
+      photo: item.player.photo,
+    });
+
+    if (scorers.length === 3) {
+      break;
+    }
+  }
+
+  return scorers;
 }
 
 async function fetchSelectedLeagueTable(
