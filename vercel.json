@@ -1,10 +1,12 @@
 {
   "crons": [
-    { "path": "/api/cron/refresh-news", "schedule": "1 5 * * *" },
-    { "path": "/api/cron/refresh-news", "schedule": "3 5 * * *" },
-    { "path": "/api/cron/refresh-news", "schedule": "5 5 * * *" },
-    { "path": "/api/cron/refresh-news", "schedule": "1 6 * * *" },
-    { "path": "/api/cron/refresh-news", "schedule": "3 6 * * *" },
-    { "path": "/api/cron/refresh-news", "schedule": "5 6 * * *" }
+    {
+      "path": "/api/cron/refresh-news",
+      "schedule": "1 5 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-news",
+      "schedule": "1 6 * * *"
+    }
   ]
 }
