@@ -5,6 +5,7 @@ import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
+import { getCachedFootballTables } from "@/lib/footballTables";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,9 @@ export async function GET(request: Request) {
   revalidateTag("glenn-news-market-day", { expire: 0 });
   const marketDay = await getCachedMarketDay();
 
+  revalidateTag("glenn-news-football-tables", { expire: 0 });
+  const footballTables = await getCachedFootballTables();
+
   revalidateTag("glenn-news-edition-meta", { expire: 0 });
   const editionMeta = await getCachedEditionMeta();
   const dailyHeader = await getDailyHeaderInfo();
@@ -99,6 +103,10 @@ export async function GET(request: Request) {
       date: marketDay.date,
       indices: marketDay.indices.length,
       source: marketDay.source,
+    },
+    footballTables: {
+      competitions: footballTables.competitions.length,
+      fetchedAt: footballTables.fetchedAt,
     },
   });
 }
