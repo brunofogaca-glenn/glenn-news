@@ -306,25 +306,26 @@ function normalizeRows(groups: StandingRow[][] | undefined): FootballGroup[] {
 function mapTopScorers(
   response: TopScorerResponse[] | null | undefined
 ): FootballTopScorer[] {
-  return (response ?? [])
-    .map(item => {
-      const stats = item.statistics?.find(
-        statistic =>
-          typeof statistic.goals?.total === "number" &&
-          statistic.team?.name
-      );
+  const scorers: FootballTopScorer[] = [];
 
-      if (!item.player?.name || !stats?.team?.name) return null;
+  for (const item of response ?? []) {
+    const stats = item.statistics?.find(
+      statistic =>
+        typeof statistic.goals?.total === "number" &&
+        Boolean(statistic.team?.name)
+    );
 
-      return {
-        name: item.player.name,
-        team: stats.team.name,
-        goals: stats.goals?.total ?? 0,
-        photo: item.player.photo,
-      };
-    })
-    .filter((item): item is FootballTopScorer => item !== null)
-    .slice(0, 3);
+    if (!item.player?.name || !stats?.team?.name) continue;
+
+    scorers.push({
+      name: item.player.name,
+      team: stats.team.name,
+      goals: stats.goals?.total ?? 0,
+      photo: item.player.photo,
+    });
+  }
+
+  return scorers.slice(0, 3);
 }
 
 async function fetchCompetition(config: CompetitionConfig): Promise<FootballCompetition> {
