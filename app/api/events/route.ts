@@ -7,6 +7,8 @@ type EventPayload = {
   articleType?: string;
   source?: string;
   topic?: string;
+  title?: string;
+  link?: string;
 };
 
 export async function POST(request: Request) {
@@ -30,6 +32,8 @@ export async function POST(request: Request) {
       articleType: body.articleType,
       source: body.source,
       topic: body.topic,
+      title: body.title,
+      link: body.link,
     });
 
     return NextResponse.json({

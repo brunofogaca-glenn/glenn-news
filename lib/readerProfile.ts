@@ -26,8 +26,6 @@ export type ReaderActivity = ReaderEvent & {
 const PROFILE_PATH = "glenn-news/profile/default.json";
 const EVENT_PREFIX = "glenn-news/profile/events/";
 const MAX_PROFILE_BYTES = 32_000;
-const EVENT_PREFIX = "glenn-news/profile/events/";
-const MAX_EVENTS = 1000;
 const MAX_EVENTS = 1000;
 
 const emptyProfile = (): ReaderProfile => ({
@@ -350,7 +348,13 @@ export async function recordReaderEvent(
   ].join(".");
 
   try {
-    await put(pathname, "{}", {
+    await put(
+      pathname,
+      JSON.stringify({
+        title: event.title?.trim().slice(0, 300) ?? "",
+        link: event.link ?? "",
+      }),
+      {
       access: "private",
       addRandomSuffix: false,
       contentType: "application/json",
