@@ -370,9 +370,14 @@ export async function getRecentReaderActivity(
       })
     );
 
-    return activity.filter(
-      (item): item is ReaderActivity => item !== null
-    );
+    const cleaned: ReaderActivity[] = [];
+    for (const item of activity) {
+      if (item !== null) {
+        cleaned.push(item);
+      }
+    }
+
+    return cleaned;
   } catch (error) {
     console.error(
       "Kunde inte läsa reader activity:",
