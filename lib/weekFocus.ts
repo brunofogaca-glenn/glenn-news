@@ -53,7 +53,8 @@ function profileForPrompt(profile: ReaderProfile) {
 
 function buildCandidates(
   editions: DailyEdition[],
-  readLinks: Set<string>
+  readLinks: Set<string>,
+  profile: ReaderProfile
 ) {
   const seen = new Set<string>();
   const stories: WeeklyCandidate[] = [];
@@ -102,7 +103,7 @@ function buildCandidates(
     ])
   );
 
-  const ranked = rankArticles(stories);
+  const ranked = rankArticles(stories, profile);
 
   const preferredTypes = new Set([
     "krönika",
@@ -174,7 +175,7 @@ export async function createWeeklyFocus(
       : [todayEdition, ...savedEditions].slice(0, 7);
 
   const readSet = new Set(readLinks);
-  const candidates = buildCandidates(editions, readSet);
+  const candidates = buildCandidates(editions, readSet, profile);
 
   const dates = editions
     .map(edition => edition.dateKey)

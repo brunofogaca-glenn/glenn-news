@@ -140,7 +140,8 @@ function profileForPrompt(
 
 function buildCandidates(
   articles: Article[],
-  excludeTrav = false
+  excludeTrav = false,
+  profile: ReaderProfile
 ) {
   const filteredArticles =
     excludeTrav
@@ -165,7 +166,12 @@ function buildCandidates(
         })
       : articles;
 
-  const ranked = rankArticles(filteredArticles);
+  const typedInput = filteredArticles.map(article => ({
+    ...article,
+    articleType: inferArticleType(article),
+  }));
+
+  const ranked = rankArticles(typedInput, profile);
 
   const rankedByNews =
     [...ranked].sort(
@@ -572,7 +578,13 @@ export async function createEditorialSection(
   articles: Article[],
   profile: ReaderProfile
 ): Promise<EditorialSection> {
-  const ranked = rankArticles(articles);
+  const ranked = rankArticles(
+    articles.map(article => ({
+      ...article,
+      articleType: inferArticleType(article),
+    })),
+    profile
+  );
 
   if (!ranked.length) {
     return {

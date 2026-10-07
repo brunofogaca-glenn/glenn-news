@@ -1,4 +1,5 @@
 import { clusterTopics } from "./topicCluster";
+import type { ReaderProfile } from "./readerProfile";
 
 type Article = {
   title: string;
@@ -268,6 +269,55 @@ function calculateReadingScore(
   );
 }
 
+
+function calculateProfileAffinity(
+  article: Article,
+  profile: ReaderProfile
+) {
+  const text =
+    `${article.title} ${article.description ?? ""}`.toLowerCase();
+
+  if (profile.totalClicks <= 0) {
+    return 0;
+  }
+
+  let score = 0;
+
+  for (const [category, value] of Object.entries(profile.category)) {
+    if (text.includes(category.toLowerCase())) {
+      score += Math.min(18, value * 0.45);
+    }
+  }
+
+  for (const [source, value] of Object.entries(profile.source)) {
+    if (
+      (article.source ?? "")
+        .toLowerCase()
+        .includes(source.toLowerCase())
+    ) {
+      score += Math.min(10, value * 0.35);
+    }
+  }
+
+  const type = (article.articleType ?? "").toLowerCase();
+  const typeAffinity = profile.articleType[type] ?? 0;
+  score += Math.min(14, typeAffinity * 0.35);
+
+  for (const [topic, value] of Object.entries(profile.topic)) {
+    const normalizedTopic = topic.toLowerCase().trim();
+
+    if (
+      normalizedTopic.length >= 5 &&
+      text.includes(normalizedTopic)
+    ) {
+      score += Math.min(14, value * 0.3);
+    }
+  }
+
+  const confidence = Math.min(1, profile.totalClicks / 20);
+  return score * (0.3 + confidence * 0.7);
+}
+
 function calculateRecencyScore(
   article: Article
 ) {
@@ -284,7 +334,15 @@ function calculateRecencyScore(
 }
 
 export function rankArticles(
-  articles: Article[]
+  articles: Article[],
+  profile: ReaderProfile = {
+    category: {},
+    articleType: {},
+    source: {},
+    topic: {},
+    totalClicks: 0,
+    lastUpdated: null,
+  }
 ) {
   const clusters =
     clusterTopics(articles);
@@ -321,9 +379,8 @@ export function rankArticles(
         sourceDiversityScore;
 
       const personalScore =
-        calculatePersonalScore(
-          article
-        );
+        calculatePersonalScore(article) +
+        calculateProfileAffinity(article, profile);
 
       const recencyScore =
         calculateRecencyScore(
