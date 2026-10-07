@@ -264,6 +264,11 @@ export default async function ProfilePage() {
     0
   );
 
+  const strongestCategory = categoryEntries[0]
+    ? CATEGORY_LABELS[categoryEntries[0][0]] ??
+      pretty(categoryEntries[0][0])
+    : "–";
+
   const strongestType = articleTypeEntries[0]
     ? pretty(articleTypeEntries[0][0])
     : null;
@@ -281,11 +286,6 @@ export default async function ProfilePage() {
         strongestSource +
         "."
       : "Mönstret blir tydligare ju mer du läser.";
-
-  const strongestCategory = categoryEntries[0]
-    ? CATEGORY_LABELS[categoryEntries[0][0]] ??
-      pretty(categoryEntries[0][0])
-    : "–";
 
   return (
     <main className="min-h-screen bg-[#f4f1e8] text-slate-950">
