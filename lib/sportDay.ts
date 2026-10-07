@@ -288,8 +288,29 @@ const DAILY_TABLE_LEAGUES = new Map<number, string>([
   [94, "Primeira Liga"],
 ]);
 
-function dailyTableSeason() {
-  return Number(localToday().slice(0, 4));
+function dailyTableSeason(dateValue: string) {
+  const date = new Date(dateValue);
+
+  if (!Number.isFinite(date.getTime())) {
+    return Number(localToday().slice(0, 4));
+  }
+
+  const month = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: STOCKHOLM_TIME_ZONE,
+      month: "numeric",
+    }).format(date)
+  );
+  const year = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: STOCKHOLM_TIME_ZONE,
+      year: "numeric",
+    }).format(date)
+  );
+
+  // Most European league seasons start in the second half of the year,
+  // so January-June matches belong to the previous season year.
+  return month <= 6 ? year - 1 : year;
 }
 
 function stableDailyPickIndex(length: number) {
@@ -395,7 +416,10 @@ async function fetchSelectedLeagueTable(
     new Map(
       results
         .filter(result => result.leagueId && DAILY_TABLE_LEAGUES.has(result.leagueId))
-        .map(result => [result.leagueId!, result])
+        .map(
+          result =>
+            [result.leagueId!, result] as [number, SportResult]
+        )
     ).values()
   );
 
@@ -416,7 +440,7 @@ async function fetchSelectedLeagueTable(
     return null;
   }
 
-  const season = dailyTableSeason();
+  const season = dailyTableSeason(selectedResult.date);
 
   const [standingsResult, scorersResult] = await Promise.allSettled([
     apiFootballGet<{ league?: { standings?: StandingRowForDailyTable[][] } }[]>(
