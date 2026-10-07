@@ -140,8 +140,8 @@ function profileForPrompt(
 
 function buildCandidates(
   articles: Article[],
-  excludeTrav = false,
-  profile: ReaderProfile
+  profile: ReaderProfile,
+  excludeTrav = false
 ) {
   const filteredArticles =
     excludeTrav
@@ -325,6 +325,7 @@ async function runEditorialAI(
   const candidates =
     buildCandidates(
       articles,
+      profile,
       categoryKey === "sport"
     );
 
