@@ -442,7 +442,7 @@ async function fetchSelectedLeagueTable(
         season: String(season),
       }
     ),
-    apiFootballGet<TopScorerForDailyTable[]>(
+    apiFootballGet(
       "/players/topscorers",
       {
         league: String(selectedResult.leagueId),
