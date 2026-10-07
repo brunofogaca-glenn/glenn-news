@@ -123,6 +123,12 @@ export default async function Home() {
                   Veckofokus
                 </a>
                 <a
+                  href="/fotboll"
+                  className="border border-slate-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-950 hover:text-slate-950"
+                >
+                  Fotboll
+                </a>
+                <a
                   href="/health"
                   className={
                     "inline-flex items-center gap-2 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition " +
