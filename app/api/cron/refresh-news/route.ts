@@ -5,7 +5,7 @@ import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
-import { refreshFootballTablesChunk, FOOTBALL_CHUNK_COUNT } from "@/lib/footballTables";
+import { getCachedFootballTables } from "@/lib/footballTables";
 
 export const dynamic = "force-dynamic";
 
@@ -55,29 +55,13 @@ export async function GET(request: Request) {
   const now = new Date();
   const localClock = getLocalClock(now);
 
-  // API-Football allows 10 requests/minute on the free plan.
-  // Football tables are therefore refreshed in three small batches at 07:01, 07:03 and 07:05.
-  if (localClock.hour !== 7 || ![1, 3, 5].includes(localClock.minute)) {
+  // Two UTC cron entries handle Sweden's switch between CET and CEST.
+  // Only the invocation that lands in the 07:00 hour performs the refresh.
+  if (localClock.hour !== 7) {
     return Response.json({
       ok: true,
       refreshed: false,
-      reason: "Outside the daily Glenn News refresh window",
-      localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
-    });
-  }
-
-  const footballChunkIndex =
-    localClock.minute === 1 ? 0 : localClock.minute === 3 ? 1 : 2;
-  const footballTables = await refreshFootballTablesChunk(footballChunkIndex);
-
-  if (localClock.minute !== 1) {
-    return Response.json({
-      ok: true,
-      refreshed: false,
-      footballRefreshed: true,
-      footballChunkIndex,
-      footballChunkCount: FOOTBALL_CHUNK_COUNT,
-      footballCompetitions: footballTables.competitions.length,
+      reason: "Outside the 07:00 Stockholm hour",
       localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
     });
   }
@@ -93,6 +77,9 @@ export async function GET(request: Request) {
 
   revalidateTag("glenn-news-market-day", { expire: 0 });
   const marketDay = await getCachedMarketDay();
+
+  revalidateTag("glenn-news-football-tables", { expire: 0 });
+  const footballTables = await getCachedFootballTables();
 
   revalidateTag("glenn-news-edition-meta", { expire: 0 });
   const editionMeta = await getCachedEditionMeta();
@@ -120,7 +107,6 @@ export async function GET(request: Request) {
     footballTables: {
       competitions: footballTables.competitions.length,
       fetchedAt: footballTables.fetchedAt,
-      refreshWindow: "07:01–07:05",
     },
   });
 }
