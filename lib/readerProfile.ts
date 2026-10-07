@@ -294,6 +294,95 @@ export function updateReaderProfile(
   );
 }
 
+export async function getRecentReaderActivity(
+  limit = 20
+): Promise<ReaderActivity[]> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return [];
+  }
+
+  try {
+    const result = await list({
+      prefix: EVENT_PREFIX,
+      limit: MAX_EVENTS,
+    });
+
+    const recentBlobs = result.blobs
+      .sort((a, b) => b.pathname.localeCompare(a.pathname))
+      .slice(0, Math.max(1, Math.min(limit, 50)));
+
+    const activity = await Promise.all(
+      recentBlobs.map(async blob => {
+        const parts = blob.pathname
+          .slice(EVENT_PREFIX.length)
+          .split(".");
+
+        if (parts.length !== 6 || parts[5] !== "json") {
+          return null;
+        }
+
+        const timestamp = Number.parseInt(
+          parts[0].split("-")[0],
+          10
+        );
+
+        if (!Number.isFinite(timestamp)) {
+          return null;
+        }
+
+        const decode = (value: string) =>
+          Buffer.from(value, "base64url").toString("utf8");
+
+        let title = "";
+        let link = "";
+
+        try {
+          const stored = await get(blob.pathname, {
+            access: "private",
+          });
+
+          if (stored?.stream) {
+            const payload = JSON.parse(
+              await new Response(stored.stream).text()
+            ) as {
+              title?: string;
+              link?: string;
+            };
+
+            title = payload.title?.trim() ?? "";
+            link = payload.link ?? "";
+          }
+        } catch {
+          // Older events may only contain metadata in the pathname.
+        }
+
+        const topic = decode(parts[4]);
+
+        return {
+          timestamp: new Date(timestamp).toISOString(),
+          category: decode(parts[1]),
+          articleType: decode(parts[2]),
+          source: decode(parts[3]),
+          topic: topic || undefined,
+          title: title || topic || "Läst artikel",
+          link: link || undefined,
+        };
+      })
+    );
+
+    return activity.filter(
+      (item): item is ReaderActivity => item !== null
+    );
+  } catch (error) {
+    console.error(
+      "Kunde inte läsa reader activity:",
+      error
+    );
+
+    return [];
+  }
+}
+
 // Kept for backwards compatibility with existing callers.
 // New events are append-only and do not overwrite the profile.
 export async function saveReaderProfile(
