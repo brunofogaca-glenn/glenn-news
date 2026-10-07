@@ -15,11 +15,19 @@ export type ReaderEvent = {
   articleType: string;
   source: string;
   topic?: string;
+  title?: string;
+  link?: string;
+};
+
+export type ReaderActivity = ReaderEvent & {
+  timestamp: string;
 };
 
 const PROFILE_PATH = "glenn-news/profile/default.json";
 const EVENT_PREFIX = "glenn-news/profile/events/";
 const MAX_PROFILE_BYTES = 32_000;
+const EVENT_PREFIX = "glenn-news/profile/events/";
+const MAX_EVENTS = 1000;
 const MAX_EVENTS = 1000;
 
 const emptyProfile = (): ReaderProfile => ({

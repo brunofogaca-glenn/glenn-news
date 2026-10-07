@@ -25,9 +25,19 @@ export function TrackableLink({
   className,
 }: TrackableLinkProps) {
   function handleClick(
-    _event: MouseEvent<HTMLAnchorElement>
+    event: MouseEvent<HTMLAnchorElement>
   ) {
     window.dispatchEvent(new Event("glenn-reader-click"));
+
+    const title =
+      event.currentTarget
+        .querySelector("h1,h2,h3")
+        ?.textContent
+        ?.trim() ||
+      event.currentTarget.textContent
+        ?.replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 300);
 
     void fetch("/api/events", {
       method: "POST",
@@ -40,6 +50,8 @@ export function TrackableLink({
         articleType,
         source,
         topic,
+        title,
+        link: href,
       }),
       keepalive: true,
     }).catch(() => {

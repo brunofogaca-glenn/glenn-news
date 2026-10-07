@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { markWeeklyRead } from "@/app/actions";
 
 type WeeklyStoryLinkProps = {
@@ -14,8 +14,16 @@ export function WeeklyStoryLink({ href, children, className }: WeeklyStoryLinkPr
 
   if (hidden) return null;
 
-  function handleClick() {
+  function handleClick(
+    event: MouseEvent<HTMLAnchorElement>
+  ) {
     setHidden(true);
+
+    const title =
+      event.currentTarget
+        .querySelector("h1,h2,h3")
+        ?.textContent
+        ?.trim() || "Veckofokus";
 
     void markWeeklyRead(href).catch(error => {
       console.error("Kunde inte spara lässtatus:", error);
@@ -29,7 +37,9 @@ export function WeeklyStoryLink({ href, children, className }: WeeklyStoryLinkPr
         category: "weekfocus",
         articleType: "veckofokus",
         source: "Veckofokus",
-        topic: href,
+        topic: title,
+        title,
+        link: href,
       }),
       keepalive: true,
     }).catch(() => {});
