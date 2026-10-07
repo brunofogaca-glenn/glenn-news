@@ -4,6 +4,10 @@ import { FootballCompetitionCard } from "@/app/components/FootballCompetitionCar
 export const dynamic = "force-dynamic";
 
 function formatUpdated(value: string) {
+  if (new Date(value).getTime() === 0) {
+    return "Inte uppdaterad ännu";
+  }
+
   return new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Stockholm",
     weekday: "long",
@@ -54,6 +58,9 @@ export default async function FootballPage() {
               <div className="font-bold">Senast uppdaterad</div>
               <div className="mt-1 text-slate-500">
                 {formatUpdated(data.fetchedAt)}
+              </div>
+              <div className="mt-1 text-[10px] uppercase tracking-[0.13em] text-slate-400">
+                Daglig refresh startar 07:01
               </div>
             </div>
           </div>
