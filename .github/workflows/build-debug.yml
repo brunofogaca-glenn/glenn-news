@@ -17,3 +17,5 @@ jobs:
       - run: npm run build
 
 # trigger build after scorer type fix
+
+# trigger after main build-check enablement
