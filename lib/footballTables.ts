@@ -1,13 +1,32 @@
-import { get, put } from "@vercel/blob";
+import { unstable_cache } from "next/cache";
 
 const TIME_ZONE = "Europe/Stockholm";
 const API_BASE = "https://v3.football.api-sports.io";
-const FOOTBALL_PREFIX = "glenn-news/football-tables/";
-const FOOTBALL_SNAPSHOT_NAME = "current.json";
 
 type ApiWrapper<T> = {
   errors?: unknown;
   response?: T;
+};
+
+type LeagueSeason = {
+  year?: number;
+  current?: boolean;
+  coverage?: {
+    standings?: boolean;
+    top_scorers?: boolean;
+  };
+};
+
+type LeagueInfo = {
+  league?: {
+    id?: number;
+    name?: string;
+    type?: string;
+  };
+  country?: {
+    name?: string;
+  };
+  seasons?: LeagueSeason[];
 };
 
 type StandingRow = {
@@ -91,15 +110,9 @@ export type FootballTopScorer = {
 export type FootballCompetition = {
   key: string;
   title: string;
-  category:
-    | "Sverige"
-    | "England"
-    | "Spanien"
-    | "Italien"
-    | "Europa"
-    | "Landslag";
-  leagueId: number;
-  season: number;
+  category: "Sverige" | "England" | "Spanien" | "Italien" | "Europa" | "Landslag";
+  leagueId: number | null;
+  season: number | null;
   groups: FootballGroup[];
   scorers: FootballTopScorer[];
   error?: string;
@@ -110,112 +123,39 @@ export type FootballTablesData = {
   fetchedAt: string;
 };
 
-export type FootballTablesSnapshot = FootballTablesData & {
-  dateKey: string;
-};
-
 type CompetitionConfig = {
   key: string;
   title: string;
   category: FootballCompetition["category"];
-  leagueId: number;
-  season: number;
+  fixedLeagueId?: number;
+  searchName?: string;
+  fixedSeason?: number;
 };
 
 const COMPETITIONS: CompetitionConfig[] = [
-  {
-    key: "allsvenskan",
-    title: "Allsvenskan",
-    category: "Sverige",
-    leagueId: 113,
-    season: 2026,
-  },
-  {
-    key: "svenska-cupen",
-    title: "Svenska Cupen",
-    category: "Sverige",
-    leagueId: 115,
-    season: 2026,
-  },
-  {
-    key: "premier-league",
-    title: "Premier League",
-    category: "England",
-    leagueId: 39,
-    season: 2026,
-  },
-  {
-    key: "la-liga",
-    title: "La Liga",
-    category: "Spanien",
-    leagueId: 140,
-    season: 2026,
-  },
-  {
-    key: "serie-a",
-    title: "Serie A",
-    category: "Italien",
-    leagueId: 135,
-    season: 2026,
-  },
-  {
-    key: "champions-league",
-    title: "UEFA Champions League",
-    category: "Europa",
-    leagueId: 2,
-    season: 2026,
-  },
-  {
-    key: "europa-league",
-    title: "UEFA Europa League",
-    category: "Europa",
-    leagueId: 3,
-    season: 2026,
-  },
-  {
-    key: "nations-league",
-    title: "UEFA Nations League",
-    category: "Europa",
-    leagueId: 5,
-    season: 2026,
-  },
-  {
-    key: "em",
-    title: "EM",
-    category: "Landslag",
-    leagueId: 4,
-    season: 2028,
-  },
+  { key: "allsvenskan", title: "Allsvenskan", category: "Sverige", fixedLeagueId: 113 },
+  { key: "svenska-cupen", title: "Svenska Cupen", category: "Sverige", fixedLeagueId: 115 },
+  { key: "premier-league", title: "Premier League", category: "England", fixedLeagueId: 39 },
+  { key: "la-liga", title: "La Liga", category: "Spanien", fixedLeagueId: 140 },
+  { key: "serie-a", title: "Serie A", category: "Italien", fixedLeagueId: 135 },
+  { key: "champions-league", title: "UEFA Champions League", category: "Europa", fixedLeagueId: 2 },
+  { key: "europa-league", title: "UEFA Europa League", category: "Europa", fixedLeagueId: 3 },
+  { key: "nations-league", title: "UEFA Nations League", category: "Europa", fixedLeagueId: 5 },
+  { key: "em", title: "EM", category: "Landslag", fixedLeagueId: 4, fixedSeason: 2028 },
   {
     key: "em-kval-europa",
     title: "EM-kval Europa",
     category: "Landslag",
-    leagueId: 960,
-    season: 2028,
+    searchName: "Euro Championship - Qualification",
   },
-  {
-    key: "vm",
-    title: "VM",
-    category: "Landslag",
-    leagueId: 1,
-    season: 2026,
-  },
+  { key: "vm", title: "VM", category: "Landslag", fixedLeagueId: 1, fixedSeason: 2026 },
   {
     key: "vm-kval-europa",
     title: "VM-kval Europa",
     category: "Landslag",
-    leagueId: 32,
-    season: 2024,
+    searchName: "World Cup - Qualification Europe",
   },
 ];
-
-const FOOTBALL_CHUNKS: CompetitionConfig[][] = [
-  COMPETITIONS.slice(0, 4),
-  COMPETITIONS.slice(4, 8),
-  COMPETITIONS.slice(8, 12),
-];
-
-export const FOOTBALL_CHUNK_COUNT = FOOTBALL_CHUNKS.length;
 
 function localDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -228,7 +168,6 @@ function localDateKey(date = new Date()) {
   const year = parts.find(part => part.type === "year")?.value ?? "0000";
   const month = parts.find(part => part.type === "month")?.value ?? "00";
   const day = parts.find(part => part.type === "day")?.value ?? "00";
-
   return year + "-" + month + "-" + day;
 }
 
@@ -237,9 +176,7 @@ async function apiFootballGet<T>(
   params: Record<string, string>
 ): Promise<T | null> {
   const key = process.env.API_FOOTBALL_KEY;
-  if (!key) {
-    throw new Error("API_FOOTBALL_KEY saknas.");
-  }
+  if (!key) return null;
 
   const url = new URL(API_BASE + path);
   for (const [name, value] of Object.entries(params)) {
@@ -264,14 +201,72 @@ async function apiFootballGet<T>(
   const payload = (await response.json()) as ApiWrapper<T>;
 
   if (payload.errors && Object.keys(payload.errors as object).length > 0) {
-    const details = Object.entries(payload.errors as Record<string, unknown>)
-      .map(([name, value]) => name + ": " + String(value))
-      .join("; ");
-
-    throw new Error("API-Football: " + (details || "okänt API-fel"));
+    throw new Error("API-Football returnerade ett API-fel.");
   }
 
   return payload.response ?? null;
+}
+
+function chooseSeason(
+  seasons: LeagueSeason[] | undefined,
+  fixedSeason?: number
+) {
+  if (!seasons?.length) return fixedSeason ?? null;
+  if (fixedSeason && seasons.some(item => item.year === fixedSeason)) {
+    return fixedSeason;
+  }
+
+  const current = seasons.find(item => item.current && item.year);
+  if (current?.year) return current.year;
+
+  const nowYear = new Date().getUTCFullYear();
+  const latestAvailable = seasons
+    .map(item => item.year)
+    .filter((year): year is number => typeof year === "number" && year <= nowYear)
+    .sort((a, b) => b - a)[0];
+
+  return latestAvailable ?? seasons[0]?.year ?? null;
+}
+
+async function resolveCompetition(config: CompetitionConfig) {
+  if (config.fixedLeagueId && config.fixedSeason) {
+    return {
+      leagueId: config.fixedLeagueId,
+      season: config.fixedSeason,
+    };
+  }
+
+  if (config.fixedLeagueId) {
+    const response = await apiFootballGet<LeagueInfo[]>(
+      "/leagues",
+      { id: String(config.fixedLeagueId) }
+    );
+    return {
+      leagueId: config.fixedLeagueId,
+      season: chooseSeason(response?.[0]?.seasons),
+    };
+  }
+
+  if (!config.searchName) {
+    return { leagueId: null, season: null };
+  }
+
+  const response = await apiFootballGet<LeagueInfo[]>(
+    "/leagues",
+    { search: config.searchName }
+  );
+
+  const exact = response?.find(
+    item =>
+      (item.league?.name ?? "").toLowerCase() ===
+      config.searchName!.toLowerCase()
+  );
+  const candidate = exact ?? response?.[0];
+
+  return {
+    leagueId: candidate?.league?.id ?? null,
+    season: chooseSeason(candidate?.seasons),
+  };
 }
 
 function normalizeRows(groups: StandingRow[][] | undefined): FootballGroup[] {
@@ -279,16 +274,15 @@ function normalizeRows(groups: StandingRow[][] | undefined): FootballGroup[] {
 
   return groups
     .map((rows, index) => {
+      const firstGroupName = rows.find(row => row.group)?.group;
       const name =
-        rows.find(row => row.group)?.group ??
-        (groups.length > 1
-          ? "Grupp " + String.fromCharCode(65 + index)
-          : "Tabell");
+        firstGroupName ||
+        (groups.length > 1 ? "Grupp " + String.fromCharCode(65 + index) : "Tabell");
 
       return {
         name,
         rows: rows
-          .filter(row => Boolean(row.team?.name))
+          .filter(row => row.team?.name)
           .map(row => ({
             rank: row.rank ?? 0,
             teamId: row.team?.id,
@@ -334,23 +328,36 @@ function mapTopScorers(
   return scorers.slice(0, 3);
 }
 
-async function fetchCompetition(
-  config: CompetitionConfig
-): Promise<FootballCompetition> {
+async function fetchCompetition(config: CompetitionConfig): Promise<FootballCompetition> {
   try {
+    const resolved = await resolveCompetition(config);
+
+    if (!resolved.leagueId || !resolved.season) {
+      return {
+        key: config.key,
+        title: config.title,
+        category: config.category,
+        leagueId: resolved.leagueId,
+        season: resolved.season,
+        groups: [],
+        scorers: [],
+        error: "Tävlingen eller aktuell säsong kunde inte hittas.",
+      };
+    }
+
     const [standings, topScorers] = await Promise.all([
       apiFootballGet<StandingResponse[]>(
         "/standings",
         {
-          league: String(config.leagueId),
-          season: String(config.season),
+          league: String(resolved.leagueId),
+          season: String(resolved.season),
         }
       ),
       apiFootballGet<TopScorerResponse[]>(
         "/players/topscorers",
         {
-          league: String(config.leagueId),
-          season: String(config.season),
+          league: String(resolved.leagueId),
+          season: String(resolved.season),
         }
       ),
     ]);
@@ -362,13 +369,13 @@ async function fetchCompetition(
       key: config.key,
       title: config.title,
       category: config.category,
-      leagueId: config.leagueId,
-      season: config.season,
+      leagueId: resolved.leagueId,
+      season: resolved.season,
       groups,
       scorers,
       error:
         groups.length === 0 && scorers.length === 0
-          ? "Ingen tabell- eller skytteligadata finns för vald säsong ännu."
+          ? "Ingen tabell- eller skytteligadata finns för den valda säsongen."
           : undefined,
     };
   } catch (error) {
@@ -376,8 +383,8 @@ async function fetchCompetition(
       key: config.key,
       title: config.title,
       category: config.category,
-      leagueId: config.leagueId,
-      season: config.season,
+      leagueId: null,
+      season: null,
       groups: [],
       scorers: [],
       error:
@@ -388,113 +395,34 @@ async function fetchCompetition(
   }
 }
 
-function snapshotPath() {
-  return FOOTBALL_PREFIX + FOOTBALL_SNAPSHOT_NAME;
-}
-
-async function readFootballSnapshot(): Promise<FootballTablesSnapshot | null> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
-
-  try {
-    const result = await get(snapshotPath(), { access: "private" });
-
-    if (!result || result.statusCode !== 200 || !result.stream) {
-      return null;
-    }
-
-    const parsed = JSON.parse(
-      await new Response(result.stream).text()
-    ) as FootballTablesSnapshot;
-
-    if (
-      !parsed.dateKey ||
-      !Array.isArray(parsed.competitions) ||
-      !parsed.generatedAt
-    ) {
-      return null;
-    }
-
-    return parsed;
-  } catch (error) {
-    console.error("Kunde inte läsa fotbollssnapshot:", error);
-    return null;
-  }
-}
-
-async function saveFootballSnapshot(snapshot: FootballTablesSnapshot) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("BLOB_READ_WRITE_TOKEN saknas.");
-  }
-
-  await put(snapshotPath(), JSON.stringify(snapshot), {
-    access: "private",
-    addRandomSuffix: false,
-    contentType: "application/json",
-  });
-}
-
-function emptySnapshot(dateKey = localDateKey()): FootballTablesSnapshot {
-  return {
-    dateKey,
-    generatedAt: new Date(0).toISOString(),
-    fetchedAt: new Date(0).toISOString(),
-    competitions: COMPETITIONS.map(config => ({
-      key: config.key,
-      title: config.title,
-      category: config.category,
-      leagueId: config.leagueId,
-      season: config.season,
-      groups: [],
-      scorers: [],
-      error: "Dagens tabell har ännu inte uppdaterats.",
-    })),
-  };
-}
-
-export async function getCachedFootballTables(): Promise<FootballTablesData> {
-  const snapshot = await readFootballSnapshot();
-
-  if (snapshot) {
-    return {
-      competitions: snapshot.competitions,
-      fetchedAt: snapshot.fetchedAt,
-    };
-  }
-
-  return {
-    competitions: emptySnapshot().competitions,
-    fetchedAt: new Date(0).toISOString(),
-  };
-}
-
-export async function refreshFootballTablesChunk(chunkIndex: number) {
-  const chunk = FOOTBALL_CHUNKS[chunkIndex];
-
-  if (!chunk) {
-    throw new Error("Ogiltigt fotbollschunk-index: " + chunkIndex);
-  }
-
-  const today = localDateKey();
-  const previous = await readFootballSnapshot();
-  const base =
-    previous?.dateKey === today
-      ? previous
-      : emptySnapshot(today);
-
-  const refreshed = await Promise.all(
-    chunk.map(config => fetchCompetition(config))
+async function fetchFootballTables(): Promise<FootballTablesData> {
+  const competitions = await Promise.all(
+    COMPETITIONS.map(config => fetchCompetition(config))
   );
 
-  const byKey = new Map(refreshed.map(item => [item.key, item]));
-
-  const snapshot: FootballTablesSnapshot = {
-    dateKey: today,
-    generatedAt: new Date().toISOString(),
+  return {
+    competitions,
     fetchedAt: new Date().toISOString(),
-    competitions: base.competitions.map(item => byKey.get(item.key) ?? item),
   };
+}
 
-  await saveFootballSnapshot(snapshot);
+const getCachedFootballTablesInternal = unstable_cache(
+  fetchFootballTables,
+  ["glenn-news-football-tables-v1"],
+  {
+    revalidate: 24 * 60 * 60,
+    tags: ["glenn-news-football-tables"],
+  }
+);
 
-  return snapshot;
+export async function getCachedFootballTables() {
+  return getCachedFootballTablesInternal();
+}
+
+export async function refreshFootballTables() {
+  return getCachedFootballTablesInternal();
+}
+
+export function getFootballTablesDate() {
+  return localDateKey();
 }
