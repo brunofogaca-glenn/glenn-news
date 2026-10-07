@@ -387,22 +387,6 @@ function normalizeDailyScorers(
     .filter((item): item is SportLeagueScorer => item !== null)
     .slice(0, 3);
 }
-function asStandingsResponse(value: unknown) {
-  return Array.isArray(value)
-    ? (value as Array<{
-        league?: {
-          standings?: StandingRowForDailyTable[][];
-        };
-      }>)
-    : [];
-}
-
-function asTopScorerResponse(value: unknown) {
-  return Array.isArray(value)
-    ? (value as TopScorerForDailyTable[])
-    : [];
-}
-
 
 async function fetchSelectedLeagueTable(
   results: SportResult[]
@@ -435,14 +419,14 @@ async function fetchSelectedLeagueTable(
   const season = dailyTableSeason();
 
   const [standingsResult, scorersResult] = await Promise.allSettled([
-    apiFootballGet(
+    apiFootballGet<{ league?: { standings?: StandingRowForDailyTable[][] } }[]>(
       "/standings",
       {
         league: String(selectedResult.leagueId),
         season: String(season),
       }
     ),
-    apiFootballGet(
+    apiFootballGet<TopScorerForDailyTable[]>(
       "/players/topscorers",
       {
         league: String(selectedResult.leagueId),
@@ -454,13 +438,13 @@ async function fetchSelectedLeagueTable(
   const rows =
     standingsResult.status === "fulfilled"
       ? normalizeDailyTableRows(
-          asStandingsResponse(standingsResult.value)?.[0]?.league?.standings
+          standingsResult.value?.[0]?.league?.standings
         )
       : [];
 
   const scorers =
     scorersResult.status === "fulfilled"
-      ? normalizeDailyScorers(asTopScorerResponse(scorersResult.value))
+      ? normalizeDailyScorers(scorersResult.value)
       : [];
 
   const errors: string[] = [];
@@ -519,10 +503,10 @@ async function fetchSelectedLeagueTable(
 }
 
 
-async function apiFootballGet(
+async function apiFootballGet<T = ApiFootballFixture[]>(
   path: string,
   params: Record<string, string>
-): Promise<unknown> {
+): Promise<T | null> {
   const key = process.env.API_FOOTBALL_KEY;
   if (!key) return null;
 
@@ -546,7 +530,7 @@ async function apiFootballGet(
   }
 
   const data = (await response.json()) as {
-    response?: unknown;
+    response?: T;
     errors?: unknown;
   };
 
