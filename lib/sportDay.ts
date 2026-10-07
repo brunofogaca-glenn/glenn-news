@@ -279,7 +279,6 @@ function isRelevantFixture(fixture: ApiFootballFixture) {
 
 const DAILY_TABLE_LEAGUES = new Map<number, string>([
   [113, "Allsvenskan"],
-  [114, "Superettan"],
   [39, "Premier League"],
   [140, "La Liga"],
   [135, "Serie A"],
@@ -388,6 +387,22 @@ function normalizeDailyScorers(
     .filter((item): item is SportLeagueScorer => item !== null)
     .slice(0, 3);
 }
+function asStandingsResponse(value: unknown) {
+  return Array.isArray(value)
+    ? (value as Array<{
+        league?: {
+          standings?: StandingRowForDailyTable[][];
+        };
+      }>)
+    : [];
+}
+
+function asTopScorerResponse(value: unknown) {
+  return Array.isArray(value)
+    ? (value as TopScorerForDailyTable[])
+    : [];
+}
+
 
 async function fetchSelectedLeagueTable(
   results: SportResult[]
@@ -420,7 +435,7 @@ async function fetchSelectedLeagueTable(
   const season = dailyTableSeason();
 
   const [standingsResult, scorersResult] = await Promise.allSettled([
-    apiFootballGet<{ league?: { standings?: StandingRowForDailyTable[][] } }[]>(
+    apiFootballGet(
       "/standings",
       {
         league: String(selectedResult.leagueId),
@@ -439,13 +454,13 @@ async function fetchSelectedLeagueTable(
   const rows =
     standingsResult.status === "fulfilled"
       ? normalizeDailyTableRows(
-          standingsResult.value?.[0]?.league?.standings
+          asStandingsResponse(standingsResult.value)?.[0]?.league?.standings
         )
       : [];
 
   const scorers =
     scorersResult.status === "fulfilled"
-      ? normalizeDailyScorers(scorersResult.value)
+      ? normalizeDailyScorers(asTopScorerResponse(scorersResult.value))
       : [];
 
   const errors: string[] = [];
@@ -504,10 +519,10 @@ async function fetchSelectedLeagueTable(
 }
 
 
-async function apiFootballGet<T = ApiFootballFixture[]>(
+async function apiFootballGet(
   path: string,
   params: Record<string, string>
-): Promise<T | null> {
+): Promise<unknown> {
   const key = process.env.API_FOOTBALL_KEY;
   if (!key) return null;
 
@@ -525,11 +540,13 @@ async function apiFootballGet<T = ApiFootballFixture[]>(
   });
 
   if (!response.ok) {
-    throw new Error("API-Football " + response.status + " " + response.statusText);
+    throw new Error(
+      "API-Football " + response.status + " " + response.statusText
+    );
   }
 
   const data = (await response.json()) as {
-    response?: T;
+    response?: unknown;
     errors?: unknown;
   };
 
