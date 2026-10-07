@@ -504,12 +504,17 @@ async function fetchSelectedLeagueTable(
 }
 
 
-async function apiFootballGet(path: string, params: Record<string, string>) {
+async function apiFootballGet<T = ApiFootballFixture[]>(
+  path: string,
+  params: Record<string, string>
+): Promise<T | null> {
   const key = process.env.API_FOOTBALL_KEY;
   if (!key) return null;
 
   const url = new URL("https://v3.football.api-sports.io" + path);
-  for (const [name, value] of Object.entries(params)) url.searchParams.set(name, value);
+  for (const [name, value] of Object.entries(params)) {
+    url.searchParams.set(name, value);
+  }
 
   const response = await fetch(url, {
     signal: AbortSignal.timeout(8000),
@@ -523,8 +528,12 @@ async function apiFootballGet(path: string, params: Record<string, string>) {
     throw new Error("API-Football " + response.status + " " + response.statusText);
   }
 
-  const data = (await response.json()) as { response?: ApiFootballFixture[]; errors?: unknown };
-  return data.response ?? [];
+  const data = (await response.json()) as {
+    response?: T;
+    errors?: unknown;
+  };
+
+  return data.response ?? null;
 }
 
 function mapFixture(fixture: ApiFootballFixture): SportResult | null {
