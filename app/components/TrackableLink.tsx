@@ -27,6 +27,8 @@ export function TrackableLink({
   function handleClick(
     _event: MouseEvent<HTMLAnchorElement>
   ) {
+    window.dispatchEvent(new Event("glenn-reader-click"));
+
     void fetch("/api/events", {
       method: "POST",
       headers: {
