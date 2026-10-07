@@ -65,6 +65,7 @@ export type SportResult = {
   id: number;
   date: string;
   league: string;
+  leagueId?: number;
   home: string;
   away: string;
   homeScore: number | null;
@@ -90,9 +91,48 @@ export type SportUpcoming = {
   source: "API-Football" | "Sportmonks";
 };
 
+export type SportLeagueTableRow = {
+  rank: number;
+  teamId?: number;
+  team: string;
+  logo?: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+};
+
+export type SportLeagueScorer = {
+  name: string;
+  team: string;
+  goals: number;
+  photo?: string;
+};
+
+export type SportLeagueTable = {
+  leagueId: number;
+  title: string;
+  season: number;
+  relatedResult: {
+    id: number;
+    home: string;
+    away: string;
+    homeScore: number | null;
+    awayScore: number | null;
+  };
+  rows: SportLeagueTableRow[];
+  scorers: SportLeagueScorer[];
+  error?: string;
+};
+
 export type SportDayData = {
   results: SportResult[];
   upcoming: SportUpcoming[];
+  selectedLeague: SportLeagueTable | null;
   provider: {
     apiFootball: boolean;
     sportmonks: boolean;
@@ -236,6 +276,234 @@ function isRelevantFixture(fixture: ApiFootballFixture) {
   );
 }
 
+
+const DAILY_TABLE_LEAGUES = new Map<number, string>([
+  [113, "Allsvenskan"],
+  [114, "Superettan"],
+  [39, "Premier League"],
+  [140, "La Liga"],
+  [135, "Serie A"],
+  [78, "Bundesliga"],
+  [61, "Ligue 1"],
+  [88, "Eredivisie"],
+  [94, "Primeira Liga"],
+]);
+
+function dailyTableSeason() {
+  return Number(localToday().slice(0, 4));
+}
+
+function stableDailyPickIndex(length: number) {
+  const key = localToday();
+  let hash = 0;
+
+  for (const char of key) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+
+  return length > 0 ? hash % length : 0;
+}
+
+type StandingRowForDailyTable = {
+  rank?: number;
+  team?: {
+    id?: number;
+    name?: string;
+    logo?: string;
+  };
+  points?: number;
+  goalsDiff?: number;
+  all?: {
+    played?: number;
+    win?: number;
+    draw?: number;
+    lose?: number;
+    goals?: {
+      for?: number;
+      against?: number;
+    };
+  };
+};
+
+type TopScorerForDailyTable = {
+  player?: {
+    name?: string;
+    photo?: string;
+  };
+  statistics?: Array<{
+    team?: {
+      name?: string;
+    };
+    goals?: {
+      total?: number | null;
+    };
+  }>;
+};
+
+function normalizeDailyTableRows(
+  groups: StandingRowForDailyTable[][] | undefined
+): SportLeagueTableRow[] {
+  const rows = groups?.[0] ?? [];
+
+  return rows
+    .filter(row => row.team?.name)
+    .map(row => ({
+      rank: row.rank ?? 0,
+      teamId: row.team?.id,
+      team: row.team?.name ?? "Okänt lag",
+      logo: row.team?.logo,
+      played: row.all?.played ?? 0,
+      wins: row.all?.win ?? 0,
+      draws: row.all?.draw ?? 0,
+      losses: row.all?.lose ?? 0,
+      goalsFor: row.all?.goals?.for ?? 0,
+      goalsAgainst: row.all?.goals?.against ?? 0,
+      goalDifference: row.goalsDiff ?? 0,
+      points: row.points ?? 0,
+    }));
+}
+
+function normalizeDailyScorers(
+  response: TopScorerForDailyTable[] | null | undefined
+): SportLeagueScorer[] {
+  return (response ?? [])
+    .map(item => {
+      const statistic = item.statistics?.find(
+        entry =>
+          typeof entry.goals?.total === "number" &&
+          Boolean(entry.team?.name)
+      );
+
+      if (!item.player?.name || !statistic?.team?.name) {
+        return null;
+      }
+
+      return {
+        name: item.player.name,
+        team: statistic.team.name,
+        goals: statistic.goals?.total ?? 0,
+        photo: item.player.photo,
+      };
+    })
+    .filter((item): item is SportLeagueScorer => item !== null)
+    .slice(0, 3);
+}
+
+async function fetchSelectedLeagueTable(
+  results: SportResult[]
+): Promise<SportLeagueTable | null> {
+  const candidates = Array.from(
+    new Map(
+      results
+        .filter(result => result.leagueId && DAILY_TABLE_LEAGUES.has(result.leagueId))
+        .map(result => [result.leagueId!, result])
+    ).values()
+  );
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  const selectedResult = candidates[
+    stableDailyPickIndex(candidates.length)
+  ];
+
+  if (!selectedResult.leagueId) {
+    return null;
+  }
+
+  const title = DAILY_TABLE_LEAGUES.get(selectedResult.leagueId);
+  if (!title) {
+    return null;
+  }
+
+  const season = dailyTableSeason();
+
+  const [standingsResult, scorersResult] = await Promise.allSettled([
+    apiFootballGet<{ league?: { standings?: StandingRowForDailyTable[][] } }[]>(
+      "/standings",
+      {
+        league: String(selectedResult.leagueId),
+        season: String(season),
+      }
+    ),
+    apiFootballGet<TopScorerForDailyTable[]>(
+      "/players/topscorers",
+      {
+        league: String(selectedResult.leagueId),
+        season: String(season),
+      }
+    ),
+  ]);
+
+  const rows =
+    standingsResult.status === "fulfilled"
+      ? normalizeDailyTableRows(
+          standingsResult.value?.[0]?.league?.standings
+        )
+      : [];
+
+  const scorers =
+    scorersResult.status === "fulfilled"
+      ? normalizeDailyScorers(scorersResult.value)
+      : [];
+
+  const errors: string[] = [];
+
+  if (standingsResult.status === "rejected") {
+    errors.push(
+      standingsResult.reason instanceof Error
+        ? standingsResult.reason.message
+        : "Tabellen kunde inte hämtas."
+    );
+  }
+
+  if (scorersResult.status === "rejected") {
+    errors.push(
+      scorersResult.reason instanceof Error
+        ? scorersResult.reason.message
+        : "Skytteligan kunde inte hämtas."
+    );
+  }
+
+  if (!rows.length && !scorers.length) {
+    return {
+      leagueId: selectedResult.leagueId,
+      title,
+      season,
+      relatedResult: {
+        id: selectedResult.id,
+        home: selectedResult.home,
+        away: selectedResult.away,
+        homeScore: selectedResult.homeScore,
+        awayScore: selectedResult.awayScore,
+      },
+      rows: [],
+      scorers: [],
+      error:
+        errors.join(" ") ||
+        "Ingen tabell- eller skytteligadata kunde hämtas.",
+    };
+  }
+
+  return {
+    leagueId: selectedResult.leagueId,
+    title,
+    season,
+    relatedResult: {
+      id: selectedResult.id,
+      home: selectedResult.home,
+      away: selectedResult.away,
+      homeScore: selectedResult.homeScore,
+      awayScore: selectedResult.awayScore,
+    },
+    rows,
+    scorers,
+    error: errors.length ? errors.join(" ") : undefined,
+  };
+}
+
+
 async function apiFootballGet(path: string, params: Record<string, string>) {
   const key = process.env.API_FOOTBALL_KEY;
   if (!key) return null;
@@ -287,6 +555,7 @@ function mapFixture(fixture: ApiFootballFixture): SportResult | null {
     id,
     date: fixture.fixture.date,
     league: fixture.league?.name ?? "Fotboll",
+    leagueId: fixture.league?.id,
     home,
     away,
     homeScore: fixture.goals?.home ?? null,
@@ -557,7 +826,13 @@ async function enrichElfsborg(
 
 export async function fetchSportDay(): Promise<SportDayData> {
   if (!process.env.API_FOOTBALL_KEY) {
-    return { results: [], upcoming: [], provider: { apiFootball: false, sportmonks: false }, fetchedAt: new Date().toISOString() };
+    return {
+      results: [],
+      upcoming: [],
+      selectedLeague: null,
+      provider: { apiFootball: false, sportmonks: false },
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
   try {
@@ -629,8 +904,10 @@ export async function fetchSportDay(): Promise<SportDayData> {
       fixture =>
         !isFinished(fixture) &&
         new Date(fixture.fixture?.date ?? "").getTime() > Date.now() &&
-        isRelevantUpcomingFixture(fixture) ||
-        articleMentionsFixture(fixture, sportArticles) > 0
+        (
+          isRelevantUpcomingFixture(fixture) ||
+          articleMentionsFixture(fixture, sportArticles) > 0
+        )
     );
 
     const upcoming = todayUpcoming
@@ -658,15 +935,29 @@ export async function fetchSportDay(): Promise<SportDayData> {
       localToday()
     );
 
+    const selectedLeague = await fetchSelectedLeagueTable(
+      enrichedResults
+    );
+
     return {
       results: enrichedResults,
       upcoming,
+      selectedLeague,
       provider: { apiFootball: true, sportmonks: Boolean(process.env.SPORTMONKS_TOKEN) },
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {
     console.error("Sportdata misslyckades:", error);
-    return { results: [], upcoming: [], provider: { apiFootball: true, sportmonks: Boolean(process.env.SPORTMONKS_TOKEN) }, fetchedAt: new Date().toISOString() };
+    return {
+      results: [],
+      upcoming: [],
+      selectedLeague: null,
+      provider: {
+        apiFootball: true,
+        sportmonks: Boolean(process.env.SPORTMONKS_TOKEN),
+      },
+      fetchedAt: new Date().toISOString(),
+    };
   }
 }
 
