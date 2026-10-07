@@ -11,6 +11,7 @@ import { getTodayDailyEdition } from "@/lib/dailyEdition";
 import { MarketDayPanel } from "./components/MarketDayPanel";
 import { SportDayPanel } from "./components/SportDayPanel";
 import { QuoteDivider } from "./components/QuoteDivider";
+import { ReaderCount } from "./components/ReaderCount";
 
 export const dynamic = "force-dynamic";
 
@@ -179,7 +180,7 @@ export default async function Home() {
 
         <div className="flex items-center justify-between border-b border-slate-400 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
           <span>07:01 · Din edition</span>
-          <span>{profile.totalClicks} lästa länkar · redaktören lär sig</span>
+          <span><ReaderCount initialCount={profile.totalClicks} /> lästa artiklar · redaktören lär sig</span>
         </div>
 
         {weather.days.length > 0 && (
