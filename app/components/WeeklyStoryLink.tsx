@@ -54,7 +54,7 @@ export function WeeklyStoryLink({ href, children, className }: WeeklyStoryLinkPr
       rel="noopener noreferrer"
       onClick={event => {
         event.preventDefault();
-        handleClick();
+        handleClick(event);
       }}
       className={className}
     >
