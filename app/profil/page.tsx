@@ -24,6 +24,63 @@ function pretty(value: string) {
     .replace(/^./, char => char.toUpperCase());
 }
 
+const STOCKHOLM_TIME_ZONE = "Europe/Stockholm";
+
+function stockholmParts(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: STOCKHOLM_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    weekday: "short",
+  }).formatToParts(value);
+
+  return Object.fromEntries(
+    parts
+      .filter(part => part.type !== "literal")
+      .map(part => [part.type, part.value])
+  );
+}
+
+function stockholmDateKey(value: Date) {
+  const parts = stockholmParts(value);
+  return parts.year + "-" + parts.month + "-" + parts.day;
+}
+
+function shiftDateKey(dateKey: string, days: number) {
+  const [year, month, day] = dateKey
+    .split("-")
+    .map(Number);
+
+  return new Date(
+    Date.UTC(year, month - 1, day + days)
+  )
+    .toISOString()
+    .slice(0, 10);
+}
+
+function weekdayLabel(dateKey: string) {
+  const [year, month, day] = dateKey
+    .split("-")
+    .map(Number);
+
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: STOCKHOLM_TIME_ZONE,
+    weekday: "short",
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+function hourOfDay(value: Date) {
+  return Number(stockholmParts(value).hour);
+}
+
+function percentage(value: number, total: number) {
+  if (total <= 0) return 0;
+  return Math.round((value / total) * 100);
+}
+
 function formatDate(value: string | null) {
   if (!value) return "–";
 
@@ -137,7 +194,7 @@ function Kpi({
 export default async function ProfilePage() {
   const [profile, activity, weeklyReadLinks] = await Promise.all([
     getReaderProfile(),
-    getRecentReaderActivity(20),
+    getRecentReaderActivity(50),
     getWeeklyReadLinks(),
   ]);
 
@@ -145,6 +202,85 @@ export default async function ProfilePage() {
   const articleTypeEntries = topEntries(profile.articleType, 6);
   const sourceEntries = topEntries(profile.source, 8);
   const topicEntries = topEntries(profile.topic, 10);
+
+  const recentActivity = activity;
+  const now = Date.now();
+  const last7Count = recentActivity.filter(
+    item => now - new Date(item.timestamp).getTime() <= 7 * 24 * 60 * 60 * 1000
+  ).length;
+  const last30Count = recentActivity.filter(
+    item => now - new Date(item.timestamp).getTime() <= 30 * 24 * 60 * 60 * 1000
+  ).length;
+
+  const todayKey = stockholmDateKey(new Date());
+  const last7Days = Array.from({ length: 7 }, (_, index) => {
+    const key = shiftDateKey(todayKey, index - 6);
+    return {
+      key,
+      label: weekdayLabel(key),
+      count: recentActivity.filter(
+        item => stockholmDateKey(new Date(item.timestamp)) === key
+      ).length,
+    };
+  });
+  const maxDayCount = Math.max(
+    1,
+    ...last7Days.map(day => day.count)
+  );
+
+  const activityDays = new Set(
+    recentActivity.map(item =>
+      stockholmDateKey(new Date(item.timestamp))
+    )
+  );
+  let readingStreak = 0;
+  while (
+    activityDays.has(shiftDateKey(todayKey, -readingStreak))
+  ) {
+    readingStreak += 1;
+  }
+
+  const hourCounts = new Map<number, number>();
+  const weekdayCounts = new Map<string, number>();
+  for (const item of recentActivity) {
+    const date = new Date(item.timestamp);
+    const hour = hourOfDay(date);
+    hourCounts.set(hour, (hourCounts.get(hour) ?? 0) + 1);
+
+    const weekday = weekdayLabel(stockholmDateKey(date));
+    weekdayCounts.set(
+      weekday,
+      (weekdayCounts.get(weekday) ?? 0) + 1
+    );
+  }
+
+  const topHour = [...hourCounts.entries()]
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+  const topWeekday = [...weekdayCounts.entries()]
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  const sourceTotal = sourceEntries.reduce(
+    (sum, [, value]) => sum + value,
+    0
+  );
+
+  const strongestType = articleTypeEntries[0]
+    ? pretty(articleTypeEntries[0][0])
+    : null;
+  const strongestSource = sourceEntries[0]
+    ? pretty(sourceEntries[0][0])
+    : null;
+
+  const profileSummary =
+    strongestType && strongestSource
+      ? "Du läser mest " +
+        strongestCategory.toLowerCase() +
+        ", med en tydlig dragning mot " +
+        strongestType.toLowerCase() +
+        " från " +
+        strongestSource +
+        "."
+      : "Mönstret blir tydligare ju mer du läser.";
 
   const strongestCategory = categoryEntries[0]
     ? CATEGORY_LABELS[categoryEntries[0][0]] ??
@@ -282,7 +418,193 @@ export default async function ProfilePage() {
         </div>
 
         <section className="mt-9 grid gap-9 lg:grid-cols-2">
-          <section className="border-b-2 border-slate-950 pb-9">
+          <section className="border-b-2 border-slate-950 pb-9 lg:col-span-2">
+          <div className="mb-5 border-b border-slate-300 pb-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
+              Just nu
+            </div>
+            <h2 className="mt-1 font-serif text-2xl font-black">
+              Dina hetaste intressen
+            </h2>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+            <div>
+              {topicEntries.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {topicEntries.slice(0, 8).map(([topic, value]) => (
+                    <span
+                      key={topic}
+                      className="border border-slate-400 bg-[#ece7d8] px-3 py-2 text-sm"
+                    >
+                      {topic}
+                      <span className="ml-2 text-xs text-slate-400">
+                        {Math.round(value)}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-serif text-base leading-7 text-slate-500">
+                  Några fler läsningar behövs innan vi kan se tydliga ämnen.
+                </p>
+              )}
+            </div>
+
+            <div className="border-l-2 border-slate-950 pl-5">
+              <div className="font-serif text-lg font-black">
+                Så känner Glenn News dig
+              </div>
+              <p className="mt-2 font-serif text-base leading-7 text-slate-600">
+                {profileSummary}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-9 border-b-2 border-slate-950 pb-9">
+          <div className="mb-5 border-b border-slate-300 pb-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
+              Läsvana
+            </div>
+            <h2 className="mt-1 font-serif text-2xl font-black">
+              Din läsning över tid
+            </h2>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            <Kpi
+              value={String(last7Count)}
+              label="Senaste 7 dagarna"
+              note="Registrerade artikelklick i den senaste veckan"
+            />
+            <Kpi
+              value={String(last30Count)}
+              label="Senaste 30 dagarna"
+              note="Så mycket av din läsning vi ser i aktuell historik"
+            />
+            <Kpi
+              value={readingStreak ? String(readingStreak) + " dagar" : "–"}
+              label="Lässerie"
+              note={
+                readingStreak
+                  ? "Du har läst Glenn News varje dag i serien"
+                  : "Öppna en artikel idag för att starta en serie"
+              }
+            />
+          </div>
+
+          <div className="mt-7 grid grid-cols-7 gap-2">
+            {last7Days.map(day => (
+              <div key={day.key}>
+                <div className="flex h-28 items-end border-b border-slate-300">
+                  <div
+                    className="w-full bg-slate-950"
+                    style={{
+                      height:
+                        day.count > 0
+                          ? String(
+                              Math.max(
+                                10,
+                                Math.round(
+                                  (day.count / maxDayCount) * 100
+                                )
+                              )
+                            ) + "%"
+                          : "3%",
+                    }}
+                    title={String(day.count) + " lästa"}
+                  />
+                </div>
+                <div className="mt-2 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                  {day.label}
+                </div>
+                <div className="mt-1 text-center text-xs text-slate-400">
+                  {day.count}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-9 border-b-2 border-slate-950 pb-9">
+          <div className="mb-5 border-b border-slate-300 pb-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
+              Favoriter
+            </div>
+            <h2 className="mt-1 font-serif text-2xl font-black">
+              Där du gärna läser
+            </h2>
+          </div>
+
+          {sourceEntries.length ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {sourceEntries.slice(0, 6).map(([source, value]) => (
+                <div key={source}>
+                  <div className="flex items-center justify-between gap-4 text-sm">
+                    <span className="font-bold">{pretty(source)}</span>
+                    <span className="text-slate-400">
+                      {percentage(value, sourceTotal)}%
+                    </span>
+                  </div>
+                  <div className="mt-1 h-2 overflow-hidden bg-slate-200">
+                    <div
+                      className="h-full bg-slate-950"
+                      style={{
+                        width:
+                          String(
+                            Math.max(
+                              4,
+                              percentage(value, sourceTotal)
+                            )
+                          ) + "%",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="font-serif text-base leading-7 text-slate-500">
+              Dina favoritkällor börjar synas efter några läsningar.
+            </p>
+          )}
+        </section>
+
+        <section className="mt-9 border-y-2 border-slate-950 py-7">
+          <div className="mb-5 border-b border-slate-300 pb-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
+              Din rytm
+            </div>
+            <h2 className="mt-1 font-serif text-2xl font-black">
+              När du brukar läsa
+            </h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="border-l-2 border-slate-950 pl-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                Mest aktiv tid
+              </div>
+              <div className="mt-1 font-serif text-3xl font-black">
+                {topHour !== undefined
+                  ? String(topHour).padStart(2, "0") + "–" +
+                    String((topHour + 1) % 24).padStart(2, "0")
+                  : "–"}
+              </div>
+            </div>
+            <div className="border-l-2 border-slate-950 pl-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                Mest aktiv veckodag
+              </div>
+              <div className="mt-1 font-serif text-3xl font-black">
+                {topWeekday ?? "–"}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-b-2 border-slate-950 pb-9">
             <div className="mb-5 border-b border-slate-300 pb-3">
               <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
                 Källor
@@ -340,13 +662,13 @@ export default async function ProfilePage() {
               </h2>
             </div>
             <div className="text-xs uppercase tracking-[0.14em] text-slate-400">
-              {activity.length} registrerade aktiviteter
+              {Math.min(activity.length, 20)} senaste registrerade aktiviteter
             </div>
           </div>
 
           {activity.length ? (
             <div className="mt-6">
-              {activity.map((item, index) => (
+              {activity.slice(0, 20).map((item, index) => (
                 <div
                   key={[
                     item.timestamp,
