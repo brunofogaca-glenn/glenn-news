@@ -1,3 +1,4 @@
+// Production baseline restored from known-good deployment cd70db3.
 import { get, put } from "@vercel/blob";
 
 export type ReaderProfile = {
