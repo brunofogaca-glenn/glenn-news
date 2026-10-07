@@ -229,6 +229,13 @@ function chooseSeason(
 }
 
 async function resolveCompetition(config: CompetitionConfig) {
+  if (config.fixedLeagueId && config.fixedSeason) {
+    return {
+      leagueId: config.fixedLeagueId,
+      season: config.fixedSeason,
+    };
+  }
+
   if (config.fixedLeagueId) {
     const response = await apiFootballGet<LeagueInfo[]>(
       "/leagues",
@@ -236,7 +243,7 @@ async function resolveCompetition(config: CompetitionConfig) {
     );
     return {
       leagueId: config.fixedLeagueId,
-      season: chooseSeason(response?.[0]?.seasons, config.fixedSeason),
+      season: chooseSeason(response?.[0]?.seasons),
     };
   }
 
