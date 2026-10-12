@@ -18,19 +18,20 @@ function formatDate(value: string) {
 }
 
 function Table({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }) {
-  const relatedTeams = new Set([
-    data.relatedResult.home,
-    data.relatedResult.away,
-  ]);
+  const relatedTeams = new Set(
+    data.relatedResult
+      ? [data.relatedResult.home, data.relatedResult.away]
+      : []
+  );
 
   if (!data.rows.length) {
     return (
       <div className="border-y border-slate-300 py-4 text-sm text-slate-500">
         <p className="font-serif">
-          Tabellen för {data.title} kunde inte hämtas just nu.
+          Tabellen för {data.title} säsongen {data.season} kunde inte hämtas just nu.
         </p>
-        {data.error && (
-          <p className="mt-1 text-xs">{data.error}</p>
+        {data.tableError && (
+          <p className="mt-1 text-xs">{data.tableError}</p>
         )}
       </div>
     );
@@ -88,8 +89,8 @@ function Table({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }) 
           })}
         </tbody>
       </table>
-      {data.error && (
-        <p className="mt-2 text-xs text-slate-500">{data.error}</p>
+      {data.tableError && (
+        <p className="mt-2 text-xs text-slate-500">{data.tableError}</p>
       )}
     </div>
   );
@@ -99,7 +100,12 @@ function Scorers({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }
   if (!data.scorers.length) {
     return (
       <div className="border-l-2 border-slate-950 pl-4 text-sm text-slate-500">
-        Skytteligan kunde inte hämtas just nu.
+        <p>
+          Skytteligan för {data.title} säsongen {data.season} kunde inte hämtas just nu.
+        </p>
+        {data.scorersError && (
+          <p className="mt-2 text-xs">{data.scorersError}</p>
+        )}
       </div>
     );
   }
@@ -136,8 +142,8 @@ function Scorers({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }
           </div>
         ))}
       </div>
-      {data.error && (
-        <p className="mt-3 text-xs text-slate-500">{data.error}</p>
+      {data.scorersError && (
+        <p className="mt-3 text-xs text-slate-500">{data.scorersError}</p>
       )}
     </aside>
   );
@@ -264,12 +270,20 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
             </div>
             <div className="text-xs text-slate-500 md:text-right">
               <div>
-                Kopplad till gårdagens resultat:{" "}
+                Veckans ligaval:{" "}
                 <span className="font-bold text-slate-700">
-                  {data.selectedLeague.relatedResult.home} –{" "}
-                  {data.selectedLeague.relatedResult.away}
+                  {data.selectedLeague.dayLabel}
                 </span>
               </div>
+              {data.selectedLeague.relatedResult && (
+                <div className="mt-1">
+                  Gårdagens resultat:{" "}
+                  <span className="font-bold text-slate-700">
+                    {data.selectedLeague.relatedResult.home} –{" "}
+                    {data.selectedLeague.relatedResult.away}
+                  </span>
+                </div>
+              )}
               <div className="mt-1">
                 Säsong {data.selectedLeague.season}
               </div>
