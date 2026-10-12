@@ -116,7 +116,7 @@ export type SportLeagueScorer = {
 export type SportLeagueTable = {
   leagueId: number;
   title: string;
-  season: number;
+  season: string;
   dayLabel: string;
   relatedResult?: {
     id: number;
@@ -281,18 +281,19 @@ function isRelevantFixture(fixture: ApiFootballFixture) {
 
 type DailyTableSelection = {
   leagueId: number;
+  fotmobLeagueId: number;
   title: string;
   dayLabel: string;
 };
 
 const DAILY_TABLE_SCHEDULE: Record<string, DailyTableSelection> = {
-  Monday: { dayLabel: "Måndag", leagueId: 113, title: "Allsvenskan" },
-  Tuesday: { dayLabel: "Tisdag", leagueId: 114, title: "Superettan" },
-  Wednesday: { dayLabel: "Onsdag", leagueId: 140, title: "La Liga" },
-  Thursday: { dayLabel: "Torsdag", leagueId: 39, title: "Premier League" },
-  Friday: { dayLabel: "Fredag", leagueId: 40, title: "Championship" },
-  Saturday: { dayLabel: "Lördag", leagueId: 135, title: "Serie A" },
-  Sunday: { dayLabel: "Söndag", leagueId: 2, title: "Champions League" },
+  Monday: { dayLabel: "Måndag", leagueId: 113, fotmobLeagueId: 67, title: "Allsvenskan" },
+  Tuesday: { dayLabel: "Tisdag", leagueId: 114, fotmobLeagueId: 168, title: "Superettan" },
+  Wednesday: { dayLabel: "Onsdag", leagueId: 140, fotmobLeagueId: 87, title: "La Liga" },
+  Thursday: { dayLabel: "Torsdag", leagueId: 39, fotmobLeagueId: 47, title: "Premier League" },
+  Friday: { dayLabel: "Fredag", leagueId: 40, fotmobLeagueId: 48, title: "Championship" },
+  Saturday: { dayLabel: "Lördag", leagueId: 135, fotmobLeagueId: 55, title: "Serie A" },
+  Sunday: { dayLabel: "Söndag", leagueId: 2, fotmobLeagueId: 42, title: "Champions League" },
 };
 
 function dailyTableSelection(): DailyTableSelection {
@@ -304,107 +305,108 @@ function dailyTableSelection(): DailyTableSelection {
   return DAILY_TABLE_SCHEDULE[weekday] ?? DAILY_TABLE_SCHEDULE.Monday;
 }
 
-function dailyTableSeason(leagueId: number, dateValue = localToday()) {
-  const year = Number(dateValue.slice(0, 4));
-  const month = Number(dateValue.slice(5, 7));
-
-  // Allsvenskan and Superettan use calendar-year seasons.
-  if (leagueId === 113 || leagueId === 114) {
-    return year;
-  }
-
-  // The other selected competitions span two calendar years.
-  return month <= 6 ? year - 1 : year;
-}
-
-type StandingRowForDailyTable = {
-  rank?: number;
-  team?: {
-    id?: number;
-    name?: string;
-    logo?: string;
-  };
-  points?: number;
-  goalsDiff?: number;
-  all?: {
-    played?: number;
-    win?: number;
-    draw?: number;
-    lose?: number;
-    goals?: {
-      for?: number;
-      against?: number;
-    };
-  };
+type FotMobStandingRow = {
+  idx?: number;
+  id?: number | string;
+  name?: string;
+  played?: number;
+  wins?: number;
+  draws?: number;
+  losses?: number;
+  scoresStr?: string;
+  goalConDiff?: number;
+  pts?: number;
 };
 
-type TopScorerForDailyTable = {
-  player?: {
-    name?: string;
-    photo?: string;
+type FotMobLeaguePayload = {
+  details?: {
+    selectedSeason?: string;
+    latestSeason?: string;
   };
-  statistics?: Array<{
-    team?: {
-      name?: string;
-    };
-    goals?: {
-      total?: number | null;
+  table?: Array<{
+    data?: {
+      leagueId?: number;
+      table?: {
+        all?: FotMobStandingRow[];
+      };
     };
   }>;
+  stats?: {
+    players?: Array<{
+      header?: string;
+      topThree?: Array<{
+        id?: number | string;
+        name?: string;
+        value?: number | string;
+        teamId?: number | string;
+        teamName?: string;
+        photo?: string;
+      }>;
+    }>;
+  };
 };
 
-function normalizeDailyTableRows(
-  groups: StandingRowForDailyTable[][] | undefined
+function normalizeFotMobTableRows(
+  groups: FotMobLeaguePayload["table"]
 ): SportLeagueTableRow[] {
-  const rows = groups?.[0] ?? [];
+  const rows = groups?.flatMap(group => group.data?.table?.all ?? []) ?? [];
 
   return rows
-    .filter(row => row.team?.name)
-    .map(row => ({
-      rank: row.rank ?? 0,
-      teamId: row.team?.id,
-      team: row.team?.name ?? "Okänt lag",
-      logo: row.team?.logo,
-      played: row.all?.played ?? 0,
-      wins: row.all?.win ?? 0,
-      draws: row.all?.draw ?? 0,
-      losses: row.all?.lose ?? 0,
-      goalsFor: row.all?.goals?.for ?? 0,
-      goalsAgainst: row.all?.goals?.against ?? 0,
-      goalDifference: row.goalsDiff ?? 0,
-      points: row.points ?? 0,
-    }));
+    .filter(row => Boolean(row.name))
+    .map((row, index) => {
+      const score = (row.scoresStr ?? "").match(/^\s*(\d+)\s*[-–:]\s*(\d+)\s*$/);
+      const parsedTeamId = row.id === undefined ? undefined : Number(row.id);
+      const teamId = parsedTeamId !== undefined && Number.isFinite(parsedTeamId)
+        ? parsedTeamId
+        : undefined;
+
+      return {
+        rank: row.idx ?? index + 1,
+        teamId,
+        team: row.name ?? "Okänt lag",
+        logo: teamId !== undefined
+          ? "https://images.fotmob.com/image_resources/logo/teamlogo/" + teamId + "_small.png"
+          : undefined,
+        played: row.played ?? 0,
+        wins: row.wins ?? 0,
+        draws: row.draws ?? 0,
+        losses: row.losses ?? 0,
+        goalsFor: score ? Number(score[1]) : 0,
+        goalsAgainst: score ? Number(score[2]) : 0,
+        goalDifference: row.goalConDiff ?? 0,
+        points: row.pts ?? 0,
+      };
+    });
 }
 
-function normalizeDailyScorers(
-  response: TopScorerForDailyTable[] | null | undefined
+function normalizeFotMobScorers(
+  stats: FotMobLeaguePayload["stats"],
+  rows: SportLeagueTableRow[]
 ): SportLeagueScorer[] {
-  const scorers: SportLeagueScorer[] = [];
+  const goalStats = stats?.players?.find(entry =>
+    /goal|scorer/i.test(entry.header ?? "") && Array.isArray(entry.topThree)
+  );
+  if (!goalStats?.topThree?.length) return [];
 
-  for (const item of response ?? []) {
-    const statistic = item.statistics?.find(
-      entry =>
-        typeof entry.goals?.total === "number" &&
-        Boolean(entry.team?.name)
-    );
+  const teamNames = new Map(
+    rows
+      .filter(row => row.teamId !== undefined)
+      .map(row => [String(row.teamId), row.team])
+  );
 
-    if (!item.player?.name || !statistic?.team?.name) {
-      continue;
-    }
-
-    scorers.push({
-      name: item.player.name,
-      team: statistic.team.name,
-      goals: statistic.goals?.total ?? 0,
-      photo: item.player.photo,
-    });
-
-    if (scorers.length === 3) {
-      break;
-    }
-  }
-
-  return scorers;
+  return goalStats.topThree
+    .filter(player => Boolean(player.name) && Number.isFinite(Number(player.value)))
+    .sort((a, b) => Number(b.value) - Number(a.value))
+    .slice(0, 3)
+    .map(player => ({
+      name: player.name ?? "Okänd spelare",
+      team:
+        player.teamName ??
+        (player.teamId !== undefined ? teamNames.get(String(player.teamId)) : undefined) ??
+        "Okänt lag",
+      goals: Number(player.value),
+      photo: player.photo,
+    }));
 }
 
 async function fetchSelectedLeagueTable(
@@ -414,114 +416,87 @@ async function fetchSelectedLeagueTable(
   const relatedResult = results.find(
     result => result.leagueId === selected.leagueId
   );
-  const currentSeason = dailyTableSeason(selected.leagueId);
+  const fallbackSeason = Number(localToday().slice(0, 4)).toString();
 
-  const fetchSeason = async (season: number) => {
-    const [standingsResult, scorersResult] = await Promise.allSettled([
-      apiFootballGet<{ league?: { standings?: StandingRowForDailyTable[][] } }[]>(
-        "/standings",
-        {
-          league: String(selected.leagueId),
-          season: String(season),
-        }
-      ),
-      apiFootballGet<TopScorerForDailyTable[]>(
-        "/players/topscorers",
-        {
-          league: String(selected.leagueId),
-          season: String(season),
-        }
-      ),
-    ]);
+  try {
+    const url = new URL("https://www.fotmob.com/api/data/leagues");
+    url.searchParams.set("id", String(selected.fotmobLeagueId));
 
-    const rows =
-      standingsResult.status === "fulfilled"
-        ? normalizeDailyTableRows(
-            standingsResult.value?.[0]?.league?.standings
-          )
-        : [];
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        "user-agent": "GlennNews/1.0 (football table)",
+        Accept: "application/json",
+      },
+    });
 
-    const scorers =
-      scorersResult.status === "fulfilled"
-        ? normalizeDailyScorers(scorersResult.value)
-        : [];
+    if (!response.ok) {
+      throw new Error("FotMob returned HTTP " + response.status);
+    }
+    if (!response.headers.get("content-type")?.includes("json")) {
+      throw new Error("FotMob returned a non-JSON response");
+    }
 
-    const tableError =
-      standingsResult.status === "rejected"
-        ? standingsResult.reason instanceof Error
-          ? standingsResult.reason.message
-          : "Tabellen kunde inte hämtas."
-        : !rows.length
-          ? `API-Football returnerade ingen tabell för ${selected.title} säsongen ${season}.`
-          : undefined;
+    const payload = (await response.json()) as FotMobLeaguePayload;
+    const rows = normalizeFotMobTableRows(payload.table);
+    const scorers = normalizeFotMobScorers(payload.stats, rows);
+    const season =
+      payload.details?.selectedSeason ??
+      payload.details?.latestSeason ??
+      fallbackSeason;
 
-    const scorersError =
-      scorersResult.status === "rejected"
-        ? scorersResult.reason instanceof Error
-          ? scorersResult.reason.message
-          : "Skytteligan kunde inte hämtas."
-        : !scorers.length
-          ? `API-Football returnerade ingen skytteliga för ${selected.title} säsongen ${season}.`
-          : undefined;
-
-    const hasRequestErrors =
-      standingsResult.status === "rejected" ||
-      scorersResult.status === "rejected";
-    const retryPrevious =
-      !hasRequestErrors && rows.length === 0 && scorers.length === 0;
+    if (rows.length === 0) {
+      console.warn("FotMob returned no standings for", selected.title, season);
+    }
+    if (scorers.length === 0) {
+      console.warn("FotMob returned no top scorers for", selected.title, season);
+    }
 
     return {
+      leagueId: selected.leagueId,
+      title: selected.title,
       season,
+      dayLabel: selected.dayLabel,
+      relatedResult: relatedResult
+        ? {
+            id: relatedResult.id,
+            home: relatedResult.home,
+            away: relatedResult.away,
+            homeScore: relatedResult.homeScore,
+            awayScore: relatedResult.awayScore,
+          }
+        : undefined,
       rows,
       scorers,
-      tableError,
-      scorersError,
-      hasRequestErrors,
-      retryPrevious,
+      tableError: rows.length
+        ? undefined
+        : "FotMob returnerade ingen aktuell tabell för " + selected.title + " säsongen " + season + ".",
+      scorersError: scorers.length
+        ? undefined
+        : "FotMob returnerade ingen aktuell skytteliga för " + selected.title + " säsongen " + season + ".",
     };
-  };
-
-  let seasonData = await fetchSeason(currentSeason);
-
-  // Some leagues have no standings yet early in a season. In that case,
-  // try the previous season instead of leaving the panel blank.
-  if (seasonData.retryPrevious) {
-    const previousSeasonData = await fetchSeason(currentSeason - 1);
-
-    if (
-      previousSeasonData.rows.length ||
-      previousSeasonData.scorers.length ||
-      previousSeasonData.hasRequestErrors
-    ) {
-      seasonData = previousSeasonData;
-    } else {
-      seasonData = {
-        ...seasonData,
-        tableError: `Ingen tabell hittades för ${selected.title} säsongen ${currentSeason} eller ${currentSeason - 1}.`,
-        scorersError: `Ingen skytteliga hittades för ${selected.title} säsongen ${currentSeason} eller ${currentSeason - 1}.`,
-      };
-    }
+  } catch (error) {
+    console.error("FotMob tabellhämtning misslyckades:", selected.title, error);
+    return {
+      leagueId: selected.leagueId,
+      title: selected.title,
+      season: fallbackSeason,
+      dayLabel: selected.dayLabel,
+      relatedResult: relatedResult
+        ? {
+            id: relatedResult.id,
+            home: relatedResult.home,
+            away: relatedResult.away,
+            homeScore: relatedResult.homeScore,
+            awayScore: relatedResult.awayScore,
+          }
+        : undefined,
+      rows: [],
+      scorers: [],
+      tableError: "Den aktuella tabellen för " + selected.title + " kunde inte hämtas från FotMob just nu.",
+      scorersError: "Skytteligan för " + selected.title + " kunde inte hämtas från FotMob just nu.",
+    };
   }
-
-  return {
-    leagueId: selected.leagueId,
-    title: selected.title,
-    season: seasonData.season,
-    dayLabel: selected.dayLabel,
-    relatedResult: relatedResult
-      ? {
-          id: relatedResult.id,
-          home: relatedResult.home,
-          away: relatedResult.away,
-          homeScore: relatedResult.homeScore,
-          awayScore: relatedResult.awayScore,
-        }
-      : undefined,
-    rows: seasonData.rows,
-    scorers: seasonData.scorers,
-    tableError: seasonData.tableError,
-    scorersError: seasonData.scorersError,
-  };
 }
 
 
@@ -886,11 +861,15 @@ async function enrichElfsborg(
 
 export async function fetchSportDay(): Promise<SportDayData> {
   if (!process.env.API_FOOTBALL_KEY) {
+    const selectedLeague = await fetchSelectedLeagueTable([]);
     return {
       results: [],
       upcoming: [],
-      selectedLeague: null,
-      provider: { apiFootball: false, sportmonks: false },
+      selectedLeague,
+      provider: {
+        apiFootball: false,
+        sportmonks: Boolean(process.env.SPORTMONKS_TOKEN),
+      },
       fetchedAt: new Date().toISOString(),
     };
   }
