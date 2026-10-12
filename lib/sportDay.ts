@@ -66,6 +66,7 @@ export type SportResult = {
   date: string;
   league: string;
   leagueId?: number;
+  country?: string;
   home: string;
   away: string;
   homeScore: number | null;
@@ -281,7 +282,7 @@ type MatchArticle = {
 function normalizeTeamName(value: string) {
   return value
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/&/g, "and")
     .replace(/[^a-z0-9]+/g, " ")
@@ -341,8 +342,8 @@ function isSelectedSportFixture(fixture: ApiFootballFixture) {
 function teamArticleTerms(teamName: string) {
   const normalized = normalizeTeamName(teamName);
   const baseName = normalized
-    .replace(/\\b(if|ff|fc|afc|fk|ik|bk|sk)\\b/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/\b(if|ff|fc|afc|fk|ik|bk|sk)\b/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
   return [...new Set([
     normalized,
@@ -380,7 +381,7 @@ function articlePriorityForFixture(fixture: ApiFootballFixture, articles: MatchA
       score += 65;
     }
 
-    if (stockholmDerby && /\\b(stockholmsderby|stockholm derby|derby|derbyt)\\b/.test(text)) {
+    if (stockholmDerby && /\b(stockholmsderby|stockholm derby|derby|derbyt)\b/.test(text)) {
       score += 120;
     }
   }
@@ -399,7 +400,7 @@ function fixtureImportance(fixture: ApiFootballFixture, articles: MatchArticle[]
 
   return (
     competitionPriorityForFixture(fixture) * 10 +
-    Math.max(teamPriority(home), teamPriority(away) * 1) * 2 +
+    Math.max(teamPriority(home), teamPriority(away)) * 2 +
     articlePriorityForFixture(fixture, articles)
   );
 }
@@ -693,6 +694,7 @@ function mapFixture(fixture: ApiFootballFixture): SportResult | null {
     date: fixture.fixture.date,
     league: fixture.league?.name ?? "Fotboll",
     leagueId: fixture.league?.id,
+    country: fixture.league?.country,
     home,
     away,
     homeScore: fixture.goals?.home ?? null,
