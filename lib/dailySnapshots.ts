@@ -408,47 +408,154 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
   };
 }
 
-function parseDateHeadingBlocks(html: string, baseUrl: string) {
-  const headings: Array<{ date: string; text: string; end: number }> = [];
-  const pattern = /<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/gi;
-  let match: RegExpExecArray | null;
+function parseRiksdagAgenda(html: string) {
+  const today = todayInStockholm();
+  const dayHeadings: Array<{ date: string; text: string; start: number; end: number }> = [];
+  const headingPattern = /<h2\b[^>]*>([\s\S]*?)<\/h2>/gi;
+  let headingMatch: RegExpExecArray | null;
 
-  while ((match = pattern.exec(html)) !== null) {
-    const text = htmlText(match[1]);
+  while ((headingMatch = headingPattern.exec(html)) !== null) {
+    const text = htmlText(headingMatch[1]);
     const date = parseDateFromText(text, true);
-    if (date && /\b(20\d{2}|\d{1,2}\s+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december))/i.test(text)) {
-      headings.push({ date, text, end: pattern.lastIndex });
-    }
+    if (!date || !/\b(?:måndag|tisdag|onsdag|torsdag|fredag|lördag|söndag)\b/i.test(text)) continue;
+    dayHeadings.push({ date, text, start: headingMatch.index, end: headingPattern.lastIndex });
   }
 
-  const today = todayInStockholm();
-  return headings
-    .map((heading, index) => {
-      const nextStart = headings[index + 1]?.end
-        ? html.lastIndexOf("<h", headings[index + 1].end)
-        : Math.min(html.length, heading.end + 5000);
-      const section = html.slice(heading.end, nextStart > heading.end ? nextStart : Math.min(html.length, heading.end + 5000));
-      const links = anchorsInHtml(section, baseUrl).filter(link =>
-        !/^(till innehåll|lättläst|teckenspråk|in english|dokument & lagar|aktuellt|start)$/i.test(link.title)
-      );
+  const entries: SnapshotLink[] = [];
+  for (let dayIndex = 0; dayIndex < dayHeadings.length; dayIndex++) {
+    const day = dayHeadings[dayIndex];
+    if (day.date < today) continue;
+    const sectionEnd = dayHeadings[dayIndex + 1]?.start ?? Math.min(html.length, day.end + 12000);
+    const section = html.slice(day.end, sectionEnd);
 
-      return {
-        date: heading.date,
-        title: heading.text,
-        url: links[0]?.url ?? baseUrl,
-        dateLabel: heading.text.replace(/\s+20\d{2}\b/, "").trim(),
-        description: links.slice(0, 3).map(link => link.title).join(" · ") ||
-          (section.toLowerCase().includes("inga ärenden") ? "Inga ärenden inplanerade." : undefined),
-        _today: today,
-      };
-    })
-    .filter(item => item.date >= today)
-    .map(({ _today: _unused, ...item }) => item);
+    const committeeHeadings: Array<{ index: number; title: string }> = [];
+    const committeePattern = /<h[3-6]\b[^>]*>([\s\S]*?)<\/h[3-6]>/gi;
+    let committeeMatch: RegExpExecArray | null;
+    while ((committeeMatch = committeePattern.exec(section)) !== null) {
+      const title = htmlText(committeeMatch[1]);
+      if (title && !parseDateFromText(title, true)) {
+        committeeHeadings.push({ index: committeeMatch.index, title });
+      }
+    }
+
+    const listPattern = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
+    let listMatch: RegExpExecArray | null;
+
+    while ((listMatch = listPattern.exec(section)) !== null) {
+      const itemHtml = listMatch[1];
+      const itemText = htmlText(itemHtml);
+      if (itemText.length < 8 || /^(till innehåll|lättläst|teckenspråk)$/i.test(itemText)) continue;
+      if (/inga ärenden inplanerade|det finns nu inga ärenden/i.test(itemText)) continue;
+
+      const links = anchorsInHtml(itemHtml, RIKSDAG_AGENDA_URL);
+      const documentLinks = links.filter(link =>
+        /dokument|betänkande|utlåtande|proposition|motion/i.test(link.title) ||
+        /\/dokument\//i.test(link.url)
+      );
+      let subject = itemText;
+      for (const link of documentLinks) {
+        subject = subject.replace(link.title, " ");
+      }
+      subject = subject
+        .replace(/\b(?:utlåtande|betänkande|proposition|motion|skrivelse)\s+\d{4}\/\d{2}:[\p{L}\d-]+\b/giu, " ")
+        .replace(/\s+/g, " ")
+        .replace(/^[·|,\-\s]+|[·|,\-\s]+$/g, "")
+        .trim();
+
+      if (subject.length < 8) continue;
+
+      const committee = committeeHeadings
+        .filter(heading => heading.index < (listMatch?.index ?? 0))
+        .at(-1)?.title;
+      const documentLabel = documentLinks.map(link => link.title).filter(Boolean).join(" · ");
+      entries.push({
+        title: subject,
+        url: documentLinks[0]?.url ?? links[0]?.url ?? RIKSDAG_AGENDA_URL,
+        date: day.date,
+        dateLabel: dateLabel(day.date),
+        time: extractTime(day.text),
+        description: [committee, documentLabel].filter(Boolean).join(" · ") || undefined,
+        kind: "riksdagsärende",
+      });
+      if (entries.length >= 8) break;
+    }
+
+    if (entries.length >= 8) break;
+  }
+
+  return dedupeEntries(entries).sort((a, b) =>
+    (a.date ?? "").localeCompare(b.date ?? "") ||
+    (a.time ?? "").localeCompare(b.time ?? "")
+  );
+}
+
+const RIKSDAG_RSS_URL = "https://data.riksdagen.se/dokumentlista/?avd=aktuellt&lang=sv&utformat=rss&sort=datum&sortorder=desc&sz=40";
+
+function rssTag(item: string, tag: string) {
+  const match = item.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + tag + ">", "i"));
+  if (!match) return "";
+  return htmlText(match[1].replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, ""));
+}
+
+function parseRiksdagNewsRss(xml: string) {
+  const entries: SnapshotLink[] = [];
+  const pattern = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(xml)) !== null) {
+    const block = match[1];
+    const title = rssTag(block, "title");
+    const url = absoluteUrl(rssTag(block, "link"), RIKSDAG_NEWS_URL);
+    const description = rssTag(block, "description");
+    const rawDate = rssTag(block, "pubDate");
+    const timestamp = rawDate ? new Date(rawDate).getTime() : NaN;
+    const date = Number.isFinite(timestamp) ? new Date(timestamp).toISOString().slice(0, 10) : undefined;
+
+    if (!title || title.length < 8 || !url) continue;
+    entries.push({
+      title,
+      url,
+      date,
+      dateLabel: date ? dateLabel(date) : undefined,
+      description: description.length > 20 ? description.slice(0, 260) : undefined,
+      kind: "riksdagsnyhet",
+    });
+    if (entries.length >= 6) break;
+  }
+
+  return dedupeEntries(entries);
+}
+
+async function getRiksdagNews() {
+  try {
+    const rssResponse = await fetch(RIKSDAG_RSS_URL, {
+      signal: AbortSignal.timeout(9000),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Glenn-News/1.0)",
+        Accept: "application/rss+xml,application/xml,text/xml,*/*",
+      },
+      cache: "no-store",
+    });
+    if (rssResponse.ok) {
+      const xml = await rssResponse.text();
+      const entries = parseRiksdagNewsRss(xml);
+      if (entries.length) return entries;
+    }
+  } catch (error) {
+    console.error("Riksdagens RSS kunde inte hämtas:", error);
+  }
+
+  try {
+    return parseRiksdagNews(await fetchHtml(RIKSDAG_NEWS_URL));
+  } catch (error) {
+    console.error("Riksdagens nyhetssida kunde inte hämtas:", error);
+    return [];
+  }
 }
 
 function parseRiksdagNews(html: string) {
   const entries: SnapshotLink[] = [];
-  const pattern = /<h3\b[^>]*>([\s\S]*?)<\/h3>/gi;
+  const pattern = /<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/gi;
   let match: RegExpExecArray | null;
 
   while ((match = pattern.exec(html)) !== null) {
@@ -456,9 +563,9 @@ function parseRiksdagNews(html: string) {
     if (!titleAnchor || titleAnchor.title.length < 8) continue;
     if (!titleAnchor.url.includes("/sv/aktuellt/")) continue;
 
-    const body = html.slice(pattern.lastIndex, Math.min(html.length, pattern.lastIndex + 1800));
+    const body = html.slice(pattern.lastIndex, Math.min(html.length, pattern.lastIndex + 2200));
     const cleaned = htmlText(body);
-    const description = cleaned.slice(0, 220).trim();
+    const description = cleaned.slice(0, 360).trim();
     entries.push({
       title: titleAnchor.title,
       url: titleAnchor.url,
@@ -471,17 +578,15 @@ function parseRiksdagNews(html: string) {
 }
 
 async function getNationalSnapshotInternal(): Promise<NationalSnapshot> {
-  const [agendaHtml, newsHtml] = await Promise.allSettled([
+  const [agendaHtml, newsResult] = await Promise.allSettled([
     fetchHtml(RIKSDAG_AGENDA_URL),
-    fetchHtml(RIKSDAG_NEWS_URL),
+    getRiksdagNews(),
   ]);
 
   const agenda = agendaHtml.status === "fulfilled"
-    ? parseDateHeadingBlocks(agendaHtml.value, RIKSDAG_AGENDA_URL).slice(0, 5)
+    ? parseRiksdagAgenda(agendaHtml.value).slice(0, 8)
     : [];
-  const news = newsHtml.status === "fulfilled"
-    ? parseRiksdagNews(newsHtml.value)
-    : [];
+  const news = newsResult.status === "fulfilled" ? newsResult.value : [];
 
   return {
     agenda,
