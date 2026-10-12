@@ -1,5 +1,4 @@
 import { getReaderProfile } from "@/lib/readerProfile";
-import { getWeeklyReadLinks } from "@/lib/weeklyRead";
 import { createWeeklyFocus } from "@/lib/weekFocus";
 import { WeeklyStoryLink } from "@/app/components/WeeklyStoryLink";
 
@@ -13,12 +12,8 @@ function formatDate(value: string) {
 }
 
 export default async function WeekFocusPage() {
-  const [profile, readLinks] = await Promise.all([
-    getReaderProfile(),
-    getWeeklyReadLinks(),
-  ]);
-
-  const focus = await createWeeklyFocus(profile, readLinks);
+  const profile = await getReaderProfile();
+  const focus = await createWeeklyFocus(profile);
 
   return (
     <main className="min-h-screen bg-[#f4f1e8] text-slate-950">
@@ -33,14 +28,14 @@ export default async function WeekFocusPage() {
                 VECKOFOKUS
               </h1>
               <p className="mt-2 max-w-2xl font-serif text-lg leading-7 text-slate-600">
-                Tio texter för att förstå veckan. Morgonens nyhetsarbete blir här en redaktionell återblick med mer perspektiv och fördjupning.
+                Veckans ämnen utifrån det du faktiskt läst – med en ny, oläst fördjupning för varje ämnesspår.
               </p>
             </div>
 
             <div className="text-sm md:text-right">
               <div className="font-bold">{formatDate(focus.periodStart)}–{formatDate(focus.periodEnd)}</div>
               <div className="mt-1 text-slate-500">
-                {focus.editionCount} sparade morgoneditioner · {focus.stories.length} texter kvar att läsa
+                {focus.readArticleCount} unika artiklar lästa senaste sju dagarna · {focus.topicCount} ämnen · {focus.stories.length} olästa fördjupningar
               </div>
             </div>
           </div>
@@ -93,7 +88,10 @@ export default async function WeekFocusPage() {
                   )}
 
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-700">
+                    <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-orange-700">
+                      Veckans ämne · {story.focusTopic}
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                       {story.articleType} · {story.source}
                     </div>
                     <h2 className="mt-2 font-serif text-2xl font-black leading-tight tracking-[-0.015em] md:text-3xl group-hover:underline">
@@ -111,6 +109,11 @@ export default async function WeekFocusPage() {
                       Därför är den med
                     </div>
                     <p className="mt-1">{story.selectionReason}</p>
+                    {story.topicReadCount > 0 ? (
+                      <div className="mt-3 text-[10px] font-bold uppercase tracking-[0.12em] text-orange-700">
+                        Bygger på {story.topicReadCount} lästa artiklar
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </WeeklyStoryLink>
@@ -131,7 +134,7 @@ export default async function WeekFocusPage() {
         )}
 
         <footer className="pt-6 text-sm leading-6 text-slate-500">
-          Veckofokus byggs från Glenn News sparade morgoneditioner. Det betyder att veckoredaktören arbetar med det som faktiskt valdes ut under veckan, medan din lässtatus fortsatt sparas separat i en cookie.
+          Veckofokus jämför klickhändelser som registrerats i Glenn News under de senaste sju dygnen med artiklarna i veckans sparade morgoneditioner. Artiklar du öppnat via Glenn News räknas centralt, så läshistoriken fungerar mellan enheter. Läsning direkt på externa webbplatser som inte registrerats av Glenn News kan inte räknas. {focus.personalized ? "Urvalet är anpassat efter din faktiska läsning denna vecka." : "Just nu visas en reservordning eftersom en tillförlitlig personlig ämnesbild saknas."}
         </footer>
       </div>
     </main>
