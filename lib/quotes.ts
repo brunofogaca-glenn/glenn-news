@@ -253,7 +253,7 @@ function extractSourcedQuoteTemplates(wikitext: string, pageTitle: string): Quot
 
     const text = stripWikiMarkup(args[1] ?? "");
     const context = stripWikiMarkup(args.slice(2).join(" | "));
-    if (text.length < 45 || text.length > 1100 || context.length < 8) {
+    if (text.length < 35 || text.length > 1100 || context.length < 8) {
       pattern.lastIndex = end;
       continue;
     }
@@ -337,8 +337,8 @@ async function fetchWikiquoteBatch(titles: string[]): Promise<Quote[]> {
 async function buildHistoricalQuotePool(): Promise<Quote[]> {
   const uniqueTitles = [...new Set(HISTORICAL_PAGES)];
   const batches: string[][] = [];
-  for (let index = 0; index < uniqueTitles.length; index += 40) {
-    batches.push(uniqueTitles.slice(index, index + 40));
+  for (let index = 0; index < uniqueTitles.length; index += 50) {
+    batches.push(uniqueTitles.slice(index, index + 50));
   }
 
   const settled = await Promise.allSettled(batches.map(fetchWikiquoteBatch));
@@ -360,8 +360,14 @@ async function buildHistoricalQuotePool(): Promise<Quote[]> {
   // when needed to keep the long-term rotation broad.
   const substantial = unique.filter(quote => quote.text.length >= 95 && quote.text.length <= 820);
   const broader = unique.filter(quote => quote.text.length >= 60 && quote.text.length <= 1000);
-  const selected = (substantial.length >= 500 ? substantial : broader)
-    .slice(0, 1000);
+  const expanded = unique.filter(quote => quote.text.length >= 35 && quote.text.length <= 1000);
+  const selected = (
+    substantial.length >= 500
+      ? substantial
+      : broader.length >= 500
+        ? broader
+        : expanded
+  ).slice(0, 1000);
 
   if (selected.length < 500) {
     console.warn(
