@@ -210,7 +210,7 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
             Utvalda matcher idag
           </div>
           <div className="mb-1 text-xs text-slate-400">
-            Endast dina valda ligor, Svenska Cupen och svenska landslaget
+            Utvalda tävlingar, favoritlag och svenska landslaget
           </div>
           <div className="mt-3 space-y-3">
             {data.upcoming.length > 0 ? (
