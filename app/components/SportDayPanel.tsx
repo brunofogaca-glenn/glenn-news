@@ -164,7 +164,7 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
           </div>
           <div className="mt-3 space-y-4">
             {data.results.length > 0 ? (
-              data.results.slice(0, 4).map(result => (
+              data.results.slice(0, 8).map(result => (
                 <div
                   key={result.id}
                   className="border-b border-slate-200 pb-3 last:border-b-0"
@@ -214,7 +214,7 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
           </div>
           <div className="mt-3 space-y-3">
             {data.upcoming.length > 0 ? (
-              data.upcoming.slice(0, 5).map(match => (
+              data.upcoming.slice(0, 8).map(match => (
                 <div
                   key={match.id}
                   className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 last:border-b-0"
