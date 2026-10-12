@@ -224,6 +224,52 @@ function removeDateFromTitle(value: string) {
     .replace(/\s+/g, " ").replace(/^[·|,\-\s]+|[·|,\-\s]+$/g, "").trim();
 }
 
+function anchorsInCityCalendarBlock(block: string, baseUrl: string) {
+  const entries: Array<{ title: string; url: string; description?: string }> = [];
+  const pattern = /<a\b([^>]*?)href\s*=\s*(?:"([^"]+)"|'([^']+)')([^>]*)>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(block)) !== null) {
+    const url = absoluteUrl(match[2] ?? match[3] ?? "", baseUrl);
+    if (!url) continue;
+
+    const inner = match[5] ?? "";
+    const attributes = (match[1] ?? "") + " " + (match[4] ?? "");
+    const titleAttribute = attributes.match(/\b(?:title|aria-label)\s*=\s*(?:"([^"]+)"|'([^']+)')/i);
+    const heading = inner.match(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i);
+    const emphasized = inner.match(/<(?:strong|b)\b[^>]*>([\s\S]*?)<\/(?:strong|b)>/i);
+    const fullText = htmlText(inner);
+    const dateMatch = /\b20\d{2}[-/]\d{1,2}[-/]\d{1,2}\b|\b\d{1,2}\.\d{1,2}\.20\d{2}\b|\b\d{1,2}\s+(?:januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)\s+20\d{2}\b/i.exec(fullText);
+    const titleFromText = dateMatch ? fullText.slice(0, dateMatch.index) : fullText;
+    const title = htmlText(titleAttribute?.[1] ?? titleAttribute?.[2] ?? heading?.[1] ?? emphasized?.[1] ?? titleFromText)
+      .replace(/\s+/g, " ")
+      .replace(/[,\s]+$/g, "")
+      .trim();
+
+    if (title.length < 4 || title.length > 180) continue;
+    if (/^(läs mer|öppna|kalender|till innehåll|bild|mer information)$/i.test(title)) continue;
+
+    let description = htmlText(block);
+    description = description.replace(title, " ");
+    description = description
+      .replace(/\b20\d{2}[-/]\d{1,2}[-/]\d{1,2}\b/g, " ")
+      .replace(/\b\d{1,2}\.\d{1,2}\.20\d{2}\b/g, " ")
+      .replace(/\b\d{1,2}\s+(?:januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)\s+20\d{2}\b/gi, " ")
+      .replace(/\b\d{1,2}[:.]\d{2}\s*(?:till|[-–])\s*\d{1,2}[:.]\d{2}\b/gi, " ")
+      .replace(/\b\d{1,2}[:.]\d{2}\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    entries.push({
+      title,
+      url,
+      description: description.length > 20 ? description.slice(0, 220) : undefined,
+    });
+  }
+
+  return entries;
+}
+
 function parseCityCalendar(html: string) {
   const today = todayInStockholm();
   const cutoff = addDays(today, 30);
@@ -239,25 +285,21 @@ function parseCityCalendar(html: string) {
     const date = parseDateFromText(text);
     if (!date || date < today || date > cutoff) continue;
 
-    const links = anchorsInHtml(block, BORAS_CALENDAR_URL);
-    const usefulLink = links.find(link =>
-      link.title.length >= 4 &&
-      !/^(läs mer|öppna|kalender|till innehåll|film|bild|mer information)$/i.test(link.title)
-    );
+    const links = anchorsInCityCalendarBlock(block, BORAS_CALENDAR_URL);
+    const usefulLink = links.find(link => link.title.length >= 4);
     if (!usefulLink) continue;
 
     const title = removeDateFromTitle(usefulLink.title);
     if (!title || title.length < 4) continue;
     const time = extractTime(text);
+    const description = usefulLink.description ?? text.replace(usefulLink.title, "").slice(0, 220).trim();
     entries.push({
       title,
       url: usefulLink.url,
       date,
       dateLabel: dateLabel(date),
       time,
-      description: text.length > usefulLink.title.length
-        ? text.replace(usefulLink.title, "").slice(0, 190).trim()
-        : undefined,
+      description: description || undefined,
       kind: /sammanträde|nämnd|kommunstyrelsen|fullmäktige/i.test(text) ? "sammanträde" : "evenemang",
     });
   }
