@@ -35,7 +35,7 @@ export async function QuoteDivider({
               rel="noreferrer"
               className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
             >
-              Källsida: Svenska Wikiquote
+              Källsida: Wikiquote-bidragsgivare · formaterat av Glenn News
             </a>
           ) : null}
           {quote.sourceUrl ? (
