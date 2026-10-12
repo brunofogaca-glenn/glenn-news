@@ -10,6 +10,18 @@ import { getCachedMarketDay } from "@/lib/marketDay";
 import { getTodayDailyEdition } from "@/lib/dailyEdition";
 import { MarketDayPanel } from "./components/MarketDayPanel";
 import { SportDayPanel } from "./components/SportDayPanel";
+import {
+  CultureSnapshotPanel,
+  LocalSnapshotPanel,
+  NationalSnapshotPanel,
+  WorldSnapshotPanel,
+} from "./components/DailySnapshotPanels";
+import {
+  getCachedCultureSnapshot,
+  getCachedLocalSnapshot,
+  getCachedNationalSnapshot,
+  getCachedWorldSnapshot,
+} from "@/lib/dailySnapshots";
 import { QuoteDivider } from "./components/QuoteDivider";
 import { ReaderCount } from "./components/ReaderCount";
 
@@ -84,7 +96,19 @@ function ArticleImage({
 }
 
 export default async function Home() {
-  const [profile, feedHealth, editionMeta, dailyHeader, weather, sportDay, marketDay] = await Promise.all([
+  const [
+    profile,
+    feedHealth,
+    editionMeta,
+    dailyHeader,
+    weather,
+    sportDay,
+    marketDay,
+    localSnapshot,
+    nationalSnapshot,
+    worldSnapshot,
+    cultureSnapshot,
+  ] = await Promise.all([
     getReaderProfile(),
     getCachedFeedHealth(),
     getCachedEditionMeta(),
@@ -92,6 +116,10 @@ export default async function Home() {
     getCachedWeather(),
     getCachedSportDay(),
     getCachedMarketDay(),
+    getCachedLocalSnapshot(),
+    getCachedNationalSnapshot(),
+    getCachedWorldSnapshot(),
+    getCachedCultureSnapshot(),
   ]);
 
   const edition = await getTodayDailyEdition(profile);
@@ -378,6 +406,30 @@ export default async function Home() {
                     : "4 texter"}
                 </span>
               </div>
+
+              {section.key === "boras" && (
+                <div className="mb-6">
+                  <LocalSnapshotPanel data={localSnapshot} />
+                </div>
+              )}
+
+              {section.key === "sverige" && (
+                <div className="mb-6">
+                  <NationalSnapshotPanel data={nationalSnapshot} />
+                </div>
+              )}
+
+              {section.key === "varlden" && (
+                <div className="mb-6">
+                  <WorldSnapshotPanel data={worldSnapshot} />
+                </div>
+              )}
+
+              {section.key === "livsstil" && (
+                <div className="mb-6">
+                  <CultureSnapshotPanel data={cultureSnapshot} />
+                </div>
+              )}
 
               {section.key === "sport" && (
                 <SportDayPanel data={sportDay} />
