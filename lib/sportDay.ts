@@ -258,6 +258,12 @@ function isSelectedSportFixture(fixture: ApiFootballFixture) {
 function fixtureImportance(fixture: ApiFootballFixture) {
   const home = fixture.teams?.home?.name ?? "";
   const away = fixture.teams?.away?.name ?? "";
+
+  // The Swedish senior national team should not get buried beneath club fixtures.
+  if (isSwedenNationalTeamFixture(fixture)) {
+    return 2000 + Math.max(teamPriority(home), teamPriority(away));
+  }
+
   return (
     competitionPriority(fixture.league?.name ?? "") * 10 +
     Math.max(teamPriority(home), teamPriority(away))
