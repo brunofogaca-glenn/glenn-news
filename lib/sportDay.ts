@@ -117,7 +117,8 @@ export type SportLeagueTable = {
   leagueId: number;
   title: string;
   season: number;
-  relatedResult: {
+  dayLabel: string;
+  relatedResult?: {
     id: number;
     home: string;
     away: string;
@@ -126,7 +127,8 @@ export type SportLeagueTable = {
   };
   rows: SportLeagueTableRow[];
   scorers: SportLeagueScorer[];
-  error?: string;
+  tableError?: string;
+  scorersError?: string;
 };
 
 export type SportDayData = {
@@ -277,51 +279,42 @@ function isRelevantFixture(fixture: ApiFootballFixture) {
 }
 
 
-const DAILY_TABLE_LEAGUES = new Map<number, string>([
-  [113, "Allsvenskan"],
-  [39, "Premier League"],
-  [140, "La Liga"],
-  [135, "Serie A"],
-  [78, "Bundesliga"],
-  [61, "Ligue 1"],
-  [88, "Eredivisie"],
-  [94, "Primeira Liga"],
-]);
+type DailyTableSelection = {
+  leagueId: number;
+  title: string;
+  dayLabel: string;
+};
 
-function dailyTableSeason(dateValue: string) {
-  const date = new Date(dateValue);
+const DAILY_TABLE_SCHEDULE: Record<string, DailyTableSelection> = {
+  Monday: { dayLabel: "Måndag", leagueId: 113, title: "Allsvenskan" },
+  Tuesday: { dayLabel: "Tisdag", leagueId: 114, title: "Superettan" },
+  Wednesday: { dayLabel: "Onsdag", leagueId: 140, title: "La Liga" },
+  Thursday: { dayLabel: "Torsdag", leagueId: 39, title: "Premier League" },
+  Friday: { dayLabel: "Fredag", leagueId: 40, title: "Championship" },
+  Saturday: { dayLabel: "Lördag", leagueId: 135, title: "Serie A" },
+  Sunday: { dayLabel: "Söndag", leagueId: 2, title: "Champions League" },
+};
 
-  if (!Number.isFinite(date.getTime())) {
-    return Number(localToday().slice(0, 4));
-  }
+function dailyTableSelection(): DailyTableSelection {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: STOCKHOLM_TIME_ZONE,
+    weekday: "long",
+  }).format(new Date());
 
-  const month = Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: STOCKHOLM_TIME_ZONE,
-      month: "numeric",
-    }).format(date)
-  );
-  const year = Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: STOCKHOLM_TIME_ZONE,
-      year: "numeric",
-    }).format(date)
-  );
-
-  // Most European league seasons start in the second half of the year,
-  // so January-June matches belong to the previous season year.
-  return month <= 6 ? year - 1 : year;
+  return DAILY_TABLE_SCHEDULE[weekday] ?? DAILY_TABLE_SCHEDULE.Monday;
 }
 
-function stableDailyPickIndex(length: number) {
-  const key = localToday();
-  let hash = 0;
+function dailyTableSeason(leagueId: number, dateValue = localToday()) {
+  const year = Number(dateValue.slice(0, 4));
+  const month = Number(dateValue.slice(5, 7));
 
-  for (const char of key) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  // Allsvenskan and Superettan use calendar-year seasons.
+  if (leagueId === 113 || leagueId === 114) {
+    return year;
   }
 
-  return length > 0 ? hash % length : 0;
+  // The other selected competitions span two calendar years.
+  return month <= 6 ? year - 1 : year;
 }
 
 type StandingRowForDailyTable = {
@@ -417,120 +410,143 @@ function normalizeDailyScorers(
 async function fetchSelectedLeagueTable(
   results: SportResult[]
 ): Promise<SportLeagueTable | null> {
-  const candidates = Array.from(
-    new Map(
-      results
-        .filter(result => result.leagueId && DAILY_TABLE_LEAGUES.has(result.leagueId))
-        .map(
-          result =>
-            [result.leagueId!, result] as [number, SportResult]
-        )
-    ).values()
+  const selected = dailyTableSelection();
+  const relatedResult = results.find(
+    result => result.leagueId === selected.leagueId
   );
+  const currentSeason = dailyTableSeason(selected.leagueId);
 
-  if (!candidates.length) {
-    return null;
-  }
+  const fetchSeason = async (season: number) => {
+    const [standingsResult, scorersResult] = await Promise.allSettled([
+      apiFootballGet<{ league?: { standings?: StandingRowForDailyTable[][] } }[]>(
+        "/standings",
+        {
+          league: String(selected.leagueId),
+          season: String(season),
+        }
+      ),
+      apiFootballGet<TopScorerForDailyTable[]>(
+        "/players/topscorers",
+        {
+          league: String(selected.leagueId),
+          season: String(season),
+        }
+      ),
+    ]);
 
-  const selectedResult = candidates[
-    stableDailyPickIndex(candidates.length)
-  ];
+    const rows =
+      standingsResult.status === "fulfilled"
+        ? normalizeDailyTableRows(
+            standingsResult.value?.[0]?.league?.standings
+          )
+        : [];
 
-  if (!selectedResult.leagueId) {
-    return null;
-  }
+    const scorers =
+      scorersResult.status === "fulfilled"
+        ? normalizeDailyScorers(scorersResult.value)
+        : [];
 
-  const title = DAILY_TABLE_LEAGUES.get(selectedResult.leagueId);
-  if (!title) {
-    return null;
-  }
+    const tableError =
+      standingsResult.status === "rejected"
+        ? standingsResult.reason instanceof Error
+          ? standingsResult.reason.message
+          : "Tabellen kunde inte hämtas."
+        : !rows.length
+          ? `API-Football returnerade ingen tabell för ${selected.title} säsongen ${season}.`
+          : undefined;
 
-  const season = dailyTableSeason(selectedResult.date);
+    const scorersError =
+      scorersResult.status === "rejected"
+        ? scorersResult.reason instanceof Error
+          ? scorersResult.reason.message
+          : "Skytteligan kunde inte hämtas."
+        : !scorers.length
+          ? `API-Football returnerade ingen skytteliga för ${selected.title} säsongen ${season}.`
+          : undefined;
 
-  const [standingsResult, scorersResult] = await Promise.allSettled([
-    apiFootballGet<{ league?: { standings?: StandingRowForDailyTable[][] } }[]>(
-      "/standings",
-      {
-        league: String(selectedResult.leagueId),
-        season: String(season),
-      }
-    ),
-    apiFootballGet<TopScorerForDailyTable[]>(
-      "/players/topscorers",
-      {
-        league: String(selectedResult.leagueId),
-        season: String(season),
-      }
-    ),
-  ]);
+    const hasRequestErrors =
+      standingsResult.status === "rejected" ||
+      scorersResult.status === "rejected";
+    const retryPrevious =
+      !hasRequestErrors && rows.length === 0 && scorers.length === 0;
 
-  const rows =
-    standingsResult.status === "fulfilled"
-      ? normalizeDailyTableRows(
-          standingsResult.value?.[0]?.league?.standings
-        )
-      : [];
-
-  const scorers =
-    scorersResult.status === "fulfilled"
-      ? normalizeDailyScorers(scorersResult.value)
-      : [];
-
-  const errors: string[] = [];
-
-  if (standingsResult.status === "rejected") {
-    errors.push(
-      standingsResult.reason instanceof Error
-        ? standingsResult.reason.message
-        : "Tabellen kunde inte hämtas."
-    );
-  }
-
-  if (scorersResult.status === "rejected") {
-    errors.push(
-      scorersResult.reason instanceof Error
-        ? scorersResult.reason.message
-        : "Skytteligan kunde inte hämtas."
-    );
-  }
-
-  if (!rows.length && !scorers.length) {
     return {
-      leagueId: selectedResult.leagueId,
-      title,
       season,
-      relatedResult: {
-        id: selectedResult.id,
-        home: selectedResult.home,
-        away: selectedResult.away,
-        homeScore: selectedResult.homeScore,
-        awayScore: selectedResult.awayScore,
-      },
-      rows: [],
-      scorers: [],
-      error:
-        errors.join(" ") ||
-        "Ingen tabell- eller skytteligadata kunde hämtas.",
+      rows,
+      scorers,
+      tableError,
+      scorersError,
+      hasRequestErrors,
+      retryPrevious,
     };
+  };
+
+  let seasonData = await fetchSeason(currentSeason);
+
+  // Some leagues have no standings yet early in a season. In that case,
+  // try the previous season instead of leaving the panel blank.
+  if (seasonData.retryPrevious) {
+    const previousSeasonData = await fetchSeason(currentSeason - 1);
+
+    if (
+      previousSeasonData.rows.length ||
+      previousSeasonData.scorers.length ||
+      previousSeasonData.hasRequestErrors
+    ) {
+      seasonData = previousSeasonData;
+    } else {
+      seasonData = {
+        ...seasonData,
+        tableError: `Ingen tabell hittades för ${selected.title} säsongen ${currentSeason} eller ${currentSeason - 1}.`,
+        scorersError: `Ingen skytteliga hittades för ${selected.title} säsongen ${currentSeason} eller ${currentSeason - 1}.`,
+      };
+    }
   }
 
   return {
-    leagueId: selectedResult.leagueId,
-    title,
-    season,
-    relatedResult: {
-      id: selectedResult.id,
-      home: selectedResult.home,
-      away: selectedResult.away,
-      homeScore: selectedResult.homeScore,
-      awayScore: selectedResult.awayScore,
-    },
-    rows,
-    scorers,
-    error: errors.length ? errors.join(" ") : undefined,
+    leagueId: selected.leagueId,
+    title: selected.title,
+    season: seasonData.season,
+    dayLabel: selected.dayLabel,
+    relatedResult: relatedResult
+      ? {
+          id: relatedResult.id,
+          home: relatedResult.home,
+          away: relatedResult.away,
+          homeScore: relatedResult.homeScore,
+          awayScore: relatedResult.awayScore,
+        }
+      : undefined,
+    rows: seasonData.rows,
+    scorers: seasonData.scorers,
+    tableError: seasonData.tableError,
+    scorersError: seasonData.scorersError,
   };
 }
 
+
+function apiFootballErrorText(errors: unknown): string {
+  if (!errors) return "";
+
+  if (Array.isArray(errors)) {
+    return errors.map(value => String(value)).filter(Boolean).join("; ");
+  }
+
+  if (typeof errors === "object") {
+    return Object.entries(errors as Record<string, unknown>)
+      .filter(([, value]) =>
+        value !== null &&
+        value !== undefined &&
+        value !== "" &&
+        !(Array.isArray(value) && value.length === 0) &&
+        !(typeof value === "object" && !Array.isArray(value) && Object.keys(value as object).length === 0)
+      )
+      .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
+      .join("; ");
+  }
+
+  return String(errors);
+}
 
 async function apiFootballGet<T = ApiFootballFixture[]>(
   path: string,
@@ -562,6 +578,11 @@ async function apiFootballGet<T = ApiFootballFixture[]>(
     response?: T;
     errors?: unknown;
   };
+  const apiErrors = apiFootballErrorText(data.errors);
+
+  if (apiErrors) {
+    throw new Error("API-Football avvisade anropet (" + path + "): " + apiErrors);
+  }
 
   return data.response ?? null;
 }
