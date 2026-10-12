@@ -164,7 +164,7 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
           </div>
           <div className="mt-3 space-y-4">
             {data.results.length > 0 ? (
-              data.results.slice(0, 4).map(result => (
+              data.results.slice(0, 8).map(result => (
                 <div
                   key={result.id}
                   className="border-b border-slate-200 pb-3 last:border-b-0"
@@ -172,7 +172,7 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        {result.league} · {formatDate(result.date)}
+                        {result.league}{result.country ? " · " + result.country : ""} · {formatDate(result.date)}
                       </div>
                       <div className="mt-1 font-serif text-lg font-black">
                         {result.home}{" "}
@@ -210,18 +210,18 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
             Utvalda matcher idag
           </div>
           <div className="mb-1 text-xs text-slate-400">
-            Endast dina valda ligor, Svenska Cupen och svenska landslaget
+            Utvalda tävlingar, favoritlag och svenska landslaget
           </div>
           <div className="mt-3 space-y-3">
             {data.upcoming.length > 0 ? (
-              data.upcoming.slice(0, 5).map(match => (
+              data.upcoming.slice(0, 8).map(match => (
                 <div
                   key={match.id}
                   className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 last:border-b-0"
                 >
                   <div className="min-w-0">
                     <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                      {match.league}
+                      {match.league}{match.country ? " · " + match.country : ""}
                     </div>
                     <div className="mt-1 font-serif font-bold">
                       {match.home} – {match.away}
