@@ -607,7 +607,7 @@ function movieAnchorsInHtml(block: string) {
   while ((match = pattern.exec(block)) !== null) {
     const href = match[2] ?? match[3] ?? "";
     const url = absoluteUrl(href, MOVIEZINE_CALENDAR_URL);
-    if (!url || !/\/film\/|\/filmer\/|\/kalender\//i.test(new URL(url).pathname)) continue;
+    if (!url || !/\/movies\/|\/film\/|\/filmer\/|\/kalender\//i.test(new URL(url).pathname)) continue;
 
     const inner = match[5] ?? "";
     const attributes = (match[1] ?? "") + " " + (match[4] ?? "");
@@ -946,19 +946,19 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
 
 const getCachedLocalSnapshotInternal = unstable_cache(
   getLocalSnapshotInternal,
-  ["glenn-news-daily-local-v1"],
+  ["glenn-news-daily-local-v2"],
   { revalidate: 4 * 60 * 60, tags: ["glenn-news-daily-local"] }
 );
 
 const getCachedNationalSnapshotInternal = unstable_cache(
   getNationalSnapshotInternal,
-  ["glenn-news-daily-national-v1"],
+  ["glenn-news-daily-national-v2"],
   { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-national"] }
 );
 
 const getCachedCultureSnapshotInternal = unstable_cache(
   getCultureSnapshotInternal,
-  ["glenn-news-daily-culture-v1"],
+  ["glenn-news-daily-culture-v2"],
   { revalidate: 12 * 60 * 60, tags: ["glenn-news-daily-culture"] }
 );
 
