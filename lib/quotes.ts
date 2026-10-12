@@ -244,7 +244,7 @@ function extractSourcedQuoteTemplates(wikitext: string, pageTitle: string): Quot
     const heading = headings[headingIndex]?.title ?? "";
 
     // Avoid quotations about the author, unsourced quote lists, and navigation/reference sections.
-    if (/\b(citat om|andra personer om|felaktiga citat|påstådda citat|externa länkar|referenser|källor|se även|vidare läsning)\b/i.test(heading)) {
+    if (/\b(andra personer om|felaktiga citat|påstådda citat|externa länkar|referenser|källor|se även|vidare läsning)\b/i.test(heading)) {
       pattern.lastIndex = end;
       continue;
     }
