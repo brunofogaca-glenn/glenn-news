@@ -100,6 +100,19 @@ type ReadingSignal = {
   date: string;
 };
 
+function countUniqueReadArticles(activity: ReaderActivity[]) {
+  const keys = new Set<string>();
+
+  for (const item of activity) {
+    const key = item.link
+      ? canonicalizeLink(item.link)
+      : normalizeTopic(item.title || item.topic || "") + "|" + item.category;
+    if (key && key !== "|") keys.add(key);
+  }
+
+  return keys.size;
+}
+
 function buildReadingHistory(activity: ReaderActivity[]): ReadingSignal[] {
   const ordered = [...activity].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   const seen = new Set<string>();
@@ -298,7 +311,7 @@ export async function createWeeklyFocus(
     periodStart,
     periodEnd,
     editionCount: editions.length,
-    readArticleCount: readingHistory.length,
+    readArticleCount: countUniqueReadArticles(activity),
   };
 
   if (!editions.length) {
