@@ -5,7 +5,11 @@ import {
   getTodayDailyEdition,
   type DailyEdition,
 } from "./dailyEdition";
-import type { ReaderProfile } from "./readerProfile";
+import {
+  getReaderActivitySince,
+  type ReaderActivity,
+  type ReaderProfile,
+} from "./readerProfile";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -26,10 +30,14 @@ type WeeklyCandidate = {
   newsScore?: number;
   readingScore?: number;
   topic?: string;
+  focusTopic?: string;
+  topicReadCount?: number;
 };
 
 type WeeklyStory = WeeklyCandidate & {
   id: number;
+  focusTopic: string;
+  topicReadCount: number;
 };
 
 export type WeeklyFocus = {
@@ -39,6 +47,9 @@ export type WeeklyFocus = {
   periodStart: string;
   periodEnd: string;
   editionCount: number;
+  readArticleCount: number;
+  topicCount: number;
+  personalized: boolean;
 };
 
 function profileForPrompt(profile: ReaderProfile) {
@@ -49,6 +60,70 @@ function profileForPrompt(profile: ReaderProfile) {
     source: profile.source,
     topic: profile.topic,
   };
+}
+
+function canonicalizeLink(value: string) {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    url.hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^utm_/i.test(key) || /^(fbclid|gclid|dclid|mc_cid|mc_eid|ref_src|campaign)$/i.test(key)) {
+        url.searchParams.delete(key);
+      }
+    }
+
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return url.toString().replace(/\?$/, "");
+  } catch {
+    return value.trim().replace(/\/+$/, "");
+  }
+}
+
+function normalizeTopic(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+type ReadingSignal = {
+  id: number;
+  title: string;
+  category: string;
+  articleType: string;
+  source: string;
+  topic?: string;
+  date: string;
+};
+
+function buildReadingHistory(activity: ReaderActivity[]): ReadingSignal[] {
+  const ordered = [...activity].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  const seen = new Set<string>();
+  const signals: ReadingSignal[] = [];
+
+  for (const item of ordered) {
+    const title = item.title?.trim() || item.topic?.trim() || "Läst artikel";
+    const key = item.link ? canonicalizeLink(item.link) : normalizeTopic(title) + "|" + item.category;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+
+    signals.push({
+      id: signals.length,
+      title: title.slice(0, 260),
+      category: item.category,
+      articleType: item.articleType,
+      source: item.source,
+      topic: item.topic,
+      date: item.timestamp.slice(0, 10),
+    });
+    if (signals.length >= 120) break;
+  }
+
+  return signals;
 }
 
 function buildCandidates(
@@ -65,12 +140,13 @@ function buildCandidates(
     for (const section of edition.sections) {
       for (const story of section.stories) {
         const link = story.link ?? "";
+        const canonicalLink = link ? canonicalizeLink(link) : "";
 
-        if (!link || readLinks.has(link) || seen.has(link)) {
+        if (!link || !canonicalLink || readLinks.has(canonicalLink) || seen.has(canonicalLink)) {
           continue;
         }
 
-        seen.add(link);
+        seen.add(canonicalLink);
 
         stories.push({
           id: stories.length,
@@ -163,10 +239,45 @@ function buildCandidates(
   }));
 }
 
+function fallbackStories(candidates: WeeklyCandidate[]): WeeklyStory[] {
+  const stories: WeeklyStory[] = [];
+  const seenTopics = new Set<string>();
+  const seenLinks = new Set<string>();
+
+  for (const candidate of candidates) {
+    const focusTopic = candidate.topic?.trim() || candidate.title;
+    const topicKey = normalizeTopic(focusTopic);
+    const linkKey = canonicalizeLink(candidate.link);
+    if (!topicKey || seenTopics.has(topicKey) || seenLinks.has(linkKey)) continue;
+
+    seenTopics.add(topicKey);
+    seenLinks.add(linkKey);
+    stories.push({
+      ...candidate,
+      id: stories.length + 1,
+      focusTopic,
+      topicReadCount: 0,
+      selectionReason: candidate.selectionReason || "En av veckans starkaste olästa texter i det tillgängliga urvalet.",
+    });
+    if (stories.length >= 10) break;
+  }
+
+  return stories;
+}
+
 export async function createWeeklyFocus(
-  profile: ReaderProfile,
-  readLinks: string[]
+  profile: ReaderProfile
 ): Promise<WeeklyFocus> {
+  const weekStartDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const activity = await getReaderActivitySince(weekStartDate.toISOString(), 250);
+  const readingHistory = buildReadingHistory(activity);
+  const readLinks = new Set(
+    activity
+      .map(item => item.link)
+      .filter((link): link is string => Boolean(link))
+      .map(canonicalizeLink)
+  );
+
   const todayEdition = await getTodayDailyEdition(profile);
   const savedEditions = await getSavedDailyEditions(7);
   const editions =
@@ -174,181 +285,219 @@ export async function createWeeklyFocus(
       ? savedEditions
       : [todayEdition, ...savedEditions].slice(0, 7);
 
-  const readSet = new Set(readLinks);
-  const candidates = buildCandidates(editions, readSet, profile);
+  const candidates = buildCandidates(editions, readLinks, profile);
+  const dates = editions.map(edition => edition.dateKey).sort();
+  const periodStart = dates[0]
+    ? new Date(dates[0] + "T05:00:00Z").toISOString()
+    : new Date().toISOString();
+  const periodEnd = dates.at(-1)
+    ? new Date(dates.at(-1) + "T20:00:00Z").toISOString()
+    : new Date().toISOString();
 
-  const dates = editions
-    .map(edition => edition.dateKey)
-    .sort();
-
-  const periodStart =
-    dates[0]
-      ? new Date(dates[0] + "T05:00:00Z").toISOString()
-      : new Date().toISOString();
-
-  const periodEnd =
-    dates.at(-1)
-      ? new Date(dates.at(-1) + "T20:00:00Z").toISOString()
-      : new Date().toISOString();
+  const sharedFields = {
+    periodStart,
+    periodEnd,
+    editionCount: editions.length,
+    readArticleCount: readingHistory.length,
+  };
 
   if (!editions.length) {
     return {
       title: "Veckofokus",
-      summary:
-        "Det finns ännu inga sparade morgoneditioner för veckan.",
+      summary: "Det finns ännu inga sparade morgoneditioner för veckan.",
       stories: [],
-      periodStart,
-      periodEnd,
-      editionCount: 0,
+      ...sharedFields,
+      topicCount: 0,
+      personalized: false,
     };
   }
 
   if (!candidates.length) {
     return {
       title: "Veckofokus",
-      summary:
-        "Du har läst allt som hittills valts ut i veckans morgoneditioner.",
+      summary: readingHistory.length
+        ? "Det finns inga olästa fördjupningar kvar bland veckans sparade morgoneditioner. Nya kandidater kan tillkomma när nästa edition sparas."
+        : "Det finns inga olästa artiklar i veckans sparade morgoneditioner just nu.",
       stories: [],
-      periodStart,
-      periodEnd,
-      editionCount: editions.length,
+      ...sharedFields,
+      topicCount: 0,
+      personalized: readingHistory.length > 0,
     };
   }
 
-  const response = await openai.responses.create({
-    model: "gpt-5-mini",
-    input: [
-      "Du är Glenns veckoredaktör.",
-      "",
-      "Du ska skapa Veckofokus utifrån de senaste sparade morgoneditionerna från Glenn News.",
-      "Detta är INTE en ny sammanställning av RSS-flöden. Kandidaterna nedan är texter som Glenn News faktiskt valde ut under morgonens redaktionella arbete.",
-      "",
-      "SYFTE:",
-      "Veckofokus ska hjälpa Glenn att förstå veckan i efterhand och ge honom texter som är värda att sätta sig ner med.",
-      "",
-      "REDaktionella principer:",
-      "- Identifiera återkommande berättelser, teman och utvecklingar i veckans editioner.",
-      "- Välj normalt den bästa texten när flera editioner länkar till samma berättelse.",
-      "- Prioritera krönika, analys, intervju, reportage, kommentar och recension.",
-      "- En viktig nyhet får ta plats om den är central för veckan.",
-      "- Variera ämnen och källor när det förbättrar listan.",
-      "- Elfsborg är viktigt för Glenn, men ska inte dominera listan utan att förtjäna platserna.",
-      "- Läsarprofilen bygger på tidigare klick. Ett enstaka klick är en svag signal; återkommande mönster väger tyngre.",
-      "- Välj aldrig en artikel som finns i READ-LINKS.",
-      "- Hitta inte på fakta.",
-      "",
-      "VIKTIGT:",
-      "- Välj exakt 10 texter om minst 10 kandidater finns.",
-      "- Kandidaterna innehåller redan Glenn News egna sammanfattningar och urvalsorsaker. Använd dem som kontext.",
-      "",
-      "LÄSARPROFIL:",
-      JSON.stringify(profileForPrompt(profile), null, 2),
-      "",
-      "READ-LINKS:",
-      JSON.stringify(readLinks, null, 2),
-      "",
-      "SPARADE MORGONEDITIONER:",
-      JSON.stringify(
-        editions.map(edition => ({
-          dateKey: edition.dateKey,
-          generatedAt: edition.generatedAt,
-          sections: edition.sections.map(section => ({
-            key: section.key,
-            title: section.title,
-            storyCount: section.stories.length,
-          })),
-        })),
-        null,
-        2
-      ),
-      "",
-      "RETURNERA ENDAST GILTIG JSON:",
-      JSON.stringify(
-        {
-          summary:
-            "4-6 meningar om vad veckan handlade om och vilka berättelser eller teman som återkom.",
-          stories: [
-            {
-              id: 0,
-              articleType:
-                "krönika|analys|intervju|reportage|kommentar|nyhet|notis|guide|recension|övrigt",
-              summary: "1-2 meningar.",
-              selectionReason: "1 kort mening om varför Glenn bör läsa.",
-            },
-          ],
-        },
-        null,
-        2
-      ),
-      "",
-      "KANDIDATER FRÅN SPARADE EDITIONER:",
-      JSON.stringify(candidates, null, 2),
-    ].join("\n"),
-  });
+  const candidatesForPrompt = candidates.map(candidate => ({
+    id: candidate.id,
+    title: candidate.title,
+    description: candidate.description,
+    source: candidate.source,
+    category: candidate.category,
+    articleType: candidate.articleType,
+    date: candidate.date,
+    topic: candidate.topic,
+    link: candidate.link,
+    aiSummary: candidate.aiSummary,
+    selectionReason: candidate.selectionReason,
+    newsScore: candidate.newsScore,
+    readingScore: candidate.readingScore,
+  }));
+
+  const readingHistoryForPrompt = readingHistory.map(item => ({
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    articleType: item.articleType,
+    source: item.source,
+    topic: item.topic ?? "",
+    date: item.date,
+  }));
 
   try {
+    const response = await openai.responses.create({
+      model: "gpt-5-mini",
+      input: [
+        "Du är Glenns personliga veckoredaktör på Glenn News.",
+        "",
+        "UPPDRAG:",
+        "Identifiera upp till tio ämnen som Glenn tydligast visat intresse för genom att öppna artiklar under de senaste sju dagarna. Välj exakt en ny, oläst artikel att läsa vidare om för varje ämne.",
+        "Detta är inte en vanlig topp tio över veckans nyheter. Varje val ska koppla ihop vad Glenn faktiskt läste med den bästa olästa fördjupningen från veckans sparade morgoneditioner.",
+        "",
+        "LÄSHISTORIK:",
+        "- READ-HISTORY innehåller faktiska klick från Glenn News under de senaste sju dygnen. ID motsvarar unika lästa artiklar och är bevis på intresse.",
+        "- Gruppera liknande rubriker till meningsfulla ämnen. Räkna hur många unika READ-HISTORY-ID:n som stödjer respektive ämne.",
+        "- Sortera de tydligaste och vanligaste läsämnena först. Återkommande läsning väger mer än ett enstaka klick.",
+        "- readIds måste innehålla verkliga ID:n ur READ-HISTORY; hitta inte på ID:n och använd helst inte samma lästa artikel i flera ämnen.",
+        "- Om READ-HISTORY är tom ska du inte påstå att ämnen bygger på läsningen. Välj då i stället de bästa olästa fördjupningarna utifrån profil och redaktionell kvalitet.",
+        "",
+        "VAL AV ARTIKEL:",
+        "- Välj bara artiklar ur CANDIDATES. id måste motsvara en kandidat; hitta inte på rubriker, artiklar eller länkar.",
+        "- CANDIDATES har redan filtrerats så att artiklar som Glenn öppnat under de senaste sju dygnen inte finns med.",
+        "- Välj en text som tar ämnet vidare: analys, krönika, intervju, reportage, bakgrund eller granskning väger tyngre än en kort notis.",
+        "- En ny artikel om samma ämne som Glenn redan läst är bra om den ger en ny vinkel eller fördjupning.",
+        "- En artikel och en tydlig ämnesetikett per plats. Dubbletter av artiklar eller ämnen ska undvikas.",
+        "- Välj upp till tio ämnen; tvinga inte fram tio om olästa kandidater eller lässignaler inte räcker.",
+        "- Låt den faktiska läshistoriken väga tyngst, med långsiktig profil som stöd. Hitta inte på fakta.",
+        "",
+        "LÅNGSIKTIG LÄSARPROFIL:",
+        JSON.stringify(profileForPrompt(profile)),
+        "",
+        "READ-HISTORY:",
+        JSON.stringify(readingHistoryForPrompt),
+        "",
+        "CANDIDATES (olästa texter):",
+        JSON.stringify(candidatesForPrompt),
+        "",
+        "Returnera ENDAST giltig JSON med formen:",
+        JSON.stringify({
+          summary: "4–6 meningar om de ämnen Glenn återkommit till under veckan och vad som binder dem samman. Var tydlig om läshistorik saknas.",
+          stories: [{
+            id: 0,
+            topic: "Kort, distinkt etikett på ämnet",
+            readIds: [0, 1],
+            summary: "2–4 meningar om vad artikeln tillför och vilken bakgrund den ger.",
+            selectionReason: "En konkret mening om varför just denna olästa artikel är nästa bästa läsning.",
+            articleType: "analys"
+          }]
+        }, null, 2),
+      ].join("\n"),
+    });
+
     const parsed = JSON.parse(response.output_text) as {
       summary?: string;
       stories?: Array<{
         id?: number;
-        articleType?: string;
+        topic?: string;
+        readIds?: number[];
         summary?: string;
         selectionReason?: string;
+        articleType?: string;
       }>;
     };
 
-    const stories = (parsed.stories ?? [])
-      .map(item => {
-        const candidate = candidates.find(
-          article => article.id === item.id
-        );
+    const historyIds = new Set(readingHistory.map(item => item.id));
+    const claimedReadIds = new Set<number>();
+    const usedTopics = new Set<string>();
+    const usedLinks = new Set<string>();
+    const selected: WeeklyStory[] = [];
 
-        if (!candidate) {
-          return null;
-        }
+    for (const item of parsed.stories ?? []) {
+      const candidate = candidates.find(article => article.id === item.id);
+      if (!candidate) continue;
 
-        return {
-          ...candidate,
-          aiSummary: item.summary ?? candidate.aiSummary,
-          selectionReason:
-            item.selectionReason ?? candidate.selectionReason,
-          articleType: item.articleType || candidate.articleType,
-        };
-      })
-      .filter(
-        (story): story is NonNullable<typeof story> =>
-          story !== null
-      )
-      .slice(0, 10)
-      .map((story, index) => ({
-        ...story,
-        id: index + 1,
-      }));
+      const linkKey = canonicalizeLink(candidate.link);
+      if (!linkKey || usedLinks.has(linkKey)) continue;
+
+      const focusTopic = item.topic?.trim().slice(0, 100) ||
+        candidate.topic?.trim() || candidate.title;
+      const topicKey = normalizeTopic(focusTopic);
+      if (!topicKey || usedTopics.has(topicKey)) continue;
+
+      const supportedReadIds = [...new Set(item.readIds ?? [])]
+        .filter(id => historyIds.has(id) && !claimedReadIds.has(id));
+
+      if (readingHistory.length > 0 && supportedReadIds.length === 0) continue;
+
+      for (const id of supportedReadIds) claimedReadIds.add(id);
+      usedTopics.add(topicKey);
+      usedLinks.add(linkKey);
+
+      selected.push({
+        ...candidate,
+        focusTopic,
+        topicReadCount: supportedReadIds.length,
+        aiSummary: item.summary?.trim() || candidate.aiSummary,
+        selectionReason: item.selectionReason?.trim() || candidate.selectionReason,
+        articleType: item.articleType || candidate.articleType,
+      });
+    }
+
+    selected.sort((a, b) => b.topicReadCount - a.topicReadCount);
+
+    if (readingHistory.length === 0 && selected.length < 10) {
+      const fallback = fallbackStories(candidates);
+      const seenLinks = new Set(selected.map(story => canonicalizeLink(story.link)));
+      const seenTopics = new Set(selected.map(story => normalizeTopic(story.focusTopic)));
+
+      for (const story of fallback) {
+        const linkKey = canonicalizeLink(story.link);
+        const topicKey = normalizeTopic(story.focusTopic);
+        if (seenLinks.has(linkKey) || seenTopics.has(topicKey)) continue;
+        selected.push({ ...story, id: 0 });
+        seenLinks.add(linkKey);
+        seenTopics.add(topicKey);
+        if (selected.length >= 10) break;
+      }
+    }
+
+    const stories = selected.slice(0, 10).map((story, index) => ({
+      ...story,
+      id: index + 1,
+    }));
+    const personalized = readingHistory.length > 0 &&
+      stories.some(story => story.topicReadCount > 0);
 
     return {
       title: "Veckofokus",
-      summary:
-        parsed.summary?.trim() ||
-        "Veckans bästa fördjupningar och perspektiv samlade från Glenn News morgoneditioner.",
+      summary: parsed.summary?.trim() ||
+        (personalized
+          ? "Veckans olästa fördjupningar utifrån ämnena du själv återkommit till."
+          : "Veckans bästa olästa fördjupningar, rangordnade efter nyhetsvärde och långsiktiga intressen."),
       stories,
-      periodStart,
-      periodEnd,
-      editionCount: editions.length,
+      ...sharedFields,
+      topicCount: stories.length,
+      personalized,
     };
   } catch (error) {
-    console.error("Weekly focus AI JSON failed:", error);
-
+    console.error("Weekly focus generation failed:", error);
+    const stories = fallbackStories(candidates);
     return {
       title: "Veckofokus",
-      summary:
-        "Veckans bästa läsning, baserad på Glenn News sparade morgoneditioner.",
-      stories: candidates.slice(0, 10).map((article, index) => ({
-        ...article,
-        id: index + 1,
-      })),
-      periodStart,
-      periodEnd,
-      editionCount: editions.length,
+      summary: readingHistory.length > 0
+        ? "Veckans läshistorik kunde inte analyseras just nu. Här är en reservlista med olästa fördjupningar; den påstår inte att de motsvarar dina toppämnen."
+        : "Ingen veckoläshistorik fanns tillgänglig. Här är de bästa olästa fördjupningarna utifrån nyhetsvärde och långsiktig profil.",
+      stories,
+      ...sharedFields,
+      topicCount: stories.length,
+      personalized: false,
     };
   }
 }
