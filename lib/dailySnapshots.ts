@@ -475,7 +475,7 @@ function parseRiksdagAgenda(html: string) {
         .replace(/^[·|,\-\s]+|[·|,\-\s]+$/g, "")
         .trim();
 
-      if (subject.length < 8 || isGenericPage.test(subject)) continue;
+      if (subject.length < 8) continue;
 
       const committee = committeeHeadings
         .filter(heading => heading.index < (listMatch?.index ?? 0))
