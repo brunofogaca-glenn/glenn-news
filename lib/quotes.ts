@@ -69,7 +69,7 @@ const HISTORICAL_PAGES = [
   "Drottning Kristina", "Alexis de Tocqueville", "Friedrich Schiller", "Johann Wolfgang von Goethe",
   "Gustave Flaubert", "Benjamin Constant", "William Blake", "Robert Burns", "John Keats",
   "Percy Bysshe Shelley", "Lord Byron", "Emily Dickinson", "Henry David Thoreau",
-  "W. E. B. Du Bois", "Booker T. Washington", "Ida B. Wells", "William Jennings Bryan",
+  "Booker T. Washington", "Ida B. Wells", "William Jennings Bryan",
   "Frederick the Great", "Garibaldi", "Giuseppe Verdi", "Richard Wagner", "George Eliot",
   "Charlotte Brontë", "Emily Brontë", "Charles Fourier", "Pierre-Joseph Proudhon",
   "Louis Blanc", "Eugène Pottier", "August Bebel", "Eduard Bernstein", "Rosa Luxemburg",
@@ -79,7 +79,7 @@ const HISTORICAL_PAGES = [
   "Hypatia", "Hippokrates", "Demokritos", "Epiktetos", "Plinius den äldre", "Tacitus",
   "Julius Caesar", "Marcus Tullius Cicero", "Thukydides", "Perikles", "Homer",
   "Kahlil Gibran", "Rabindranath Tagore", "José Rizal", "Sun Yat-sen", "Mahatma Gandhi",
-  "Jawaharlal Nehru", "José de San Martín", "Benito Juárez", "Toussaint Louverture",
+  "José de San Martín", "Benito Juárez", "Toussaint Louverture",
   "Simón Rodríguez", "Bartolomé de las Casas", "Sor Juana Inés de la Cruz",
   "Thomas à Kempis", "Teresa av Ávila", "Johannes Calvin", "John Wesley", "William Penn",
   "Jonathan Swift", "Daniel Defoe", "Samuel Johnson", "Edmund Burke", "Mary Astell",
@@ -129,11 +129,6 @@ const FALLBACK_QUOTES: Quote[] = [
     person: "Emma Goldman",
     context: "Anarchism and Other Essays",
     sourceUrl: "https://sv.wikiquote.org/wiki/Emma_Goldman",
-  },
-  {
-    text: "En lång tradition är inte en ursäkt för att aldrig pröva en ny idé.",
-    person: "Reservcitat",
-    context: "Tillfälligt reservurval",
   },
 ];
 
