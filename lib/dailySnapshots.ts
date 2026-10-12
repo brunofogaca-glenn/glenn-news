@@ -449,9 +449,22 @@ function parseRiksdagAgenda(html: string) {
 
       const links = anchorsInHtml(itemHtml, RIKSDAG_AGENDA_URL);
       const documentLinks = links.filter(link =>
-        /dokument|betänkande|utlåtande|proposition|motion/i.test(link.title) ||
+        /dokument|betänkande|utlåtande|proposition|motion|skrivelse/i.test(link.title) ||
         /\/dokument\//i.test(link.url)
       );
+
+      // The page includes global navigation/footer links in some date sections.
+      // Only keep genuine parliamentary business, not service pages such as jobs or downloads.
+      const isGenericPage = /\b(arbeta hos oss|beställ och ladda ner|om riksdagen|kontakta oss|lediga jobb|pressrum|tillgänglighet|webbplatskarta|cookies|frågor och svar)\b/i.test(itemText);
+      if (isGenericPage) continue;
+
+      const hasDocumentReference =
+        documentLinks.length > 0 ||
+        /\b(?:utlåtande|betänkande|proposition|motion|skrivelse)\s+\d{4}\/\d{2}:[\p{L}\d-]+\b/iu.test(itemText);
+      const hasParliamentaryTopic =
+        /\b(frågestund|interpellation|kammardebatt|votering|riksdagsbeslut|frågor till regeringen)\b/i.test(itemText);
+      if (!hasDocumentReference && !hasParliamentaryTopic) continue;
+
       let subject = itemText;
       for (const link of documentLinks) {
         subject = subject.replace(link.title, " ");
@@ -462,7 +475,7 @@ function parseRiksdagAgenda(html: string) {
         .replace(/^[·|,\-\s]+|[·|,\-\s]+$/g, "")
         .trim();
 
-      if (subject.length < 8) continue;
+      if (subject.length < 8 || isGenericPage.test(subject)) continue;
 
       const committee = committeeHeadings
         .filter(heading => heading.index < (listMatch?.index ?? 0))
@@ -641,7 +654,7 @@ function movieAnchorsInHtml(block: string) {
 
 function parseMovieCalendar(html: string) {
   const today = todayInStockholm();
-  const cutoff = addDays(today, 10);
+  const cutoff = addDays(today, 6);
   const headings: Array<{ date: string; end: number }> = [];
   const headingPattern = /<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/gi;
   let match: RegExpExecArray | null;
@@ -679,7 +692,7 @@ function parseMovieCalendar(html: string) {
 
   return dedupeEntries(films).sort((a, b) =>
     (a.date ?? "").localeCompare(b.date ?? "") || a.title.localeCompare(b.title)
-  ).slice(0, 5);
+  );
 }
 
 async function getCultureSnapshotInternal(): Promise<CultureSnapshot> {
@@ -952,13 +965,13 @@ const getCachedLocalSnapshotInternal = unstable_cache(
 
 const getCachedNationalSnapshotInternal = unstable_cache(
   getNationalSnapshotInternal,
-  ["glenn-news-daily-national-v2"],
+  ["glenn-news-daily-national-v3"],
   { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-national"] }
 );
 
 const getCachedCultureSnapshotInternal = unstable_cache(
   getCultureSnapshotInternal,
-  ["glenn-news-daily-culture-v2"],
+  ["glenn-news-daily-culture-v3"],
   { revalidate: 12 * 60 * 60, tags: ["glenn-news-daily-culture"] }
 );
 
