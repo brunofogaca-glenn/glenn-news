@@ -452,6 +452,46 @@ async function getNationalSnapshotInternal(): Promise<NationalSnapshot> {
   };
 }
 
+function movieAnchorsInHtml(block: string) {
+  const entries: SnapshotLink[] = [];
+  const pattern = /<a\b([^>]*?)href\s*=\s*(?:"([^"]+)"|'([^']+)')([^>]*)>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(block)) !== null) {
+    const href = match[2] ?? match[3] ?? "";
+    const url = absoluteUrl(href, MOVIEZINE_CALENDAR_URL);
+    if (!url || !/\/film\/|\/filmer\/|\/kalender\//i.test(new URL(url).pathname)) continue;
+
+    const inner = match[5] ?? "";
+    const attributes = (match[1] ?? "") + " " + (match[4] ?? "");
+    const titleAttribute = attributes.match(/\btitle\s*=\s*(?:"([^"]+)"|'([^']+)')/i);
+    const heading = inner.match(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i);
+    const emphasized = inner.match(/<(?:strong|b)\b[^>]*>([\s\S]*?)<\/(?:strong|b)>/i);
+    const fullText = htmlText(inner);
+    let title = htmlText(titleAttribute?.[1] ?? titleAttribute?.[2] ?? heading?.[1] ?? emphasized?.[1] ?? fullText);
+
+    if (title.length > 120 && fullText.length > 0) {
+      const firstSentence = fullText.search(/[.!?]\s/);
+      title = firstSentence > 2 && firstSentence <= 120
+        ? fullText.slice(0, firstSentence + 1).trim()
+        : fullText.split(/\s+/).slice(0, 8).join(" ");
+    }
+    if (!title || title.length < 2 || title.length > 120) continue;
+
+    let description = fullText;
+    const titleIndex = fullText.toLowerCase().indexOf(title.toLowerCase());
+    if (titleIndex >= 0) {
+      description = (fullText.slice(0, titleIndex) + " " + fullText.slice(titleIndex + title.length)).trim();
+    }
+    entries.push({
+      title,
+      url,
+      description: description && description.length > 20 ? description.slice(0, 170) : undefined,
+    });
+  }
+  return entries;
+}
+
 function parseMovieCalendar(html: string) {
   const today = todayInStockholm();
   const cutoff = addDays(today, 10);
@@ -476,18 +516,16 @@ function parseMovieCalendar(html: string) {
       ? html.lastIndexOf("<h", headings[index + 1].end)
       : Math.min(html.length, heading.end + 10000);
     const section = html.slice(heading.end, nextHeadingStart > heading.end ? nextHeadingStart : Math.min(html.length, heading.end + 10000));
-    const anchors = anchorsInHtml(section, MOVIEZINE_CALENDAR_URL).filter(link =>
-      /\/film\/|\/filmer\/|\/kalender\//i.test(new URL(link.url).pathname)
-    );
+    const anchors = movieAnchorsInHtml(section);
 
     for (const link of anchors) {
-      if (link.title.length < 2 || link.title.length > 120) continue;
       if (/^(kalender|film|serier|nyheter|recensioner|topplistor)$/i.test(link.title)) continue;
       films.push({
         title: link.title,
         url: link.url,
         date: heading.date,
         dateLabel: dateLabel(heading.date),
+        description: link.description,
       });
     }
   }
