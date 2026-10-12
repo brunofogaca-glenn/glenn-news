@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type {
   CultureSnapshot,
   LocalSnapshot,
@@ -18,7 +19,7 @@ function SourceLink({ title, url }: { title: string; url: string }) {
   );
 }
 
-function SourceFooter({ children }: { children: React.ReactNode }) {
+function SourceFooter({ children }: { children: ReactNode }) {
   return (
     <div className="mt-4 border-t border-slate-300 pt-2 text-[9px] uppercase tracking-[0.12em] text-slate-400">
       {children}
