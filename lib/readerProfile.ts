@@ -388,6 +388,99 @@ export async function getRecentReaderActivity(
   }
 }
 
+export async function getReaderActivitySince(
+  sinceIso: string,
+  limit = 250
+): Promise<ReaderActivity[]> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return [];
+  }
+
+  const cutoff = Date.parse(sinceIso);
+  if (!Number.isFinite(cutoff)) {
+    return [];
+  }
+
+  try {
+    const result = await list({
+      prefix: EVENT_PREFIX,
+      limit: MAX_EVENTS,
+    });
+
+    const candidates = result.blobs
+      .map(blob => {
+        const parts = blob.pathname
+          .slice(EVENT_PREFIX.length)
+          .split(".");
+        if (parts.length !== 6 || parts[5] !== "json") {
+          return null;
+        }
+
+        const timestamp = Number.parseInt(parts[0].split("-")[0], 10);
+        if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > Date.now()) {
+          return null;
+        }
+
+        return { blob, parts, timestamp };
+      })
+      .filter(
+        (item): item is NonNullable<typeof item> => item !== null
+      )
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, Math.max(1, Math.min(limit, 300)));
+
+    const decodeValue = (value: string) =>
+      Buffer.from(value, "base64url").toString("utf8");
+
+    const activity: ReaderActivity[] = [];
+
+    // Read a small batch at a time to avoid overwhelming Blob when a busy week
+    // contains many clicks. All history is read centrally, across devices.
+    for (let offset = 0; offset < candidates.length; offset += 20) {
+      const batch = candidates.slice(offset, offset + 20);
+      const resolved = await Promise.all(batch.map(async item => {
+        let title = "";
+        let link = "";
+
+        try {
+          const stored = await get(item.blob.pathname, {
+            access: "private",
+          });
+
+          if (stored?.stream && stored.statusCode === 200) {
+            const payload = JSON.parse(
+              await new Response(stored.stream).text()
+            ) as { title?: string; link?: string };
+
+            title = payload.title?.trim() ?? "";
+            link = payload.link ?? "";
+          }
+        } catch {
+          // The event path still preserves category, type, source and topic.
+        }
+
+        const topic = decodeValue(item.parts[4]);
+        return {
+          timestamp: new Date(item.timestamp).toISOString(),
+          category: decodeValue(item.parts[1]),
+          articleType: decodeValue(item.parts[2]),
+          source: decodeValue(item.parts[3]),
+          topic: topic || undefined,
+          title: title || topic || "Läst artikel",
+          link: link || undefined,
+        } satisfies ReaderActivity;
+      }));
+
+      activity.push(...resolved);
+    }
+
+    return activity;
+  } catch (error) {
+    console.error("Kunde inte läsa veckans läshistorik:", error);
+    return [];
+  }
+}
+
 // Kept for backwards compatibility with existing callers.
 // New events are append-only and do not overwrite the profile.
 export async function saveReaderProfile(
