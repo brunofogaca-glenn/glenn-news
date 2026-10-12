@@ -18,12 +18,6 @@ function formatDate(value: string) {
 }
 
 function Table({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }) {
-  const relatedTeams = new Set(
-    data.relatedResult
-      ? [data.relatedResult.home, data.relatedResult.away]
-      : []
-  );
-
   if (!data.rows.length) {
     return (
       <div className="border-y border-slate-300 py-4 text-sm text-slate-500">
@@ -54,15 +48,10 @@ function Table({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }) 
         </thead>
         <tbody>
           {data.rows.map(row => {
-            const related = relatedTeams.has(row.team);
-
             return (
               <tr
                 key={String(row.teamId ?? row.team) + "-" + String(row.rank)}
-                className={
-                  "border-b border-slate-200 " +
-                  (related ? "bg-[#ece7d8] font-semibold" : "")
-                }
+                className="border-b border-slate-200"
               >
                 <td className="py-2 font-bold text-slate-500">{row.rank}</td>
                 <td className="px-2 py-2">
@@ -221,7 +210,7 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
             Utvalda matcher idag
           </div>
           <div className="mb-1 text-xs text-slate-400">
-            Prioriterar Elfsborg, Sverige och stora europeiska matcher
+            Endast dina valda ligor, Svenska Cupen och svenska landslaget
           </div>
           <div className="mt-3 space-y-3">
             {data.upcoming.length > 0 ? (
@@ -275,15 +264,6 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
                   {data.selectedLeague.dayLabel}
                 </span>
               </div>
-              {data.selectedLeague.relatedResult && (
-                <div className="mt-1">
-                  Gårdagens resultat:{" "}
-                  <span className="font-bold text-slate-700">
-                    {data.selectedLeague.relatedResult.home} –{" "}
-                    {data.selectedLeague.relatedResult.away}
-                  </span>
-                </div>
-              )}
               <div className="mt-1">
                 Säsong {data.selectedLeague.season}
               </div>
