@@ -357,11 +357,11 @@ function hasArticleTerm(text: string, term: string) {
 }
 
 function isStockholmRivalryFixture(fixture: ApiFootballFixture) {
-  const teams = [
-    ...teamArticleTerms(fixture.teams?.home?.name ?? ""),
-    ...teamArticleTerms(fixture.teams?.away?.name ?? ""),
-  ];
-  return teams.filter(team => STOCKHOLM_DERBY_TEAMS.has(team)).length >= 2;
+  const homeIsStockholmTeam = teamArticleTerms(fixture.teams?.home?.name ?? "")
+    .some(team => STOCKHOLM_DERBY_TEAMS.has(team));
+  const awayIsStockholmTeam = teamArticleTerms(fixture.teams?.away?.name ?? "")
+    .some(team => STOCKHOLM_DERBY_TEAMS.has(team));
+  return homeIsStockholmTeam && awayIsStockholmTeam;
 }
 
 function articlePriorityForFixture(fixture: ApiFootballFixture, articles: MatchArticle[]) {
