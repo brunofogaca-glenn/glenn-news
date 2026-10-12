@@ -3,7 +3,7 @@ import { fetchSportDay } from "./sportDay";
 
 export const getCachedSportDay = unstable_cache(
   async () => fetchSportDay(),
-  ["glenn-news-sport-day-cache-v5"],
+  ["glenn-news-sport-day-cache-v6"],
   {
     revalidate: 60 * 60,
     tags: ["glenn-news-sport-day"],
