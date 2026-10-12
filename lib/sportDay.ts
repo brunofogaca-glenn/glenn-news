@@ -391,7 +391,7 @@ function normalizeFotMobScorers(
   const teamNames = new Map(
     rows
       .filter(row => row.teamId !== undefined)
-      .map(row => [String(row.teamId), row.team])
+      .map(row => [String(row.teamId), row.team] as const)
   );
 
   return goalStats.topThree
