@@ -172,7 +172,7 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                        {result.league} · {formatDate(result.date)}
+                        {result.league}{result.country ? " · " + result.country : ""} · {formatDate(result.date)}
                       </div>
                       <div className="mt-1 font-serif text-lg font-black">
                         {result.home}{" "}
@@ -221,7 +221,7 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
                 >
                   <div className="min-w-0">
                     <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                      {match.league}
+                      {match.league}{match.country ? " · " + match.country : ""}
                     </div>
                     <div className="mt-1 font-serif font-bold">
                       {match.home} – {match.away}
