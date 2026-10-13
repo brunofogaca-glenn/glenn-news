@@ -27,3 +27,87 @@ body {
   background: #111827;
   color: #f4f1e8;
 }
+
+/* Tablet-friendly layout: keep every column inside the available viewport. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  font-size: 15px;
+}
+
+main,
+main > div,
+main section,
+main header,
+main footer,
+main article,
+main .grid,
+main .flex {
+  min-width: 0;
+}
+
+main p,
+main h1,
+main h2,
+main h3,
+main h4,
+main a,
+main span,
+main div {
+  overflow-wrap: anywhere;
+}
+
+main img {
+  max-width: 100%;
+}
+
+/* Slightly tighter typography and gutters on tablets, including portrait mode. */
+@media (min-width: 640px) and (max-width: 1100px) {
+  main > div {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  main h1 {
+    font-size: clamp(2.25rem, 5.2vw, 3.75rem);
+  }
+
+  main h2 {
+    font-size: clamp(1.65rem, 3.2vw, 2.25rem);
+  }
+
+  main h3 {
+    font-size: clamp(1.05rem, 2.2vw, 1.45rem);
+  }
+
+  main p {
+    font-size: 0.94em;
+    line-height: 1.55;
+  }
+
+  main .grid {
+    column-gap: 1rem;
+  }
+}
+
+/* Avoid narrow two-column text blocks on tablet portrait widths. */
+@media (min-width: 768px) and (max-width: 900px) {
+  main .grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  main .md\\:min-w-\\[520px\\] {
+    min-width: 0;
+  }
+}
