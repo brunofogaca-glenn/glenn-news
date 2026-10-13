@@ -50,18 +50,79 @@ function editionPath(dateKey: string) {
   return EDITION_PREFIX + dateKey + ".json";
 }
 
+function normalizeArticleUrl(value?: string) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_.*|fbclid|gclid|mc_cid|mc_eid|ref|source)$/i.test(key)) {
+        url.searchParams.delete(key);
+      }
+    }
+    return (url.hostname + url.pathname).replace(/^www\./i, "").replace(/\/$/, "").toLowerCase();
+  } catch {
+    return value.trim().toLowerCase().replace(/\/$/, "");
+  }
+}
+
+function normalizedTitle(value?: string) {
+  return (value ?? "").trim().toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function getEditionArticleKeys(edition: DailyEdition | null) {
+  const keys = new Set<string>();
+  if (!edition) return keys;
+
+  for (const section of edition.sections ?? []) {
+    const collect = (article: { link?: string; title?: string }) => {
+      const urlKey = normalizeArticleUrl(article.link);
+      const titleKey = normalizedTitle(article.title);
+      if (urlKey) keys.add("url:" + urlKey);
+      if (titleKey) keys.add("title:" + titleKey);
+    };
+
+    for (const story of section.stories ?? []) collect(story);
+    for (const story of section.allArticles ?? []) collect(story);
+  }
+
+  return keys;
+}
+
+function filterPreviouslyPublished<T extends { link?: string; title?: string }>(
+  articles: T[],
+  previousKeys: Set<string>
+) {
+  return articles.filter(article => {
+    const urlKey = normalizeArticleUrl(article.link);
+    const titleKey = normalizedTitle(article.title);
+    if (urlKey && previousKeys.has("url:" + urlKey)) return false;
+    if (titleKey && previousKeys.has("title:" + titleKey)) return false;
+    return true;
+  });
+}
+
 async function buildDailyEdition(
   dateKey: string,
-  profile: ReaderProfile
+  profile: ReaderProfile,
+  previousEdition: DailyEdition | null = null
 ): Promise<DailyEdition> {
   const news = await getCachedArticles();
+  const previousKeys = getEditionArticleKeys(previousEdition);
+  const filteredNews = Object.fromEntries(
+    Object.entries(news).map(([category, articles]) => [
+      category,
+      filterPreviouslyPublished(articles as Array<{ link?: string; title?: string }>, previousKeys),
+    ])
+  ) as typeof news;
 
   const articleBuckets = {
-    ...news,
+    ...filteredNews,
     sport: [
-      ...news.fotboll,
-      ...news.sport,
-      ...news.tennis,
+      ...filteredNews.fotboll,
+      ...filteredNews.sport,
+      ...filteredNews.tennis,
     ],
   };
 
@@ -79,8 +140,8 @@ async function buildDailyEdition(
     categoryConfig.map(category =>
       category.key === "sport"
         ? createSportEditorialSection(
-            news.fotboll,
-            [...news.sport, ...news.tennis],
+            filteredNews.fotboll,
+            [...filteredNews.sport, ...filteredNews.tennis],
             profile
           )
         : createEditorialSection(
@@ -173,7 +234,13 @@ export async function getTodayDailyEdition(
     return existing;
   }
 
-  const edition = await buildDailyEdition(dateKey, profile);
+  // Compare against the most recent saved morning edition before selecting today's stories.
+  const previousDate = new Date(dateKey + "T12:00:00Z");
+  previousDate.setUTCDate(previousDate.getUTCDate() - 1);
+  const previousDateKey = previousDate.toISOString().slice(0, 10);
+  const previousEdition = await readBlobEdition(previousDateKey);
+
+  const edition = await buildDailyEdition(dateKey, profile, previousEdition);
   const saved = await saveBlobEdition(edition);
 
   return {
