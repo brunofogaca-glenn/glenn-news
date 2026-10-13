@@ -5,6 +5,8 @@ import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
+import { getReaderProfile } from "@/lib/readerProfile";
+import { generateMorningEdition } from "@/lib/dailyEdition";
 
 export const dynamic = "force-dynamic";
 
@@ -55,12 +57,12 @@ export async function GET(request: Request) {
   const localClock = getLocalClock(now);
 
   // Two UTC cron entries handle Sweden's switch between CET and CEST.
-  // Only the invocation that lands in the 07:00 hour performs the refresh.
-  if (localClock.hour !== 7) {
+  // Only the invocation that lands in the 06:00 Stockholm hour performs the refresh.
+  if (localClock.hour !== 6) {
     return Response.json({
       ok: true,
       refreshed: false,
-      reason: "Outside the 07:00 Stockholm hour",
+      reason: "Outside the 06:00 Stockholm hour",
       localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
     });
   }
@@ -81,6 +83,10 @@ export async function GET(request: Request) {
   const editionMeta = await getCachedEditionMeta();
   const dailyHeader = await getDailyHeaderInfo();
 
+  // Generate and persist the one morning edition after refreshing its source data.
+  const profile = await getReaderProfile();
+  const edition = await generateMorningEdition(profile);
+
   return Response.json({
     ok: true,
     refreshed: true,
@@ -89,6 +95,9 @@ export async function GET(request: Request) {
     totalArticles: totalArticles(news),
     feedHealth: feedHealth.totals,
     editionUpdatedAt: editionMeta.updatedAt,
+    morningEditionDate: edition.dateKey,
+    morningEditionGeneratedAt: edition.generatedAt,
+    morningEditionArticles: edition.totalArticles,
     dailyHeader,
     sport: {
       results: sportDay.results.length,
