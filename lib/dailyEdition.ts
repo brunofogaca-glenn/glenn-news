@@ -106,9 +106,10 @@ function filterPreviouslyPublished<T extends { link?: string; title?: string }>(
 async function buildDailyEdition(
   dateKey: string,
   profile: ReaderProfile,
-  previousEdition: DailyEdition | null = null
+  previousEdition: DailyEdition | null = null,
+  suppliedNews?: Awaited<ReturnType<typeof getCachedArticles>>
 ): Promise<DailyEdition> {
-  const news = await getCachedArticles();
+  const news = suppliedNews ?? await getCachedArticles();
   const previousKeys = getEditionArticleKeys(previousEdition);
   const filteredNews = Object.fromEntries(
     Object.entries(news).map(([category, articles]) => [
@@ -224,23 +225,64 @@ async function saveBlobEdition(edition: DailyEdition) {
   }
 }
 
+async function getPreviousEditionKeys(dateKey: string, days = 7) {
+  const keys = new Set<string>();
+  const date = new Date(dateKey + "T12:00:00Z");
+
+  for (let offset = 1; offset <= days; offset += 1) {
+    const previousDate = new Date(date);
+    previousDate.setUTCDate(previousDate.getUTCDate() - offset);
+    const previousDateKey = previousDate.toISOString().slice(0, 10);
+    const edition = await readBlobEdition(previousDateKey);
+
+    for (const key of getEditionArticleKeys(edition)) {
+      keys.add(key);
+    }
+  }
+
+  return keys;
+}
+
+function editionHasPreviouslyPublishedArticles(
+  edition: DailyEdition,
+  previousKeys: Set<string>
+) {
+  for (const key of getEditionArticleKeys(edition)) {
+    if (previousKeys.has(key)) return true;
+  }
+
+  return false;
+}
+
 export async function getTodayDailyEdition(
   profile: ReaderProfile
 ): Promise<DailyEdition> {
   const dateKey = getTodayKey();
-
   const existing = await readBlobEdition(dateKey);
-  if (existing) {
+  const previousKeys = await getPreviousEditionKeys(dateKey);
+
+  // Repair today's edition if it contains articles that were already published
+  // in recent morning editions. This also fixes a stale edition created before
+  // the freshness rules were deployed.
+  if (
+    existing &&
+    !editionHasPreviouslyPublishedArticles(existing, previousKeys)
+  ) {
     return existing;
   }
 
-  // Compare against the most recent saved morning edition before selecting today's stories.
-  const previousDate = new Date(dateKey + "T12:00:00Z");
-  previousDate.setUTCDate(previousDate.getUTCDate() - 1);
-  const previousDateKey = previousDate.toISOString().slice(0, 10);
-  const previousEdition = await readBlobEdition(previousDateKey);
+  const news = await getCachedArticles();
+  const filteredNews = Object.fromEntries(
+    Object.entries(news).map(([category, articles]) => [
+      category,
+      filterPreviouslyPublished(
+        articles as Array<{ link?: string; title?: string }>,
+        previousKeys
+      ),
+    ])
+  ) as typeof news;
 
-  const edition = await buildDailyEdition(dateKey, profile, previousEdition);
+  const edition = await buildDailyEdition(dateKey, profile, null, filteredNews);
   const saved = await saveBlobEdition(edition);
 
   return {
