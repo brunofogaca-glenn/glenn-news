@@ -254,23 +254,71 @@ function editionHasPreviouslyPublishedArticles(
   return false;
 }
 
+function createWaitingEdition(dateKey: string): DailyEdition {
+  const sections: EditorialSection[] = [
+    { key: "elfsborg", title: "Elfsborg", summary: "Morgonens edition publiceras 06.30.", stories: [], allArticles: [] },
+    { key: "boras", title: "Lokalt", summary: "Morgonens edition publiceras 06.30.", stories: [] },
+    { key: "sverige", title: "Sverige", summary: "Morgonens edition publiceras 06.30.", stories: [] },
+    { key: "varlden", title: "Världen", summary: "Morgonens edition publiceras 06.30.", stories: [] },
+    { key: "ekonomi", title: "Ekonomi", summary: "Morgonens edition publiceras 06.30.", stories: [] },
+    { key: "sport", title: "Sport", summary: "Morgonens edition publiceras 06.30.", stories: [] },
+    { key: "livsstil", title: "Kultur, Mat & Livsstil", summary: "Morgonens edition publiceras 06.30.", stories: [] },
+  ];
+
+  return {
+    dateKey,
+    generatedAt: new Date().toISOString(),
+    totalArticles: 0,
+    sections,
+    storage: "live",
+  };
+}
+
+/**
+ * Read-only homepage access: never call the editorial AI or build an edition.
+ * The scheduled morning job is the only normal path that generates an edition.
+ */
 export async function getTodayDailyEdition(
+  _profile: ReaderProfile
+): Promise<DailyEdition> {
+  const dateKey = getTodayKey();
+  const existing = await readBlobEdition(dateKey);
+  return existing ?? createWaitingEdition(dateKey);
+}
+
+/**
+ * Called by the scheduled 06:30 Stockholm cron only.
+ * A successful saved edition makes subsequent/retried invocations idempotent.
+ */
+export async function generateMorningEdition(
   profile: ReaderProfile
 ): Promise<DailyEdition> {
   const dateKey = getTodayKey();
   const existing = await readBlobEdition(dateKey);
   const previousKeys = await getPreviousEditionKeys(dateKey);
+  const existingIsFreshEnough = existing
+    ? (() => {
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          timeZone: TIME_ZONE,
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).formatToParts(new Date(existing.generatedAt));
+        const hour = Number(parts.find(part => part.type === "hour")?.value ?? "0");
+        const minute = Number(parts.find(part => part.type === "minute")?.value ?? "0");
+        return hour > 6 || (hour === 6 && minute >= 30);
+      })()
+    : false;
 
-  // Repair today's edition if it contains articles that were already published
-  // in recent morning editions. This also fixes a stale edition created before
-  // the freshness rules were deployed.
   if (
     existing &&
+    existingIsFreshEnough &&
     !editionHasPreviouslyPublishedArticles(existing, previousKeys)
   ) {
     return existing;
   }
 
+  // Force fresh source data after the cron has invalidated the RSS cache.
   const news = await getCachedArticles();
   const filteredNews = Object.fromEntries(
     Object.entries(news).map(([category, articles]) => [
@@ -285,10 +333,11 @@ export async function getTodayDailyEdition(
   const edition = await buildDailyEdition(dateKey, profile, null, filteredNews);
   const saved = await saveBlobEdition(edition);
 
-  return {
-    ...edition,
-    storage: saved ? "blob" : "live",
-  };
+  if (!saved) {
+    throw new Error("Morgonens edition kunde inte sparas i Vercel Blob.");
+  }
+
+  return { ...edition, storage: "blob" };
 }
 
 export async function getSavedDailyEditions(limit = 7) {
