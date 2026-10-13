@@ -3,9 +3,9 @@ import { getArticles } from "./rss";
 
 const getCachedArticlesInternal = unstable_cache(
   async () => getArticles(),
-  ["glenn-news-articles-v1"],
+  ["glenn-news-articles-v2"],
   {
-    revalidate: 24 * 60 * 60,
+    revalidate: 30 * 60,
     tags: ["glenn-news-articles"],
   }
 );
