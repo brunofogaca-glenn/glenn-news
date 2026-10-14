@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { recordReaderEvent } from "@/lib/readerProfile";
+import { classifyClickedArticle } from "@/lib/articleClassification";
 
 type EventPayload = {
   type?: unknown;
@@ -9,6 +10,7 @@ type EventPayload = {
   source?: unknown;
   topic?: unknown;
   title?: unknown;
+  summary?: unknown;
   link?: unknown;
 };
 
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
       !isText(body.source, 160) ||
       (body.topic !== undefined && (typeof body.topic !== "string" || body.topic.length > 160)) ||
       (body.title !== undefined && (typeof body.title !== "string" || body.title.length > 300)) ||
+      (body.summary !== undefined && (typeof body.summary !== "string" || body.summary.length > 1_500)) ||
       !isValidArticleUrl(body.link)
     ) {
       return NextResponse.json(
@@ -82,6 +85,7 @@ export async function POST(request: Request) {
       source: body.source.trim(),
       topic: typeof body.topic === "string" ? body.topic.trim().slice(0, 80) : undefined,
       title: typeof body.title === "string" ? body.title.trim().slice(0, 300) : undefined,
+      summary: typeof body.summary === "string" ? body.summary.trim().slice(0, 1_200) : undefined,
       link: body.link,
     }, body.eventId);
 
@@ -91,6 +95,24 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
+
+    // Classification runs after the event is persisted and response work is complete.
+    // AI timeout/failure never turns a successful click write into an error.
+    after(async () => {
+      try {
+        await classifyClickedArticle({
+          link: body.link as string,
+          title: typeof body.title === "string" ? body.title.trim().slice(0, 300) : "",
+          summary: typeof body.summary === "string" ? body.summary.trim().slice(0, 1_200) : undefined,
+          category: body.category as string,
+          articleType: body.articleType as string,
+          source: body.source as string,
+          topic: typeof body.topic === "string" ? body.topic.trim().slice(0, 80) : undefined,
+        });
+      } catch (error) {
+        console.warn("AI article classification skipped; click event was saved.", error);
+      }
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

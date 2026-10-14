@@ -466,6 +466,7 @@ export default async function Home() {
                 articleType={elfsborg.allArticles[0].articleType}
                 source={elfsborg.allArticles[0].source ?? "Okänd källa"}
                 topic={elfsborg.allArticles[0].topic}
+                summary={elfsborg.allArticles[0].aiSummary}
                 className="group block border-b border-slate-300 pb-7"
               >
                 <div className="grid gap-6 md:grid-cols-[1.15fr_0.85fr]">
@@ -505,6 +506,7 @@ export default async function Home() {
                   articleType={article.articleType}
                   source={article.source ?? "Okänd källa"}
                   topic={article.topic}
+                  summary={article.aiSummary}
                   className="group flex gap-4 border-b border-slate-300 py-4"
                 >
                   <div className="w-7 shrink-0 pt-0.5 text-sm font-bold text-yellow-700">
@@ -625,6 +627,7 @@ export default async function Home() {
                       articleType={story.articleType}
                       source={story.source ?? "Okänd källa"}
                       topic={story.topic}
+                      summary={story.aiSummary}
                       className="group overflow-hidden border-b border-slate-300 pb-6"
                     >
                       <div className="overflow-hidden bg-slate-200">

@@ -11,6 +11,7 @@ type TrackableLinkProps = {
   articleType: string;
   source: string;
   topic?: string;
+  summary?: string;
   children: ReactNode;
   className?: string;
 };
@@ -21,6 +22,7 @@ export function TrackableLink({
   articleType,
   source,
   topic,
+  summary,
   children,
   className,
 }: TrackableLinkProps) {
@@ -50,6 +52,7 @@ export function TrackableLink({
       source,
       topic,
       title,
+      summary: summary?.trim().slice(0, 1_200),
       link: href,
     });
 

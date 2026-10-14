@@ -1,42 +1,13 @@
 import Parser from "rss-parser";
 import { detectCategory } from "./categorizer";
 import { getWebArticles } from "./webSources";
+import { normalizeArticleUrl } from "./articleUrl";
 
 /**
  * Build a comparison key for article links so tracking tags and cosmetic URL
  * differences do not produce duplicate stories. Keep non-tracking query
  * parameters because some publishers use them to identify the actual article.
  */
-function normalizeArticleUrl(value?: string) {
-  if (!value?.trim()) return "";
-
-  try {
-    const url = new URL(value.trim());
-
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return value.trim();
-    }
-
-    url.hash = "";
-    url.hostname = url.hostname.toLowerCase().replace(/^www\./i, "");
-
-    for (const key of [...url.searchParams.keys()]) {
-      if (/^(utm_.*|fbclid|gclid|mc_cid|mc_eid|ref|source)$/i.test(key)) {
-        url.searchParams.delete(key);
-      }
-    }
-
-    url.searchParams.sort();
-
-    const hostname = url.hostname + (url.port ? ":" + url.port : "");
-    const pathname = url.pathname.replace(/\/+$/, "");
-
-    return (hostname + pathname + url.search).replace(/\/$/, "");
-  } catch {
-    return value.trim();
-  }
-}
-
 const TITLE_STOPWORDS = new Set([
   "och", "att", "det", "den", "de", "en", "ett", "i", "på", "av", "för",
   "med", "mot", "om", "som", "till", "från", "efter", "innan", "nu",

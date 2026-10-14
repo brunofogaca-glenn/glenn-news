@@ -17,6 +17,7 @@ export type ReaderEvent = {
   topic?: string;
   title?: string;
   link?: string;
+  summary?: string;
 };
 
 export type ReaderActivity = ReaderEvent & {
@@ -554,6 +555,7 @@ export async function recordReaderEvent(
       JSON.stringify({
         title: event.title?.trim().slice(0, 300) ?? "",
         link: event.link ?? "",
+        summary: event.summary?.trim().slice(0, 1_500) ?? "",
       }),
       {
       access: "private",
