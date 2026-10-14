@@ -1,3 +1,4 @@
+import { withOptionalFallback } from "@/lib/optionalData";
 import { ManualRefreshButton } from "./components/ManualRefreshButton";
 import { TrackableLink } from "./components/TrackableLink";
 import { getReaderProfile } from "@/lib/readerProfile";
@@ -109,17 +110,77 @@ export default async function Home() {
     worldSnapshot,
     cultureSnapshot,
   ] = await Promise.all([
-    getReaderProfile(),
-    getCachedFeedHealth(),
-    getCachedEditionMeta(),
-    getDailyHeaderInfo(),
-    getCachedWeather(),
-    getCachedSportDay(),
-    getCachedMarketDay(),
-    getCachedLocalSnapshot(),
-    getCachedNationalSnapshot(),
-    getCachedWorldSnapshot(),
-    getCachedCultureSnapshot(),
+    withOptionalFallback("reader profile", getReaderProfile(), () => ({
+      category: {},
+      articleType: {},
+      source: {},
+      topic: {},
+      totalClicks: 0,
+      lastUpdated: null,
+    })),
+    withOptionalFallback("feed health", getCachedFeedHealth(), () => ({
+      checkedAt: new Date().toISOString(),
+      feeds: [{
+        kind: "Webb" as const,
+        name: "Flödesstatus kunde inte hämtas",
+        url: "/health",
+        category: "system",
+        status: "error" as const,
+        responseMs: 0,
+        articles24h: 0,
+        detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
+      }],
+      totals: { all: 1, healthy: 0, empty: 0, errors: 1 },
+    })),
+    withOptionalFallback("edition metadata", getCachedEditionMeta(), () => ({
+      updatedAt: "",
+    })),
+    withOptionalFallback("daily header", getDailyHeaderInfo(), () => ({
+      namedays: [],
+      historicalEvent: null,
+    })),
+    withOptionalFallback("weather", getCachedWeather(), () => ({
+      location: "Borås",
+      days: [],
+      fetchedAt: new Date().toISOString(),
+    })),
+    withOptionalFallback("sport day", getCachedSportDay(), () => ({
+      results: [],
+      upcoming: [],
+      selectedLeague: null,
+      provider: { apiFootball: false, sportmonks: false },
+      fetchedAt: new Date().toISOString(),
+    })),
+    withOptionalFallback("market day", getCachedMarketDay(), () => ({
+      date: new Date().toISOString().slice(0, 10),
+      indices: [],
+      source: "Yahoo Finance · historiska stängningar" as const,
+      error: "Marknadsinformationen kunde inte hämtas just nu.",
+    })),
+    withOptionalFallback("local snapshot", getCachedLocalSnapshot(), () => ({
+      events: [],
+      meetings: [],
+      updatedAt: new Date().toISOString(),
+      sources: [],
+    })),
+    withOptionalFallback("national snapshot", getCachedNationalSnapshot(), () => ({
+      agenda: [],
+      news: [],
+      updatedAt: new Date().toISOString(),
+      sources: [],
+    })),
+    withOptionalFallback("world snapshot", getCachedWorldSnapshot(), () => ({
+      markets: [],
+      rates: [],
+      gdp: [],
+      updatedAt: new Date().toISOString(),
+      warnings: ["Världsdata kunde inte hämtas just nu."],
+    })),
+    withOptionalFallback("culture snapshot", getCachedCultureSnapshot(), () => ({
+      films: [],
+      updatedAt: new Date().toISOString(),
+      sourceUrl: "https://www.moviezine.se/kalender",
+    })),
   ]);
 
   const edition = await getTodayDailyEdition(profile);
@@ -197,13 +258,15 @@ export default async function Home() {
                   </div>
                 )}
                 <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                  Uppdaterad {new Intl.DateTimeFormat("sv-SE", {
-                    timeZone: "Europe/Stockholm",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                    hourCycle: "h23",
-                  }).format(new Date(editionMeta.updatedAt))}
+                  {editionMeta.updatedAt
+                    ? "Uppdaterad " + new Intl.DateTimeFormat("sv-SE", {
+                        timeZone: "Europe/Stockholm",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hourCycle: "h23",
+                      }).format(new Date(editionMeta.updatedAt))
+                    : "Uppdateringstid saknas"}
                   {" · "}
                   {totalArticles} artiklar
                 </div>
