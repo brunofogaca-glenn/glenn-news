@@ -176,6 +176,8 @@ export default async function Home() {
         status: "error" as const,
         responseMs: 0,
         articles24h: 0,
+        latestArticleAt: null,
+        latestArticleAgeHours: null,
         detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
       }],
       totals: { all: 1, healthy: 0, empty: 0, stale: 0, errors: 1 },
