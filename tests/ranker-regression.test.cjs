@@ -312,11 +312,16 @@ test("WeekFocus end-to-end selects an unread deep read and reuses output until r
   };
   const generateEditorResponse = async input => {
     editorCalls += 1;
-    const historyMarker = "READ-HISTORY:\\n"; const candidatesMarker = "\\n\\nCANDIDATES (olästa texter):\\n"; const returnMarker = "\\n\\nReturnera ENDAST giltig JSON";
-    const historyStart = input.lastIndexOf(historyMarker); const candidatesStart = input.indexOf(candidatesMarker, historyStart); const returnStart = input.indexOf(returnMarker, candidatesStart);
-    assert.ok(historyStart >= 0 && candidatesStart > historyStart && returnStart > candidatesStart);
-    const history = JSON.parse(input.slice(historyStart + historyMarker.length, candidatesStart));
-    const candidates = JSON.parse(input.slice(candidatesStart + candidatesMarker.length, returnStart));
+    const historyMarker = "READ-HISTORY:";
+    const candidatesMarker = "CANDIDATES (olästa texter):";
+    const returnMarker = "Returnera ENDAST giltig JSON";
+    const historyLabelIndex = input.lastIndexOf(historyMarker);
+    const historyStart = historyLabelIndex + historyMarker.length;
+    const candidatesStart = input.indexOf(candidatesMarker, historyStart);
+    const returnStart = input.indexOf(returnMarker, candidatesStart);
+    assert.ok(historyLabelIndex >= 0 && candidatesStart > historyStart && returnStart > candidatesStart);
+    const history = JSON.parse(input.slice(historyStart, candidatesStart).trim());
+    const candidates = JSON.parse(input.slice(candidatesStart + candidatesMarker.length, returnStart).trim());
     assert.ok(history.length > 0); assert.ok(candidates.length > 0);
     const candidate = candidates[0];
     return { output_text: JSON.stringify({ summary: "Veckans val bygger på faktisk läsning och ger en ny fördjupning.", stories: [{ id: candidate.id, topic: candidate.category === "elfsborg" ? "IF Elfsborg" : "Ekonomi och räntor", readIds: [history[0].id], summary: "Fördjupning vald ur veckans olästa kandidater.", selectionReason: "Vald utifrån läshistoriken och artikelns djup.", articleType: candidate.articleType }] }) };
