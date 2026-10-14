@@ -478,7 +478,7 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
         }
       }
 
-      profile.semanticClicks += 1;
+      profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
     }
 
     return mergeProfiles(emptyProfile(), profile);
