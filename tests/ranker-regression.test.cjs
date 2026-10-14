@@ -22,6 +22,7 @@ require.extensions[".ts"] = (module, filename) => {
 const { rankArticles } = require("../lib/ranker.ts");
 const { collectWeeklyCandidates, canonicalizeLink } = require("../lib/weekFocusCandidates.ts");
 const { buildWeeklyInterestProfile } = require("../lib/weekFocusInterests.ts");
+const { createWeeklyFocusFingerprint, getOrCreateWeeklyFocus } = require("../lib/weekFocusCache.ts");
 const { curateWeeklyCandidates, scoreWeeklyReadingQuality, isNewswireCandidate } = require("../lib/weekFocusQuality.ts");
 
 function emptyProfile() {
@@ -239,4 +240,56 @@ test("WeekFocus prefers deep reads over short syndicated copy and removes near-d
   assert.equal(curated[0].link, originalAnalysis.link);
   assert.equal(curated[0].articleType, "analys");
   assert.equal(curated.some(item => item.link === wireBrief.link), false);
+});
+
+test("WeekFocus cache fingerprints are stable and change with relevant inputs", () => {
+  const first = createWeeklyFocusFingerprint({
+    profile: { source: "BT", category: "elfsborg" },
+    candidates: [{ link: "https://example.com/one", title: "Rubrik" }],
+    history: [1, 2, 3],
+  });
+  const sameInputDifferentKeyOrder = createWeeklyFocusFingerprint({
+    history: [1, 2, 3],
+    candidates: [{ title: "Rubrik", link: "https://example.com/one" }],
+    profile: { category: "elfsborg", source: "BT" },
+  });
+  const changedInput = createWeeklyFocusFingerprint({
+    history: [1, 2, 3, 4],
+    candidates: [{ title: "Rubrik", link: "https://example.com/one" }],
+    profile: { category: "elfsborg", source: "BT" },
+  });
+
+  assert.match(first, /^[a-f0-9]{64}$/);
+  assert.equal(first, sameInputDifferentKeyOrder);
+  assert.notEqual(first, changedInput);
+});
+
+test("WeekFocus concurrent requests with the same fingerprint share one generation", async () => {
+  const originalToken = process.env.BLOB_READ_WRITE_TOKEN;
+  delete process.env.BLOB_READ_WRITE_TOKEN;
+  const fingerprint = createWeeklyFocusFingerprint({ test: "same-flight-2026-10-14" });
+  let generationCount = 0;
+  const create = async () => {
+    generationCount += 1;
+    await new Promise(resolve => setTimeout(resolve, 10));
+    return { title: "Veckofokus", stories: [] };
+  };
+  const isValid = value => Boolean(value && typeof value === "object" && value.title === "Veckofokus");
+
+  try {
+    const results = await Promise.all([
+      getOrCreateWeeklyFocus(fingerprint, create, isValid),
+      getOrCreateWeeklyFocus(fingerprint, create, isValid),
+      getOrCreateWeeklyFocus(fingerprint, create, isValid),
+    ]);
+    assert.equal(generationCount, 1);
+    assert.deepEqual(results, [
+      { title: "Veckofokus", stories: [] },
+      { title: "Veckofokus", stories: [] },
+      { title: "Veckofokus", stories: [] },
+    ]);
+  } finally {
+    if (originalToken === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
+    else process.env.BLOB_READ_WRITE_TOKEN = originalToken;
+  }
 });

@@ -4,6 +4,8 @@ import { canonicalizeLink, collectWeeklyCandidates, type WeeklyCandidate } from 
 import { curateWeeklyCandidates, isNewswireCandidate } from "./weekFocusQuality";
 import { inferArticleType } from "./articleType";
 import { buildWeeklyInterestProfile } from "./weekFocusInterests";
+import { createWeeklyFocusFingerprint, getOrCreateWeeklyFocus } from "./weekFocusCache";
+import { getWeeklyReadLinks } from "./weeklyRead";
 import {
   getSavedDailyEditions,
   getTodayDailyEdition,
@@ -241,16 +243,42 @@ function fallbackStories(candidates: WeeklyCandidate[]): WeeklyStory[] {
   return stories;
 }
 
+function isValidWeeklyFocus(value: unknown): value is WeeklyFocus {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const focus = value as Partial<WeeklyFocus>;
+  return (
+    typeof focus.title === "string" &&
+    typeof focus.summary === "string" &&
+    Array.isArray(focus.stories) &&
+    typeof focus.periodStart === "string" && Number.isFinite(Date.parse(focus.periodStart)) &&
+    typeof focus.periodEnd === "string" && Number.isFinite(Date.parse(focus.periodEnd)) &&
+    Number.isInteger(focus.editionCount) &&
+    Number.isInteger(focus.readArticleCount) &&
+    Number.isInteger(focus.topicCount) &&
+    typeof focus.personalized === "boolean" &&
+    focus.stories.every(story =>
+      typeof story?.title === "string" &&
+      typeof story.link === "string" &&
+      typeof story.focusTopic === "string" &&
+      typeof story.selectionReason === "string"
+    )
+  );
+}
 export async function createWeeklyFocus(
   profile: ReaderProfile
 ): Promise<WeeklyFocus> {
   const weekStartDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const activity = await getReaderActivitySince(weekStartDate.toISOString(), 250);
+  const [activity, savedWeeklyReadLinks] = await Promise.all([
+    getReaderActivitySince(weekStartDate.toISOString(), 250),
+    getWeeklyReadLinks(),
+  ]);
   const readingHistory = buildReadingHistory(activity);
   const weeklyInterestProfile = buildWeeklyInterestProfile(readingHistory);
   const readLinks = new Set(
-    activity
-      .map(item => item.link)
+    [
+      ...activity.map(item => item.link),
+      ...savedWeeklyReadLinks,
+    ]
       .filter((link): link is string => Boolean(link))
       .map(canonicalizeLink)
   );
@@ -330,7 +358,22 @@ export async function createWeeklyFocus(
     date: item.date,
   }));
 
-  try {
+  const promptProfile = profileForPrompt(profile);
+  const cacheFingerprint = createWeeklyFocusFingerprint({
+    cacheSchema: "weekfocus-v24",
+    sharedFields,
+    periodStart,
+    periodEnd,
+    profile: promptProfile,
+    weeklyInterestProfile,
+    readingHistory: readingHistoryForPrompt,
+    candidates: candidatesForPrompt,
+  });
+
+  return getOrCreateWeeklyFocus<WeeklyFocus>(
+    cacheFingerprint,
+    async () => {
+      try {
     const response = await openai.responses.create({
       model: "gpt-5-mini",
       input: [
@@ -360,7 +403,7 @@ export async function createWeeklyFocus(
         "- Låt den faktiska läshistoriken väga tyngst, med långsiktig profil som stöd. Hitta inte på fakta.",
         "",
         "LÅNGSIKTIG LÄSARPROFIL:",
-        JSON.stringify(profileForPrompt(profile)),
+        JSON.stringify(promptProfile),
         "",
         "VECKANS FAKTISKA LÄSINTRESSE (räknat från unika artiklar i READ-HISTORY):",
         JSON.stringify(weeklyInterestProfile),
@@ -487,5 +530,8 @@ export async function createWeeklyFocus(
       topicCount: stories.length,
       personalized: false,
     };
-  }
+      }
+    },
+    isValidWeeklyFocus
+  );
 }
