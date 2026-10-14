@@ -6,7 +6,10 @@ import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
 import { getReaderProfile } from "@/lib/readerProfile";
-import { generateMorningEdition } from "@/lib/dailyEdition";
+import {
+  generateMorningEdition,
+  hasFreshMorningEditionForToday,
+} from "@/lib/dailyEdition";
 
 export const dynamic = "force-dynamic";
 
@@ -56,13 +59,26 @@ export async function GET(request: Request) {
   const now = new Date();
   const localClock = getLocalClock(now);
 
-  // Run the publication only in the 06:30 minute in Stockholm.
-  // The two UTC cron entries handle CET/CEST, but only one should match locally.
-  if (localClock.hour !== 6 || localClock.minute < 30 || localClock.minute > 34) {
+  // Three daily scheduled attempts (06:30, 06:34, 06:38 Stockholm)
+  // cover a transient failure. The duplicate UTC schedules handle CET/CEST;
+  // only the schedule matching the active Swedish offset reaches this window.
+  if (localClock.hour !== 6 || localClock.minute < 30 || localClock.minute > 39) {
     return Response.json({
       ok: true,
       refreshed: false,
-      reason: "Outside the 06:30 Stockholm publication window",
+      reason: "Outside the 06:30-06:39 Stockholm publication window",
+      localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
+    });
+  }
+
+  // Later scheduled invocations are retries, not a reason to regenerate a
+  // valid edition or refetch every source. Retry only if today's edition is
+  // still missing, invalid, too early, or repeats recent articles.
+  if (localClock.minute > 30 && await hasFreshMorningEditionForToday()) {
+    return Response.json({
+      ok: true,
+      refreshed: false,
+      reason: "Today's morning edition is already published; retry skipped",
       localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
     });
   }
