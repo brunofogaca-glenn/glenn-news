@@ -49,8 +49,37 @@ const CATEGORY_ACCENTS = {
   livsstil: "text-pink-700",
 } as const;
 
+function getStockholmDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = parts.find(part => part.type === "year")?.value ?? "0000";
+  const month = parts.find(part => part.type === "month")?.value ?? "00";
+  const day = parts.find(part => part.type === "day")?.value ?? "00";
+
+  return year + "-" + month + "-" + day;
+}
+
+function formatEditionDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
 function formatDate() {
   return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -186,6 +215,12 @@ export default async function Home() {
   const edition = await getTodayDailyEdition(profile);
   const sections = edition.sections;
   const totalArticles = edition.totalArticles;
+  const todayDateKey = getStockholmDateKey();
+  const isFallbackEdition = edition.dateKey !== todayDateKey;
+  const isUnavailableEdition =
+    !isFallbackEdition &&
+    totalArticles <= 0 &&
+    sections.every(section => section.stories.length === 0);
 
   const elfsborg = sections.find(section => section.key === "elfsborg");
   const otherSections = sections.filter(section => section.key !== "elfsborg");
@@ -258,15 +293,17 @@ export default async function Home() {
                   </div>
                 )}
                 <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                  {editionMeta.updatedAt
-                    ? "Uppdaterad " + new Intl.DateTimeFormat("sv-SE", {
-                        timeZone: "Europe/Stockholm",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                        hourCycle: "h23",
-                      }).format(new Date(editionMeta.updatedAt))
-                    : "Uppdateringstid saknas"}
+                  {isFallbackEdition
+                    ? "Reservedition från " + formatEditionDate(edition.dateKey)
+                    : editionMeta.updatedAt
+                      ? "Uppdaterad " + new Intl.DateTimeFormat("sv-SE", {
+                          timeZone: "Europe/Stockholm",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          hourCycle: "h23",
+                        }).format(new Date(editionMeta.updatedAt))
+                      : "Uppdateringstid saknas"}
                   {" · "}
                   {totalArticles} artiklar
                 </div>
@@ -275,8 +312,46 @@ export default async function Home() {
           </div>
         </header>
 
+        {isFallbackEdition && (
+          <section
+            role="alert"
+            className="mt-4 border-2 border-amber-700 bg-amber-50 px-4 py-3 text-amber-950"
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.18em]">
+              Reservedition · inte dagens nyhetsurval
+            </div>
+            <p className="mt-1 font-serif text-sm leading-6">
+              Dagens morgonedition ({formatEditionDate(todayDateKey)}) kunde inte skapas.
+              Du läser i stället den senaste fungerande editionen från{" "}
+              <strong>{formatEditionDate(edition.dateKey)}</strong>. Artiklarna hör till
+              det datumet och ska inte tolkas som dagens nyheter.
+            </p>
+          </section>
+        )}
+
+        {isUnavailableEdition && (
+          <section
+            role="alert"
+            className="mt-4 border-2 border-red-700 bg-red-50 px-4 py-3 text-red-950"
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.18em]">
+              Morgoneditionen är inte tillgänglig
+            </div>
+            <p className="mt-1 font-serif text-sm leading-6">
+              Dagens edition kunde inte skapas, och ingen tidigare fungerande edition
+              finns att visa. Försök ladda om sidan senare.
+            </p>
+          </section>
+        )}
+
         <div className="flex items-center justify-between border-b border-slate-400 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
-          <span>07:01 · Din edition</span>
+          <span>
+            {isFallbackEdition
+              ? "Reservedition · " + formatEditionDate(edition.dateKey)
+              : isUnavailableEdition
+                ? "Morgoneditionen saknas"
+                : "07:01 · Din edition"}
+          </span>
           <span><ReaderCount initialCount={profile.totalClicks} /> lästa artiklar · redaktören lär sig</span>
         </div>
 
