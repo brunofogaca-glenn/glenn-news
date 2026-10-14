@@ -342,7 +342,7 @@ function isValidArticleUrl(value?: string): value is string {
     return (
       (url.protocol === "https:" || url.protocol === "http:") &&
       Boolean(url.hostname) &&
-      !/\\s/.test(value)
+      !/\s/.test(value)
     );
   } catch {
     return false;
