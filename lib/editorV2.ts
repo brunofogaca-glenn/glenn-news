@@ -7,7 +7,7 @@ import type {
   ReaderProfile,
 } from "./readerProfile";
 
-const OPENAI_TIMEOUT_MS = 20_000;
+const OPENAI_TIMEOUT_MS = 45_000;
 
 let openaiClient: OpenAI | null = null;
 
@@ -22,7 +22,7 @@ function getOpenAIClient() {
     openaiClient = new OpenAI({
       apiKey,
       timeout: OPENAI_TIMEOUT_MS,
-      maxRetries: 1,
+      maxRetries: 0,
     });
   }
 
