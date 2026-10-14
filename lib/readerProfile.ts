@@ -513,14 +513,28 @@ export async function saveReaderProfile(
 }
 
 export async function recordReaderEvent(
-  event: ReaderEvent
+  event: ReaderEvent,
+  eventId?: string
 ) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return false;
   }
 
-  const timestamp = Date.now();
-  const id = randomUUID().replaceAll("-", "");
+  const now = Date.now();
+  const match = eventId?.match(/^(\d{13})-([a-f0-9]{32})$/i);
+  const requestedTimestamp = match ? Number(match[1]) : Number.NaN;
+  const canUseStableId =
+    Boolean(match) &&
+    Number.isFinite(requestedTimestamp) &&
+    requestedTimestamp <= now + 60_000 &&
+    requestedTimestamp >= now - 10 * 60_000;
+
+  // Keep the same Blob pathname for a quick retry of the same click. If the
+  // supplied ID is absent or stale, fall back to a fresh server-generated ID.
+  const timestamp = canUseStableId ? requestedTimestamp : now;
+  const id = canUseStableId
+    ? match![2].toLowerCase()
+    : randomUUID().replaceAll("-", "");
 
   const pathname = [
     EVENT_PREFIX +
