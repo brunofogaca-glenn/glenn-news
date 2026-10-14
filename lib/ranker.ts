@@ -354,12 +354,15 @@ function calculateSemanticAffinity(
   const text = `${article.title} ${article.description ?? ""} ${article.topic ?? ""}`
     .toLocaleLowerCase("sv-SE");
 
+  const type = (article.articleType ?? "").toLocaleLowerCase("sv-SE");
+  const typeAffinity = Math.min(6, (profile.semanticArticleType?.[type] ?? 0) * 0.8);
   const score =
     scoreSemanticMapMatches(text, profile.semanticTopic, 4, 1.5, 5, 14) +
     scoreSemanticMapMatches(text, profile.semanticTag, 4, 0.8, 3, 10) +
     scoreSemanticMapMatches(text, profile.entity, 4, 1.5, 6, 16) +
     scoreSemanticMapMatches(text, profile.geography, 4, 0.45, 2, 5) +
-    scoreSemanticMapMatches(text, profile.eventKey, 6, 0.35, 1.5, 3);
+    scoreSemanticMapMatches(text, profile.eventKey, 6, 0.35, 1.5, 3) +
+    typeAffinity;
 
   const learningConfidence = Math.min(1, profile.semanticClicks / 8);
   return Math.min(32, score) * (0.25 + learningConfidence * 0.75);
@@ -388,6 +391,7 @@ export function rankArticles(
     source: {},
     topic: {},
     semanticCategory: {},
+    semanticArticleType: {},
     semanticTopic: {},
     semanticTag: {},
     entity: {},

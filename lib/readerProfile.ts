@@ -7,6 +7,7 @@ export type ReaderProfile = {
   source: Record<string, number>;
   topic: Record<string, number>;
   semanticCategory: Record<string, number>;
+  semanticArticleType: Record<string, number>;
   semanticTopic: Record<string, number>;
   semanticTag: Record<string, number>;
   entity: Record<string, number>;
@@ -58,6 +59,7 @@ const emptyProfile = (): ReaderProfile => ({
   source: {},
   topic: {},
   semanticCategory: {},
+  semanticArticleType: {},
   semanticTopic: {},
   semanticTag: {},
   entity: {},
@@ -104,6 +106,7 @@ function mergeProfiles(
     ...emptyProfile(),
     ...structuredClone(base),
     semanticCategory: { ...(base.semanticCategory ?? {}) },
+    semanticArticleType: { ...(base.semanticArticleType ?? {}) },
     semanticTopic: { ...(base.semanticTopic ?? {}) },
     semanticTag: { ...(base.semanticTag ?? {}) },
     entity: { ...(base.entity ?? {}) },
@@ -130,6 +133,27 @@ function mergeProfiles(
     merged.topic[key] =
       (merged.topic[key] ?? 0) + value;
   }
+
+  const semanticMapKeys = [
+    "semanticCategory",
+    "semanticArticleType",
+    "semanticTopic",
+    "semanticTag",
+    "entity",
+    "geography",
+    "eventKey",
+  ] as const;
+
+  for (const field of semanticMapKeys) {
+    const target = merged[field] ?? {};
+    const source = addition[field] ?? {};
+    for (const [key, value] of Object.entries(source)) {
+      target[key] = (target[key] ?? 0) + value;
+    }
+    merged[field] = target;
+  }
+
+  merged.semanticClicks += addition.semanticClicks ?? 0;
 
   merged.totalClicks += addition.totalClicks;
 
@@ -176,6 +200,7 @@ function mergeProfiles(
       )
     ),
     semanticCategory: trimWeightedMap(merged.semanticCategory),
+    semanticArticleType: trimWeightedMap(merged.semanticArticleType),
     semanticTopic: trimWeightedMap(merged.semanticTopic),
     semanticTag: trimWeightedMap(merged.semanticTag),
     entity: trimWeightedMap(merged.entity),
@@ -381,7 +406,7 @@ export async function recordSemanticReaderEvent(
 
 function addSemanticWeight(
   profile: ReaderProfile,
-  key: "semanticCategory" | "semanticTopic" | "semanticTag" | "entity" | "geography" | "eventKey",
+  key: "semanticCategory" | "semanticArticleType" | "semanticTopic" | "semanticTag" | "entity" | "geography" | "eventKey",
   value: unknown,
   weight: number
 ) {
@@ -429,6 +454,7 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
       const weight = recencyWeight * (0.4 + confidence * 0.6);
 
       addSemanticWeight(profile, "semanticCategory", data.c, weight * 0.5);
+      addSemanticWeight(profile, "semanticArticleType", data.a, weight * 0.7);
       addSemanticWeight(profile, "semanticTopic", data.t, weight * 1.4);
       addSemanticWeight(profile, "eventKey", data.v, weight * 0.35);
 
