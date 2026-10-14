@@ -6,9 +6,11 @@ export type FeedHealth = {
   name: string;
   url: string;
   category: string;
-  status: "ok" | "empty" | "error";
+  status: "ok" | "empty" | "stale" | "error";
   responseMs: number;
   articles24h: number;
+  latestArticleAt: string | null;
+  latestArticleAgeHours: number | null;
   detail: string;
 };
 
@@ -30,13 +32,73 @@ function countLast24Hours(items: Array<{ pubDate?: string; date?: string }>) {
   }).length;
 }
 
+const STALE_AFTER_HOURS = 72;
+
+function getLatestArticleTimestamp(
+  items: Array<{ pubDate?: string; date?: string }>
+) {
+  const now = Date.now();
+  const timestamps = items
+    .map(item => new Date(item.pubDate ?? item.date ?? "").getTime())
+    .filter(time => Number.isFinite(time) && time <= now + 5 * 60 * 1000);
+
+  return timestamps.length ? Math.max(...timestamps) : null;
+}
+
+function getArticleAgeHours(timestamp: number | null) {
+  if (timestamp === null) return null;
+  return Math.max(0, Math.floor((Date.now() - timestamp) / (60 * 60 * 1000)));
+}
+
+function getFeedHealthStatus(
+  articles24h: number,
+  latestArticleAgeHours: number | null
+): "ok" | "empty" | "stale" {
+  if (articles24h > 0) return "ok";
+  if (
+    latestArticleAgeHours !== null &&
+    latestArticleAgeHours >= STALE_AFTER_HOURS
+  ) {
+    return "stale";
+  }
+  return "empty";
+}
+
+function getFreshnessDetail(
+  itemCount: number,
+  articles24h: number,
+  latestArticleAgeHours: number | null
+) {
+  if (articles24h > 0) {
+    return `${articles24h} artiklar senaste 24 h`;
+  }
+
+  if (latestArticleAgeHours === null) {
+    return itemCount === 0
+      ? "Flödet svarade men innehåller inga artiklar"
+      : `${itemCount} poster hittades, men publiceringsdatum saknas eller kan inte tolkas`;
+  }
+
+  if (latestArticleAgeHours >= STALE_AFTER_HOURS) {
+    return `Senaste daterade artikel är ${latestArticleAgeHours} h gammal; ingen ny artikel på minst ${STALE_AFTER_HOURS} h`;
+  }
+
+  return `${itemCount} poster i flödet; senaste daterade artikel för ${latestArticleAgeHours} h sedan, inga senaste 24 h`;
+}
+
 async function checkRssFeed(feed: (typeof FEEDS)[number]): Promise<FeedHealth> {
   const started = Date.now();
 
   try {
     const parsed = await parseFeed(feed.url);
-    const articles24h = countLast24Hours(parsed.items);
-    const status = articles24h > 0 ? "ok" : "empty";
+    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    const articles24h = countLast24Hours(items);
+    const latestArticleTimestamp = getLatestArticleTimestamp(items);
+    const latestArticleAt = latestArticleTimestamp === null
+      ? null
+      : new Date(latestArticleTimestamp).toISOString();
+    const latestArticleAgeHours = getArticleAgeHours(latestArticleTimestamp);
+    const status = getFeedHealthStatus(articles24h, latestArticleAgeHours);
 
     return {
       kind: "RSS",
@@ -46,10 +108,9 @@ async function checkRssFeed(feed: (typeof FEEDS)[number]): Promise<FeedHealth> {
       status,
       responseMs: Date.now() - started,
       articles24h,
-      detail:
-        articles24h > 0
-          ? `${articles24h} artiklar senaste 24 h`
-          : "Flödet svarade, men inga artiklar senaste 24 h",
+      latestArticleAt,
+      latestArticleAgeHours,
+      detail: getFreshnessDetail(items.length, articles24h, latestArticleAgeHours),
     };
   } catch (error) {
     return {
@@ -71,7 +132,12 @@ async function checkWebSource(source: (typeof WEB_SOURCES)[number]): Promise<Fee
   try {
     const articles = await fetchWebSource(source);
     const articles24h = countLast24Hours(articles);
-    const status = articles24h > 0 ? "ok" : "empty";
+    const latestArticleTimestamp = getLatestArticleTimestamp(articles);
+    const latestArticleAt = latestArticleTimestamp === null
+      ? null
+      : new Date(latestArticleTimestamp).toISOString();
+    const latestArticleAgeHours = getArticleAgeHours(latestArticleTimestamp);
+    const status = getFeedHealthStatus(articles24h, latestArticleAgeHours);
 
     return {
       kind: "Webb",
@@ -81,10 +147,9 @@ async function checkWebSource(source: (typeof WEB_SOURCES)[number]): Promise<Fee
       status,
       responseMs: Date.now() - started,
       articles24h,
-      detail:
-        articles24h > 0
-          ? `${articles24h} artiklar senaste 24 h`
-          : `${articles.length} artiklar hittades, men inga med tydligt datum senaste 24 h`,
+      latestArticleAt,
+      latestArticleAgeHours,
+      detail: getFreshnessDetail(articles.length, articles24h, latestArticleAgeHours),
     };
   } catch (error) {
     return {
@@ -109,6 +174,7 @@ export async function getFeedHealth() {
   const feeds = [...rss, ...web];
   const healthy = feeds.filter(feed => feed.status === "ok").length;
   const empty = feeds.filter(feed => feed.status === "empty").length;
+  const stale = feeds.filter(feed => feed.status === "stale").length;
   const errors = feeds.filter(feed => feed.status === "error").length;
 
   return {
@@ -118,6 +184,7 @@ export async function getFeedHealth() {
       all: feeds.length,
       healthy,
       empty,
+      stale,
       errors,
     },
   };
