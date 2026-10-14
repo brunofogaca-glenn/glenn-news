@@ -4,7 +4,6 @@ import { RetryMorningEditionButton } from "./components/RetryMorningEditionButto
 import { TrackableLink } from "./components/TrackableLink";
 import { getReaderProfile } from "@/lib/readerProfile";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
-import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedWeather } from "@/lib/weather";
 import { getCachedSportDay } from "@/lib/sportDayCache";
@@ -78,6 +77,20 @@ function formatEditionDate(dateKey: string) {
   }).format(date);
 }
 
+function formatEditionTimestamp(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(timestamp));
+}
+
 function formatDate() {
   return new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Stockholm",
@@ -142,7 +155,6 @@ export default async function Home() {
   const [
     profile,
     feedHealth,
-    editionMeta,
     dailyHeader,
     weather,
     sportDay,
@@ -167,9 +179,6 @@ export default async function Home() {
         detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
       }],
       totals: { all: 1, healthy: 0, empty: 0, errors: 1 },
-    })),
-    withOptionalFallback("edition metadata", getCachedEditionMeta(), () => ({
-      updatedAt: "",
     })),
     withOptionalFallback("daily header", getDailyHeaderInfo(), () => ({
       namedays: [],
@@ -302,15 +311,12 @@ export default async function Home() {
                 <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                   {isFallbackEdition
                     ? "Reservedition från " + formatEditionDate(edition.dateKey)
-                    : editionMeta.updatedAt
-                      ? "Uppdaterad " + new Intl.DateTimeFormat("sv-SE", {
-                          timeZone: "Europe/Stockholm",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                          hourCycle: "h23",
-                        }).format(new Date(editionMeta.updatedAt))
-                      : "Uppdateringstid saknas"}
+                      + (formatEditionTimestamp(edition.generatedAt)
+                        ? " · skapad " + formatEditionTimestamp(edition.generatedAt)
+                        : "")
+                    : formatEditionTimestamp(edition.generatedAt)
+                      ? "Edition skapad " + formatEditionTimestamp(edition.generatedAt)
+                      : "Editionens skapandetid saknas"}
                   {" · "}
                   {totalArticles} artiklar
                 </div>
