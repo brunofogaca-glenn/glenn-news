@@ -326,11 +326,11 @@ function normalizeStoryUrl(value?: string) {
       }
     }
 
-    return `${url.hostname.replace(/^www\\./i, "")}${url.pathname}${url.search}`
-      .replace(/\\/$/, "")
+    return `${url.hostname.replace(/^www\./i, "")}${url.pathname}${url.search}`
+      .replace(/\/$/, "")
       .toLowerCase();
   } catch {
-    return value.trim().toLowerCase().replace(/\\/$/, "");
+    return value.trim().toLowerCase().replace(/\/$/, "");
   }
 }
 
@@ -338,7 +338,7 @@ function normalizeStoryTitle(value?: string) {
   return (value ?? "")
     .trim()
     .toLowerCase()
-    .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
