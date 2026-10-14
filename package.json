@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run test:ranker && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:ranker": "node --test tests/ranker-regression.test.cjs"
   },
   "dependencies": {
     "next": "16.2.6",
