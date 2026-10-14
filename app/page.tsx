@@ -178,7 +178,7 @@ export default async function Home() {
         articles24h: 0,
         detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
       }],
-      totals: { all: 1, healthy: 0, empty: 0, errors: 1 },
+      totals: { all: 1, healthy: 0, empty: 0, stale: 0, errors: 1 },
     })),
     withOptionalFallback("daily header", getDailyHeaderInfo(), () => ({
       namedays: [],
