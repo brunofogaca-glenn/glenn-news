@@ -638,6 +638,9 @@ POÄNGSIGNALER:
 - newsScore uppskattar nyhetsvärde: aktualitet, betydelse, personlig relevans och hur brett en händelse bevakas.
 - readingScore uppskattar läsvärde: fördjupning, perspektiv och sannolikheten att texten är värd Glenns lästid.
 - Använd readingScore extra tydligt när du väljer "Dagens läsning", men låt högt nyhetsvärde vinna när en nyhet är exceptionellt viktig.
+- publicImportanceScore uppskattar allmän påverkan: stora politiska beslut, konflikter, katastrofer och systemiska ekonomi- eller folkhälsohändelser. Den signalen finns oberoende av Glenns klickhistorik.
+- personalizationScore är medvetet begränsad. Se den som en relevansbonus, inte som ett skäl att välja en mindre viktig rutinnyhet framför en stor händelse.
+- Ge viktiga nyheter plats även när de inte matchar Glenns återkommande ämnen. En nyhet med stor samhällspåverkan kan vara viktig just för att den är ny för honom.
 
 GLENNS GRUNDPREFERENSER:
 - Elfsborg ska ha full täckning; materialet ska inte filtreras bort på grund av mängd.

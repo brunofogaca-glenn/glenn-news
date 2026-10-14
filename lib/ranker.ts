@@ -223,9 +223,81 @@ function calculatePersonalScore(
   score += scoreTerms(text, TIER_2, 30);
   score += scoreTerms(text, TIER_3, 20);
   score += scoreTerms(text, TIER_4, 10);
-  score += scoreTerms(text, BREAKING_TERMS, 15);
 
-  return score;
+  // Long-term/fixed preferences are useful, but must not swamp broad news.
+  return Math.min(42, score);
+}
+
+
+const PUBLIC_IMPORTANCE_SIGNALS = [
+  {
+    weight: 8,
+    cap: 24,
+    terms: [
+      "regeringskris", "regeringen avgår", "statsminister avgår", "misstroende",
+      "valresultat", "ny regering", "president avgår", "presidentval",
+      "parlamentsval", "riksdagen", "lagstiftning", "grundlag", "government resigns",
+      "prime minister resigns", "election result", "parliament votes", "impeachment",
+    ],
+  },
+  {
+    weight: 8,
+    cap: 26,
+    terms: [
+      "invasion", "vapenvila", "bombning", "bombningar", "luftangrepp", "offensiv",
+      "krig", "terrorattack", "gisslan", "kärnvapen", "missilangrepp", "sanktioner",
+      "ceasefire", "airstrike", "air strikes", "hostage", "nuclear threat",
+      "military offensive", "war escalates", "peace deal", "attacks civilian",
+    ],
+  },
+  {
+    weight: 9,
+    cap: 27,
+    terms: [
+      "jordbävning", "tsunami", "orkan", "översvämning", "skogsbrand", "naturkatastrof",
+      "evakueras", "masskrock", "rasar samman", "dödsoffer", "flera döda",
+      "katastrofläge", "emergency declared", "mass casualty", "major earthquake",
+      "wildfire", "flooding forces", "evacuation order", "disaster zone",
+    ],
+  },
+  {
+    weight: 6,
+    cap: 20,
+    terms: [
+      "finanskris", "börsras", "bankkollaps", "styrräntan", "riksbanken höjer",
+      "riksbanken sänker", "recession", "lågkonjunktur", "massuppsägning",
+      "massvarsel", "statsbudget", "statsbankrutt", "market crash", "bank collapse",
+      "central bank emergency", "sovereign debt crisis",
+    ],
+  },
+  {
+    weight: 6,
+    cap: 18,
+    terms: [
+      "pandemi", "epidemi", "smittutbrott", "folkhälsokris", "klimatnödläge",
+      "värmerekord", "kärnkraftsolycka", "radioaktivt läckage", "antibiotikaresistens",
+      "public health emergency", "disease outbreak", "nuclear accident",
+      "record-breaking heat", "climate emergency",
+    ],
+  },
+] as const;
+
+/**
+ * Broad public-interest signals are independent of Glenn's click history.
+ * Multi-source coverage and freshness are scored elsewhere; this provides a
+ * separate boost for high-impact events that deserve attention even if novel
+ * to the reader.
+ */
+function calculatePublicImportanceScore(article: Article) {
+  const text = `${article.title} ${article.description ?? ""}`
+    .toLocaleLowerCase("sv-SE");
+
+  let score = 0;
+  for (const group of PUBLIC_IMPORTANCE_SIGNALS) {
+    score += Math.min(group.cap, scoreTerms(text, [...group.terms], group.weight));
+  }
+
+  return Math.min(60, score);
 }
 
 function calculateReadingScore(
@@ -316,7 +388,9 @@ function calculateProfileAffinity(
   }
 
   const confidence = Math.min(1, profile.totalClicks / 20);
-  return score * (0.3 + confidence * 0.7);
+  // Repeat behavior is useful evidence, but the entire historical profile has
+  // a fixed ceiling so it cannot overwhelm breaking or widely covered news.
+  return Math.min(14, score * (0.3 + confidence * 0.7));
 }
 
 
@@ -365,7 +439,8 @@ function calculateSemanticAffinity(
     typeAffinity;
 
   const learningConfidence = Math.min(1, (profile.semanticClicks ?? 0) / 8);
-  return Math.min(32, score) * (0.25 + learningConfidence * 0.75);
+  // Semantic matching is an additional hint, not a hard filter or a dominant score.
+  return Math.min(18, score) * (0.25 + learningConfidence * 0.75);
 }
 
 function calculateRecencyScore(
@@ -436,19 +511,21 @@ export function rankArticles(
         editorialEchoScore +
         sourceDiversityScore;
 
-      const personalScore =
-        calculatePersonalScore(article) +
-        calculateProfileAffinity(article, profile) +
-        calculateSemanticAffinity(article, profile);
+      const fixedPreferenceScore = calculatePersonalScore(article);
+      const behaviorProfileScore = calculateProfileAffinity(article, profile);
+      const semanticProfileScore = calculateSemanticAffinity(article, profile);
+      const personalizationScore = Math.min(
+        55,
+        fixedPreferenceScore + behaviorProfileScore + semanticProfileScore
+      );
 
-      const recencyScore =
-        calculateRecencyScore(
-          article
-        );
+      const publicImportanceScore = calculatePublicImportanceScore(article);
+      const recencyScore = calculateRecencyScore(article);
 
       const newsScore =
         clusterScore +
-        personalScore +
+        publicImportanceScore +
+        personalizationScore +
         recencyScore;
 
       const readingScore =
@@ -463,6 +540,8 @@ export function rankArticles(
         score,
         newsScore,
         readingScore,
+        publicImportanceScore,
+        personalizationScore,
         mentions,
         uniqueSources,
         topic:
