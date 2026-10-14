@@ -17,9 +17,14 @@ import {
   type ReaderProfile,
 } from "./readerProfile";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient() {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+}
 
 type WeeklyStory = WeeklyCandidate & {
   id: number;
@@ -37,6 +42,16 @@ export type WeeklyFocus = {
   readArticleCount: number;
   topicCount: number;
   personalized: boolean;
+};
+
+type WeeklyFocusDependencies = {
+  loadReaderActivity: typeof getReaderActivitySince;
+  loadWeeklyReadLinks: typeof getWeeklyReadLinks;
+  loadTodayEdition: typeof getTodayDailyEdition;
+  loadSavedEditions: typeof getSavedDailyEditions;
+  fingerprint: typeof createWeeklyFocusFingerprint;
+  getOrCreate: typeof getOrCreateWeeklyFocus;
+  generateEditorResponse: (input: string) => Promise<{ output_text: string }>;
 };
 
 function profileForPrompt(profile: ReaderProfile) {
@@ -264,13 +279,26 @@ function isValidWeeklyFocus(value: unknown): value is WeeklyFocus {
     )
   );
 }
+const defaultWeeklyFocusDependencies: WeeklyFocusDependencies = {
+  loadReaderActivity: getReaderActivitySince,
+  loadWeeklyReadLinks: getWeeklyReadLinks,
+  loadTodayEdition: getTodayDailyEdition,
+  loadSavedEditions: getSavedDailyEditions,
+  fingerprint: createWeeklyFocusFingerprint,
+  getOrCreate: getOrCreateWeeklyFocus,
+  generateEditorResponse: input =>
+    getOpenAIClient().responses.create({ model: "gpt-5-mini", input }),
+};
+
 export async function createWeeklyFocus(
-  profile: ReaderProfile
+  profile: ReaderProfile,
+  dependencyOverrides: Partial<WeeklyFocusDependencies> = {}
 ): Promise<WeeklyFocus> {
+  const dependencies = { ...defaultWeeklyFocusDependencies, ...dependencyOverrides };
   const weekStartDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const [activity, savedWeeklyReadLinks] = await Promise.all([
-    getReaderActivitySince(weekStartDate.toISOString(), 250),
-    getWeeklyReadLinks(),
+    dependencies.loadReaderActivity(weekStartDate.toISOString(), 250),
+    dependencies.loadWeeklyReadLinks(),
   ]);
   const readingHistory = buildReadingHistory(activity);
   const weeklyInterestProfile = buildWeeklyInterestProfile(readingHistory);
@@ -283,8 +311,8 @@ export async function createWeeklyFocus(
       .map(canonicalizeLink)
   );
 
-  const todayEdition = await getTodayDailyEdition(profile);
-  const savedEditions = await getSavedDailyEditions(7);
+  const todayEdition = await dependencies.loadTodayEdition(profile);
+  const savedEditions = await dependencies.loadSavedEditions(7);
   const editions =
     savedEditions.some(edition => edition.dateKey === todayEdition.dateKey)
       ? savedEditions
@@ -359,7 +387,7 @@ export async function createWeeklyFocus(
   }));
 
   const promptProfile = profileForPrompt(profile);
-  const cacheFingerprint = createWeeklyFocusFingerprint({
+  const cacheFingerprint = dependencies.fingerprint({
     cacheSchema: "weekfocus-v24",
     sharedFields,
     periodStart,
@@ -370,13 +398,11 @@ export async function createWeeklyFocus(
     candidates: candidatesForPrompt,
   });
 
-  return getOrCreateWeeklyFocus<WeeklyFocus>(
+  return dependencies.getOrCreate<WeeklyFocus>(
     cacheFingerprint,
     async () => {
       try {
-    const response = await openai.responses.create({
-      model: "gpt-5-mini",
-      input: [
+    const response = await dependencies.generateEditorResponse([
         "Du är Glenns personliga veckoredaktör på Glenn News.",
         "",
         "UPPDRAG:",
@@ -429,8 +455,7 @@ export async function createWeeklyFocus(
             articleType: "analys"
           }]
         }, null, 2),
-      ].join("\n"),
-    });
+      ].join("\n"));
 
     const parsed = JSON.parse(response.output_text) as {
       summary?: string;

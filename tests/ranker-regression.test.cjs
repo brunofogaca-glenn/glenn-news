@@ -23,6 +23,7 @@ const { rankArticles } = require("../lib/ranker.ts");
 const { collectWeeklyCandidates, canonicalizeLink } = require("../lib/weekFocusCandidates.ts");
 const { buildWeeklyInterestProfile } = require("../lib/weekFocusInterests.ts");
 const { createWeeklyFocusFingerprint, getOrCreateWeeklyFocus } = require("../lib/weekFocusCache.ts");
+const { createWeeklyFocus } = require("../lib/weekFocus.ts");
 const { curateWeeklyCandidates, scoreWeeklyReadingQuality, isNewswireCandidate } = require("../lib/weekFocusQuality.ts");
 
 function emptyProfile() {
@@ -292,4 +293,44 @@ test("WeekFocus concurrent requests with the same fingerprint share one generati
     if (originalToken === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
     else process.env.BLOB_READ_WRITE_TOKEN = originalToken;
   }
+});
+
+test("WeekFocus end-to-end selects an unread deep read and reuses output until read state changes", async () => {
+  const historyFixture = [{ timestamp: "2026-10-13T07:20:00.000Z", title: "Elfsborgs presspel fungerade igen", category: "elfsborg", articleType: "analys", source: "Borås Tidning", topic: "IF Elfsborg", link: "https://example.com/read-history-elfsborg" }];
+  const articleA = { title: "Analys: IF Elfsborg pressade högt i ny matchplan", description: "En fördjupad genomgång av presspelet, lagdelarnas avstånd och hur tränaren har förändrat lagets uppbyggnad. ".repeat(7), source: "Offside", link: "https://example.com/elfsborg-analysis", image: null, date: "2026-10-14T05:15:00.000Z", articleType: "analys", aiSummary: "En taktisk fördjupning.", selectionReason: "Taktisk analys.", topic: "IF Elfsborg" };
+  const articleB = { title: "Intervju: Så tänker Riksbanken om nästa räntebesked", description: "Ett längre samtal om inflationsutsikter, hushållens ekonomi och hur kommande räntebeslut kan påverka bolånetagare. ".repeat(6), source: "Ekonomikanalen", link: "https://example.com/riksbank-interview", image: null, date: "2026-10-14T05:30:00.000Z", articleType: "intervju", aiSummary: "Bakgrund om ränteläget.", selectionReason: "En intervju med nya perspektiv.", topic: "Riksbanken" };
+  const edition = { dateKey: "2026-10-14", generatedAt: "2026-10-14T04:35:00.000Z", totalArticles: 2, storage: "blob", sections: [ { key: "elfsborg", title: "Elfsborg", summary: "Elfsborgsnyheter", stories: [articleA], allArticles: [articleA] }, { key: "ekonomi", title: "Ekonomi", summary: "Ekonominyheter", stories: [articleB] } ] };
+  let savedReadLinks = []; let editorCalls = 0; let activityCalls = 0;
+  const cache = new Map(); const pending = new Map();
+  const isValidFocus = value => Boolean(value && typeof value === "object" && value.title === "Veckofokus" && Array.isArray(value.stories) && value.stories.every(story => typeof story.link === "string"));
+  const getOrCreate = async (fingerprint, create, isValid) => {
+    if (cache.has(fingerprint) && isValid(cache.get(fingerprint))) return cache.get(fingerprint);
+    if (pending.has(fingerprint)) return pending.get(fingerprint);
+    const task = (async () => { const result = await create(); if (isValid(result)) cache.set(fingerprint, result); return result; })();
+    pending.set(fingerprint, task);
+    try { return await task; } finally { if (pending.get(fingerprint) === task) pending.delete(fingerprint); }
+  };
+  const generateEditorResponse = async input => {
+    editorCalls += 1;
+    const historyMarker = "READ-HISTORY:\\n"; const candidatesMarker = "\\n\\nCANDIDATES (olästa texter):\\n"; const returnMarker = "\\n\\nReturnera ENDAST giltig JSON";
+    const historyStart = input.lastIndexOf(historyMarker); const candidatesStart = input.indexOf(candidatesMarker, historyStart); const returnStart = input.indexOf(returnMarker, candidatesStart);
+    assert.ok(historyStart >= 0 && candidatesStart > historyStart && returnStart > candidatesStart);
+    const history = JSON.parse(input.slice(historyStart + historyMarker.length, candidatesStart));
+    const candidates = JSON.parse(input.slice(candidatesStart + candidatesMarker.length, returnStart));
+    assert.ok(history.length > 0); assert.ok(candidates.length > 0);
+    const candidate = candidates[0];
+    return { output_text: JSON.stringify({ summary: "Veckans val bygger på faktisk läsning och ger en ny fördjupning.", stories: [{ id: candidate.id, topic: candidate.category === "elfsborg" ? "IF Elfsborg" : "Ekonomi och räntor", readIds: [history[0].id], summary: "Fördjupning vald ur veckans olästa kandidater.", selectionReason: "Vald utifrån läshistoriken och artikelns djup.", articleType: candidate.articleType }] }) };
+  };
+  const profile = { category: { elfsborg: 2 }, articleType: { analys: 2 }, source: { "Borås Tidning": 1 }, topic: { "IF Elfsborg": 2 }, semanticCategory: {}, semanticArticleType: {}, semanticTopic: {}, semanticTag: {}, entity: {}, geography: {}, eventKey: {}, semanticClicks: 1, totalClicks: 1, lastUpdated: "2026-10-13T07:20:00.000Z" };
+  const dependencies = { loadReaderActivity: async () => { activityCalls += 1; return historyFixture; }, loadWeeklyReadLinks: async () => [...savedReadLinks], loadTodayEdition: async () => edition, loadSavedEditions: async () => [edition], generateEditorResponse, getOrCreate };
+
+  const first = await createWeeklyFocus(profile, dependencies);
+  assert.equal(first.title, "Veckofokus"); assert.equal(first.stories.length, 1); assert.equal(first.personalized, true); assert.equal(first.stories[0].topicReadCount, 1);
+  assert.ok([articleA.link, articleB.link].includes(first.stories[0].link)); assert.equal(editorCalls, 1);
+  const repeated = await createWeeklyFocus(profile, dependencies);
+  assert.deepEqual(repeated, first, "the same editorial inputs reuse the cached result"); assert.equal(editorCalls, 1, "an unchanged request does not call AI again");
+  savedReadLinks = [first.stories[0].link];
+  const afterRead = await createWeeklyFocus(profile, dependencies);
+  assert.equal(afterRead.stories.length, 1); assert.notEqual(afterRead.stories[0].link, first.stories[0].link, "marking a story read changes the candidate pool");
+  assert.equal(editorCalls, 2, "a changed read state generates a fresh editorial result"); assert.equal(activityCalls, 3);
 });
