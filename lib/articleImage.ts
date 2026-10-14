@@ -1,8 +1,10 @@
 export async function getOgImage(
-  url: string
+  url: string,
+  timeoutMs = 6_000
 ) {
   try {
     const response = await fetch(url, {
+      signal: AbortSignal.timeout(Math.max(1, Math.floor(timeoutMs))),
       headers: {
         "User-Agent":
           "Mozilla/5.0 Glenn News",
@@ -10,7 +12,16 @@ export async function getOgImage(
       cache: "force-cache",
     });
 
-    const html = await response.text();
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (contentLength > 2_000_000) {
+      return null;
+    }
+
+    const html = (await response.text()).slice(0, 1_500_000);
     const metaTags =
       html.match(/<meta[^>]*>/gi) ?? [];
 

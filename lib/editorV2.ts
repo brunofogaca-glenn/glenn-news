@@ -406,24 +406,149 @@ function fallbackEditorialResult(
   };
 }
 
-async function ensureImages(
-  stories: SelectedStory[]
-) {
-  await Promise.all(
-    stories.map(async story => {
-      if (
-        !story.image &&
-        story.link
-      ) {
-        story.image =
-          await getOgImage(
-            story.link
-          );
-      }
-    })
-  );
+type ImageArticle = {
+  title: string;
+  link?: string;
+  image?: string | null;
+};
 
-  return stories;
+const MAX_CONCURRENT_IMAGE_LOOKUPS = 8;
+const IMAGE_LOOKUP_TIMEOUT_MS = 6_000;
+const IMAGE_ENRICHMENT_BUDGET_MS = 25_000;
+
+function imageArticleKey(article: ImageArticle, index: number) {
+  const urlKey = normalizeStoryUrl(article.link);
+  if (urlKey) return "url:" + urlKey;
+
+  const titleKey = normalizeStoryTitle(article.title);
+  return titleKey ? "title:" + titleKey : "anonymous:" + index;
+}
+
+/**
+ * Enrich article images after editorial selection. Existing RSS image URLs are
+ * kept first. Selected stories are processed before the eight leading Elfsborg
+ * full-coverage articles. A shared worker pool and deadline prevent slow sites
+ * from holding up the whole edition.
+ */
+export async function enrichEditorialImages(
+  sections: EditorialSection[]
+): Promise<EditorialSection[]> {
+  const elfsborgSection = sections.find(section => section.key === "elfsborg");
+  const elfsborgArticles = elfsborgSection?.allArticles ?? [];
+  const selectedArticles = sections.flatMap(section => section.stories);
+
+  const allReferences: ImageArticle[] = [];
+  const seenObjects = new Set<ImageArticle>();
+  for (const article of [...selectedArticles, ...elfsborgArticles]) {
+    if (!seenObjects.has(article)) {
+      seenObjects.add(article);
+      allReferences.push(article);
+    }
+  }
+
+  const aliases = new Map<string, ImageArticle[]>();
+  const keysByObject = new Map<ImageArticle, string>();
+  allReferences.forEach((article, index) => {
+    const key = imageArticleKey(article, index);
+    keysByObject.set(article, key);
+    const group = aliases.get(key) ?? [];
+    group.push(article);
+    aliases.set(key, group);
+  });
+
+  const prioritizedReferences = [
+    ...selectedArticles,
+    ...elfsborgArticles.slice(0, 8),
+  ];
+  const priorityKeys: string[] = [];
+  const seenKeys = new Set<string>();
+  for (const article of prioritizedReferences) {
+    const key = keysByObject.get(article);
+    if (key && !seenKeys.has(key)) {
+      seenKeys.add(key);
+      priorityKeys.push(key);
+    }
+  }
+
+  const jobs: Array<{ refs: ImageArticle[]; url: string }> = [];
+  for (const key of priorityKeys) {
+    const refs = aliases.get(key) ?? [];
+    const existingImage = refs.find(article => article.image)?.image;
+    if (existingImage) {
+      refs.forEach(article => {
+        if (!article.image) article.image = existingImage;
+      });
+      continue;
+    }
+
+    const url = refs.find(article => article.link)?.link;
+    if (url) jobs.push({ refs, url });
+  }
+
+  if (!jobs.length) return sections;
+
+  const deadline = Date.now() + IMAGE_ENRICHMENT_BUDGET_MS;
+  let nextJob = 0;
+  let completedJobs = 0;
+
+  async function worker() {
+    while (Date.now() < deadline) {
+      const jobIndex = nextJob;
+      nextJob += 1;
+      if (jobIndex >= jobs.length) return;
+
+      const job = jobs[jobIndex];
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) return;
+
+      try {
+        const image = await getOgImage(
+          job.url,
+          Math.min(IMAGE_LOOKUP_TIMEOUT_MS, remainingMs)
+        );
+        if (image) {
+          job.refs.forEach(article => {
+            if (!article.image) article.image = image;
+          });
+        }
+      } catch (error) {
+        console.warn("Editorial image lookup failed:", error);
+      } finally {
+        completedJobs += 1;
+      }
+    }
+  }
+
+  const workerCount = Math.min(MAX_CONCURRENT_IMAGE_LOOKUPS, jobs.length);
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const deadlinePromise = new Promise<void>(resolve => {
+    deadlineTimer = setTimeout(
+      resolve,
+      Math.max(0, deadline - Date.now())
+    );
+  });
+
+  try {
+    await Promise.race([
+      Promise.all(Array.from({ length: workerCount }, () => worker())),
+      deadlinePromise,
+    ]);
+  } finally {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
+  }
+
+  if (completedJobs < jobs.length) {
+    console.warn(
+      "Editorial image enrichment reached its time budget:",
+      {
+        completed: completedJobs,
+        queuedOrPending: jobs.length - completedJobs,
+        budgetMs: IMAGE_ENRICHMENT_BUDGET_MS,
+      }
+    );
+  }
+
+  return sections;
 }
 
 async function runEditorialAI(
@@ -684,11 +809,10 @@ export async function createSportEditorialSection(
       })
     );
 
-  const stories =
-    await ensureImages([
-      ...footballStories,
-      ...otherStories,
-    ]);
+  const stories = [
+    ...footballStories,
+    ...otherStories,
+  ];
 
   return {
     key: "sport",
@@ -739,24 +863,20 @@ export async function createEditorialSection(
       ai.stories[0];
 
     const allArticles =
-      await ensureImages(
-        ranked.map((article, index) => ({
-          id: index,
-          ...article,
+      ranked.map((article, index) => ({
+        id: index,
+        ...article,
         aiSummary:
-          article.title ===
-          mainStory?.title
+          article.title === mainStory?.title
             ? mainStory.aiSummary
             : "",
         selectionReason:
-          article.title ===
-          mainStory?.title
+          article.title === mainStory?.title
             ? mainStory.selectionReason
             : "",
-          articleType:
-            inferArticleType(article),
-        }))
-      );
+        articleType:
+          inferArticleType(article),
+      }));
 
     return {
       key: categoryKey,
@@ -782,9 +902,6 @@ export async function createEditorialSection(
     key: categoryKey,
     title: categoryTitle,
     summary: ai.summary,
-    stories:
-      await ensureImages(
-        ai.stories
-      ),
+    stories: ai.stories,
   };
 }

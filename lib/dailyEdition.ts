@@ -2,6 +2,7 @@ import { get, list, put } from "@vercel/blob";
 import {
   createEditorialSection,
   createSportEditorialSection,
+  enrichEditorialImages,
   type EditorialSection,
 } from "./editorV2";
 import { getCachedArticles } from "./articlesCache";
@@ -137,7 +138,7 @@ async function buildDailyEdition(
     { key: "livsstil", title: "Kultur, Mat & Livsstil" },
   ] as const;
 
-  const sections = await Promise.all(
+  const editorialSections = await Promise.all(
     categoryConfig.map(category =>
       category.key === "sport"
         ? createSportEditorialSection(
@@ -153,6 +154,7 @@ async function buildDailyEdition(
           )
     )
   );
+  const sections = await enrichEditorialImages(editorialSections);
 
   const totalArticles = categoryConfig.reduce(
     (sum, category) => sum + articleBuckets[category.key].length,
