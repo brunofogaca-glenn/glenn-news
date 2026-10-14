@@ -420,6 +420,43 @@ function editionHasPreviouslyPublishedArticles(
   return false;
 }
 
+/** True only when today's saved edition is valid, published after 06:30 Stockholm,
+ * and does not repeat articles from the previous seven editions.
+ */
+function isEditionGeneratedAfterMorningStart(edition: DailyEdition) {
+  const generatedAtMs = Date.parse(edition.generatedAt);
+  if (!Number.isFinite(generatedAtMs) || generatedAtMs > Date.now()) {
+    return false;
+  }
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(generatedAtMs));
+  const hour = Number(parts.find(part => part.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find(part => part.type === "minute")?.value ?? "0");
+
+  return hour > 6 || (hour === 6 && minute >= 30);
+}
+
+/**
+ * Used by scheduled retry invocations so a successful first run does not
+ * trigger unnecessary source refreshes or a second editorial generation.
+ */
+export async function hasFreshMorningEditionForToday(): Promise<boolean> {
+  const dateKey = getTodayKey();
+  const existing = await readBlobEdition(dateKey);
+
+  if (!existing || !isEditionGeneratedAfterMorningStart(existing)) {
+    return false;
+  }
+
+  const previousKeys = await getPreviousEditionKeys(dateKey);
+  return !editionHasPreviouslyPublishedArticles(existing, previousKeys);
+}
+
 function createWaitingEdition(dateKey: string): DailyEdition {
   const sections: EditorialSection[] = [
     { key: "elfsborg", title: "Elfsborg", summary: "Morgoneditionen är inte tillgänglig ännu. Försök ladda om sidan om en stund.", stories: [], allArticles: [] },
@@ -494,17 +531,7 @@ export async function generateMorningEdition(
   const existing = await readBlobEdition(dateKey);
   const previousKeys = await getPreviousEditionKeys(dateKey);
   const existingIsFreshEnough = existing
-    ? (() => {
-        const parts = new Intl.DateTimeFormat("en-GB", {
-          timeZone: TIME_ZONE,
-          hour: "2-digit",
-          minute: "2-digit",
-          hourCycle: "h23",
-        }).formatToParts(new Date(existing.generatedAt));
-        const hour = Number(parts.find(part => part.type === "hour")?.value ?? "0");
-        const minute = Number(parts.find(part => part.type === "minute")?.value ?? "0");
-        return hour > 6 || (hour === 6 && minute >= 30);
-      })()
+    ? isEditionGeneratedAfterMorningStart(existing)
     : false;
 
   if (
