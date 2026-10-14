@@ -256,13 +256,13 @@ function editionHasPreviouslyPublishedArticles(
 
 function createWaitingEdition(dateKey: string): DailyEdition {
   const sections: EditorialSection[] = [
-    { key: "elfsborg", title: "Elfsborg", summary: "Morgonens edition publiceras 06.30.", stories: [], allArticles: [] },
-    { key: "boras", title: "Lokalt", summary: "Morgonens edition publiceras 06.30.", stories: [] },
-    { key: "sverige", title: "Sverige", summary: "Morgonens edition publiceras 06.30.", stories: [] },
-    { key: "varlden", title: "Världen", summary: "Morgonens edition publiceras 06.30.", stories: [] },
-    { key: "ekonomi", title: "Ekonomi", summary: "Morgonens edition publiceras 06.30.", stories: [] },
-    { key: "sport", title: "Sport", summary: "Morgonens edition publiceras 06.30.", stories: [] },
-    { key: "livsstil", title: "Kultur, Mat & Livsstil", summary: "Morgonens edition publiceras 06.30.", stories: [] },
+    { key: "elfsborg", title: "Elfsborg", summary: "Morgoneditionen är inte tillgänglig ännu. Försök ladda om sidan om en stund.", stories: [], allArticles: [] },
+    { key: "boras", title: "Lokalt", summary: "Morgoneditionen är inte tillgänglig ännu. Försök ladda om sidan om en stund.", stories: [] },
+    { key: "sverige", title: "Sverige", summary: "Morgoneditionen är inte tillgänglig ännu. Försök ladda om sidan om en stund.", stories: [] },
+    { key: "varlden", title: "Världen", summary: "Morgoneditionen är inte tillgänglig ännu. Försök ladda om sidan om en stund.", stories: [] },
+    { key: "ekonomi", title: "Ekonomi", summary: "Morgoneditionen är inte tillgänglig ännu. Försök ladda om sidan om en stund.", stories: [] },
+    { key: "sport", title: "Sport", summary: "Morgoneditionen är inte tillgänglig ännu. Försök ladda om sidan om en stund.", stories: [] },
+    { key: "livsstil", title: "Kultur, Mat & Livsstil", summary: "Morgoneditionen är inte tillgänglig ännu. Försök ladda om sidan om en stund.", stories: [] },
   ];
 
   return {
