@@ -258,7 +258,7 @@ export default async function Home() {
             </div>
 
             <div className="flex flex-col items-start gap-3 font-serif text-sm md:items-end md:text-right">
-              <div className="flex items-center gap-3">
+              <div className="hidden items-center gap-3 md:flex">
                 <a
                   href="/veckofokus"
                   className="border border-slate-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-950 hover:text-slate-950"
@@ -288,6 +288,9 @@ export default async function Home() {
                     ? " · " + feedHealth.totals.errors + " fel"
                     : ""}
                 </a>
+                <ManualRefreshButton />
+              </div>
+              <div className="md:hidden">
                 <ManualRefreshButton />
               </div>
               <div>
