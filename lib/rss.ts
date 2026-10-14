@@ -49,14 +49,14 @@ function normalizeArticleTitle(value?: string) {
   return (value ?? "")
     .trim()
     .toLowerCase()
-    .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
 function getHeadlineTokens(value: string) {
   return new Set(
     normalizeArticleTitle(value)
-      .split(/\\s+/)
+      .split(/\s+/)
       .filter(token => token.length > 2 && !TITLE_STOPWORDS.has(token))
   );
 }
