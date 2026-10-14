@@ -120,7 +120,7 @@ function ArticleImage({
   priority?: boolean;
 }) {
   return (
-    <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-200">
+    <div className="mobile-article-media relative aspect-[16/9] w-full overflow-hidden bg-slate-200">
       {src ? (
         <img
           src={src}
@@ -484,7 +484,7 @@ export default async function Home() {
                     <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-yellow-700">
                       {elfsborg.allArticles[0].articleType} · {elfsborg.allArticles[0].source}
                     </div>
-                    <h3 className="mt-3 font-serif text-3xl font-black leading-[1.05] tracking-[-0.02em] md:text-4xl">
+                    <h3 className="mobile-article-title mt-3 font-serif text-3xl font-black leading-[1.05] tracking-[-0.02em] md:text-4xl">
                       {elfsborg.allArticles[0].title}
                     </h3>
                     {elfsborg.allArticles[0].aiSummary && (
@@ -529,7 +529,7 @@ export default async function Home() {
                     <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
                       {article.articleType} · {article.source}
                     </div>
-                    <h3 className="mt-1 font-serif text-lg font-bold leading-tight group-hover:underline">
+                    <h3 className="mobile-article-title mt-1 font-serif text-lg font-bold leading-tight group-hover:underline">
                       {article.title}
                     </h3>
                   </div>
@@ -652,12 +652,12 @@ export default async function Home() {
                           · {story.articleType}
                         </div>
 
-                        <h3 className="mt-2 font-serif text-2xl font-black leading-tight tracking-[-0.015em] md:text-3xl group-hover:underline">
+                        <h3 className="mobile-article-title mt-2 font-serif text-2xl font-black leading-tight tracking-[-0.015em] md:text-3xl group-hover:underline">
                           {story.title}
                         </h3>
 
                         {story.aiSummary && (
-                          <p className="mt-3 font-serif text-base leading-7 text-slate-600">
+                          <p className="mobile-article-summary mt-3 font-serif text-base leading-7 text-slate-600">
                             {story.aiSummary}
                           </p>
                         )}

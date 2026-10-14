@@ -111,3 +111,61 @@ main img {
     min-width: 0;
   }
 }
+
+/* Phone reading: keep headlines balanced, summaries relaxed, and images consistent. */
+@media (max-width: 639px) {
+  main > div {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  main h1 {
+    font-size: clamp(2.1rem, 10.5vw, 2.9rem);
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+
+  main h2 {
+    font-size: clamp(1.5rem, 6.4vw, 1.95rem);
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+
+  main h3 {
+    font-size: clamp(1.2rem, 5.4vw, 1.65rem);
+    line-height: 1.16;
+    text-wrap: pretty;
+  }
+
+  main .mobile-article-title {
+    margin-top: 0.7rem;
+    font-size: clamp(1.25rem, 5.2vw, 1.55rem);
+    line-height: 1.17;
+    letter-spacing: -0.025em;
+    text-wrap: pretty;
+  }
+
+  main .mobile-article-summary {
+    margin-top: 0.65rem;
+    font-size: 0.98rem;
+    line-height: 1.62;
+  }
+
+  main .mobile-article-media {
+    overflow: hidden;
+    border-radius: 2px;
+    background: #e2e8f0;
+  }
+
+  main .mobile-article-media img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+
+  main a.group {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

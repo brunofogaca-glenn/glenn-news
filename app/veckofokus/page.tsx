@@ -78,16 +78,16 @@ export default async function WeekFocusPage() {
                   </div>
 
                   {story.image ? (
-                    <div className="overflow-hidden bg-slate-200">
+                    <div className="mobile-article-media overflow-hidden bg-slate-200">
                       <img
                         src={story.image}
                         alt=""
                         loading="lazy"
-                        className="aspect-[16/9] h-auto w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                        className="mobile-article-image aspect-[16/9] h-auto w-full object-cover transition duration-300 group-hover:scale-[1.02]"
                       />
                     </div>
                   ) : (
-                    <div className="flex aspect-[16/9] items-center justify-center bg-slate-800 font-serif text-sm font-bold text-white/80">
+                    <div className="mobile-article-media flex aspect-[16/9] items-center justify-center bg-slate-800 font-serif text-sm font-bold text-white/80">
                       Glenn News
                     </div>
                   )}
@@ -99,11 +99,11 @@ export default async function WeekFocusPage() {
                     <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                       {story.articleType} · {story.source}
                     </div>
-                    <h2 className="mt-2 font-serif text-2xl font-black leading-tight tracking-[-0.015em] md:text-3xl group-hover:underline">
+                    <h2 className="mobile-article-title mt-2 font-serif text-2xl font-black leading-tight tracking-[-0.015em] md:text-3xl group-hover:underline">
                       {story.title}
                     </h2>
                     {story.aiSummary && (
-                      <p className="mt-3 font-serif text-base leading-7 text-slate-600">
+                      <p className="mobile-article-summary mt-3 font-serif text-base leading-7 text-slate-600">
                         {story.aiSummary}
                       </p>
                     )}
