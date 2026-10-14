@@ -407,7 +407,7 @@ test("production morning edition contract keeps Stockholm scheduling, validation
   );
 
   const cron = fs.readFileSync(require.resolve("../app/api/cron/refresh-news/route.ts"), "utf8");
-  assert.match(cron, /const TIME_ZONE = "Europe\\/Stockholm"/);
+  assert.ok(cron.includes('const TIME_ZONE = "Europe/Stockholm"'));
   assert.match(cron, /localClock\.hour !== 6 \|\| localClock\.minute < 30 \|\| localClock\.minute > 39/);
   assert.match(cron, /localClock\.minute > 30 && await hasFreshMorningEditionForToday\(\)/,
     "follow-up cron runs skip a valid edition rather than generating it twice");
