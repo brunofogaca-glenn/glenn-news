@@ -153,6 +153,11 @@ function profileForPrompt(
     articleType: profile.articleType,
     source: profile.source,
     topic: profile.topic,
+    semanticInterests: {
+      topics: Object.fromEntries(Object.entries(profile.semanticTopic ?? {}).slice(0, 8)),
+      tags: Object.fromEntries(Object.entries(profile.semanticTag ?? {}).slice(0, 8)),
+      entities: Object.fromEntries(Object.entries(profile.entity ?? {}).slice(0, 8)),
+    },
   };
 }
 

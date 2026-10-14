@@ -9,6 +9,7 @@ type Article = {
   link?: string;
   image?: string | null;
   articleType?: string;
+  topic?: string;
 };
 
 const TIER_1 = [
@@ -318,6 +319,52 @@ function calculateProfileAffinity(
   return score * (0.3 + confidence * 0.7);
 }
 
+
+function scoreSemanticMapMatches(
+  text: string,
+  values: Record<string, number> | undefined,
+  minimumLength: number,
+  factor: number,
+  perItemCap: number,
+  totalCap: number
+) {
+  let score = 0;
+
+  for (const [rawKey, value] of Object.entries(values ?? {})) {
+    const key = rawKey.toLocaleLowerCase("sv-SE").trim();
+    if (key.length < minimumLength || !text.includes(key)) continue;
+    score += Math.min(perItemCap, value * factor);
+    if (score >= totalCap) return totalCap;
+  }
+
+  return Math.min(totalCap, score);
+}
+
+/**
+ * Semantic affinity generalizes clicks across publishers and section labels.
+ * Only the article's metadata is classified by AI; the click history remains
+ * private and is aggregated locally into recency-weighted interest maps.
+ */
+function calculateSemanticAffinity(
+  article: Article,
+  profile: ReaderProfile
+) {
+  if ((profile.semanticClicks ?? 0) <= 0) return 0;
+
+  const text = `${article.title} ${article.description ?? ""} ${article.topic ?? ""}`
+    .toLocaleLowerCase("sv-SE");
+
+  const score =
+    scoreSemanticMapMatches(text, profile.semanticTopic, 4, 1.5, 5, 14) +
+    scoreSemanticMapMatches(text, profile.semanticTag, 4, 0.8, 3, 10) +
+    scoreSemanticMapMatches(text, profile.entity, 4, 1.5, 6, 16) +
+    scoreSemanticMapMatches(text, profile.geography, 4, 0.45, 2, 5) +
+    scoreSemanticMapMatches(text, profile.eventKey, 6, 0.35, 1.5, 3);
+
+  const learningConfidence = Math.min(1, profile.semanticClicks / 8);
+  return Math.min(32, score) * (0.25 + learningConfidence * 0.75);
+}
+
 function calculateRecencyScore(
   article: Article
 ) {
@@ -340,6 +387,13 @@ export function rankArticles(
     articleType: {},
     source: {},
     topic: {},
+    semanticCategory: {},
+    semanticTopic: {},
+    semanticTag: {},
+    entity: {},
+    geography: {},
+    eventKey: {},
+    semanticClicks: 0,
     totalClicks: 0,
     lastUpdated: null,
   }
@@ -380,7 +434,8 @@ export function rankArticles(
 
       const personalScore =
         calculatePersonalScore(article) +
-        calculateProfileAffinity(article, profile);
+        calculateProfileAffinity(article, profile) +
+        calculateSemanticAffinity(article, profile);
 
       const recencyScore =
         calculateRecencyScore(

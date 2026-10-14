@@ -6,8 +6,30 @@ export type ReaderProfile = {
   articleType: Record<string, number>;
   source: Record<string, number>;
   topic: Record<string, number>;
+  semanticCategory: Record<string, number>;
+  semanticTopic: Record<string, number>;
+  semanticTag: Record<string, number>;
+  entity: Record<string, number>;
+  geography: Record<string, number>;
+  eventKey: Record<string, number>;
+  semanticClicks: number;
   totalClicks: number;
   lastUpdated: string | null;
+};
+
+export type SemanticReaderClassification = {
+  broadCategory: string;
+  mainTopic: string;
+  tags: string[];
+  entities: Array<{ name: string; kind: string }>;
+  geography: {
+    country: string | null;
+    region: string | null;
+    city: string | null;
+  };
+  articleType: string;
+  eventKey: string;
+  confidence: number;
 };
 
 export type ReaderEvent = {
@@ -26,6 +48,7 @@ export type ReaderActivity = ReaderEvent & {
 
 const PROFILE_PATH = "glenn-news/profile/default.json";
 const EVENT_PREFIX = "glenn-news/profile/events/";
+const SEMANTIC_EVENT_PREFIX = "glenn-news/profile/semantic-events/";
 const MAX_PROFILE_BYTES = 32_000;
 const MAX_EVENTS = 1000;
 
@@ -34,6 +57,13 @@ const emptyProfile = (): ReaderProfile => ({
   articleType: {},
   source: {},
   topic: {},
+  semanticCategory: {},
+  semanticTopic: {},
+  semanticTag: {},
+  entity: {},
+  geography: {},
+  eventKey: {},
+  semanticClicks: 0,
   totalClicks: 0,
   lastUpdated: null,
 });
@@ -50,11 +80,37 @@ function trimMap(map: Record<string, number>) {
   );
 }
 
+function trimWeightedMap(map?: Record<string, number>) {
+  return trimMap(
+    Object.fromEntries(
+      Object.entries(map ?? {}).map(([key, value]) => [key, clamp(value)])
+    )
+  );
+}
+
+function addWeightedValue(map: Record<string, number>, value: unknown, weight: number) {
+  if (typeof value !== "string") return;
+  const key = value.trim().toLocaleLowerCase("sv-SE").slice(0, 90);
+  if (key.length < 2 || !Number.isFinite(weight) || weight <= 0) return;
+  map[key] = (map[key] ?? 0) + weight;
+}
+
 function mergeProfiles(
   base: ReaderProfile,
   addition: ReaderProfile
 ): ReaderProfile {
-  const merged = structuredClone(base);
+  // Backfill semantic maps for profiles saved before semantic classification existed.
+  const merged: ReaderProfile = {
+    ...emptyProfile(),
+    ...structuredClone(base),
+    semanticCategory: { ...(base.semanticCategory ?? {}) },
+    semanticTopic: { ...(base.semanticTopic ?? {}) },
+    semanticTag: { ...(base.semanticTag ?? {}) },
+    entity: { ...(base.entity ?? {}) },
+    geography: { ...(base.geography ?? {}) },
+    eventKey: { ...(base.eventKey ?? {}) },
+    semanticClicks: base.semanticClicks ?? 0,
+  };
 
   for (const [key, value] of Object.entries(addition.category)) {
     merged.category[key] = (merged.category[key] ?? 0) + value;
@@ -119,6 +175,13 @@ function mergeProfiles(
         ])
       )
     ),
+    semanticCategory: trimWeightedMap(merged.semanticCategory),
+    semanticTopic: trimWeightedMap(merged.semanticTopic),
+    semanticTag: trimWeightedMap(merged.semanticTag),
+    entity: trimWeightedMap(merged.entity),
+    geography: trimWeightedMap(merged.geography),
+    eventKey: trimWeightedMap(merged.eventKey),
+    semanticClicks: merged.semanticClicks ?? 0,
   };
 }
 
@@ -252,13 +315,161 @@ async function getEventProfile(): Promise<ReaderProfile> {
   }
 }
 
+
+/**
+ * Create a lightweight semantic index entry whose features are available from
+ * the Blob listing itself. This avoids downloading every event body every time
+ * the reader profile is rebuilt.
+ */
+export async function recordSemanticReaderEvent(
+  eventId: string,
+  classification: SemanticReaderClassification
+): Promise<boolean> {
+  if (
+    !process.env.BLOB_READ_WRITE_TOKEN ||
+    !/^\d{13}-[a-f0-9]{32}$/i.test(eventId)
+  ) {
+    return false;
+  }
+
+  const geography = classification.geography ?? {
+    country: null,
+    region: null,
+    city: null,
+  };
+  const compact = {
+    c: classification.broadCategory.trim().toLowerCase().slice(0, 18),
+    t: classification.mainTopic.trim().toLocaleLowerCase("sv-SE").slice(0, 48),
+    g: classification.tags.slice(0, 4)
+      .map(value => value.trim().toLocaleLowerCase("sv-SE").slice(0, 42))
+      .filter(Boolean),
+    e: classification.entities.slice(0, 3).map(item => [
+      item.name.trim().toLocaleLowerCase("sv-SE").slice(0, 42),
+      item.kind.trim().toLowerCase().slice(0, 12),
+    ]),
+    p: [geography.country, geography.region, geography.city]
+      .filter((value): value is string => Boolean(value))
+      .map(value => value.trim().toLocaleLowerCase("sv-SE").slice(0, 32)),
+    a: classification.articleType.trim().toLocaleLowerCase("sv-SE").slice(0, 20),
+    v: classification.eventKey.trim().toLocaleLowerCase("sv-SE").slice(0, 55),
+    q: Number.isFinite(classification.confidence)
+      ? Math.max(0, Math.min(1, classification.confidence))
+      : 0.5,
+  };
+  const encoded = encode(JSON.stringify(compact));
+  if (encoded.length > 1_600) {
+    console.warn("Semantic reader index entry exceeded the safe pathname budget.");
+    return false;
+  }
+
+  try {
+    await put(
+      SEMANTIC_EVENT_PREFIX + eventId + "." + encoded + ".json",
+      JSON.stringify({ version: 1 }),
+      {
+        access: "private",
+        addRandomSuffix: false,
+        contentType: "application/json",
+      }
+    );
+    return true;
+  } catch (error) {
+    console.warn("Kunde inte spara semantisk läsarhändelse:", error);
+    return false;
+  }
+}
+
+function addSemanticWeight(
+  profile: ReaderProfile,
+  key: "semanticCategory" | "semanticTopic" | "semanticTag" | "entity" | "geography" | "eventKey",
+  value: unknown,
+  weight: number
+) {
+  addWeightedValue(profile[key], value, weight);
+}
+
+async function getSemanticEventProfile(): Promise<ReaderProfile> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return emptyProfile();
+
+  try {
+    const result = await list({
+      prefix: SEMANTIC_EVENT_PREFIX,
+      limit: MAX_EVENTS,
+    });
+    const profile = emptyProfile();
+    const now = Date.now();
+
+    for (const blob of result.blobs) {
+      const parts = blob.pathname.slice(SEMANTIC_EVENT_PREFIX.length).split(".");
+      if (parts.length !== 3 || parts[2] !== "json") continue;
+      if (!/^\d{13}-[a-f0-9]{32}$/i.test(parts[0])) continue;
+
+      const timestamp = Number.parseInt(parts[0].slice(0, 13), 10);
+      if (!Number.isFinite(timestamp) || timestamp > now + 60_000) continue;
+
+      let compact: unknown;
+      try {
+        compact = JSON.parse(decode(parts[1]));
+      } catch {
+        continue;
+      }
+      if (typeof compact !== "object" || compact === null || Array.isArray(compact)) {
+        continue;
+      }
+
+      const data = compact as {
+        c?: unknown; t?: unknown; g?: unknown; e?: unknown; p?: unknown;
+        a?: unknown; v?: unknown; q?: unknown;
+      };
+      const ageDays = Math.max(0, (now - timestamp) / (1000 * 60 * 60 * 24));
+      const recencyWeight = Math.max(0.15, Math.exp(-ageDays / 45));
+      const confidence = typeof data.q === "number" && Number.isFinite(data.q)
+        ? Math.max(0, Math.min(1, data.q))
+        : 0.5;
+      const weight = recencyWeight * (0.4 + confidence * 0.6);
+
+      addSemanticWeight(profile, "semanticCategory", data.c, weight * 0.5);
+      addSemanticWeight(profile, "semanticTopic", data.t, weight * 1.4);
+      addSemanticWeight(profile, "eventKey", data.v, weight * 0.35);
+
+      if (Array.isArray(data.g)) {
+        for (const tag of data.g) {
+          addSemanticWeight(profile, "semanticTag", tag, weight * 0.7);
+        }
+      }
+
+      if (Array.isArray(data.e)) {
+        for (const item of data.e) {
+          if (!Array.isArray(item) || typeof item[0] !== "string") continue;
+          addSemanticWeight(profile, "entity", item[0], weight * 1.2);
+        }
+      }
+
+      if (Array.isArray(data.p)) {
+        for (const place of data.p) {
+          addSemanticWeight(profile, "geography", place, weight * 0.3);
+        }
+      }
+
+      profile.semanticClicks += 1;
+    }
+
+    return mergeProfiles(emptyProfile(), profile);
+  } catch (error) {
+    console.warn("Kunde inte läsa semantisk läsarprofil:", error);
+    return emptyProfile();
+  }
+}
+
+
 export async function getReaderProfile(): Promise<ReaderProfile> {
-  const [legacy, events] = await Promise.all([
+  const [legacy, events, semanticEvents] = await Promise.all([
     getLegacyProfile(),
     getEventProfile(),
+    getSemanticEventProfile(),
   ]);
 
-  return mergeProfiles(legacy, events);
+  return mergeProfiles(mergeProfiles(legacy, events), semanticEvents);
 }
 
 export function updateReaderProfile(

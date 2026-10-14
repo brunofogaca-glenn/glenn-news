@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { recordReaderEvent } from "@/lib/readerProfile";
+import { recordReaderEvent, recordSemanticReaderEvent } from "@/lib/readerProfile";
 import { classifyClickedArticle } from "@/lib/articleClassification";
 
 type EventPayload = {
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     // AI timeout/failure never turns a successful click write into an error.
     after(async () => {
       try {
-        await classifyClickedArticle({
+        const classification = await classifyClickedArticle({
           link: body.link as string,
           title: typeof body.title === "string" ? body.title.trim().slice(0, 300) : "",
           summary: typeof body.summary === "string" ? body.summary.trim().slice(0, 1_200) : undefined,
@@ -109,6 +109,10 @@ export async function POST(request: Request) {
           source: body.source as string,
           topic: typeof body.topic === "string" ? body.topic.trim().slice(0, 80) : undefined,
         });
+
+        if (classification) {
+          await recordSemanticReaderEvent(body.eventId as string, classification);
+        }
       } catch (error) {
         console.warn("AI article classification skipped; click event was saved.", error);
       }
