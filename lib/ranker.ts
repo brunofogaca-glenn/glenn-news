@@ -304,13 +304,9 @@ function calculatePublicImportanceScore(article: Article) {
 function calculateReadingScore(
   article: Article
 ) {
-  const text =
-    (article.title + " " + (article.description ?? "")).toLocaleLowerCase("sv-SE");
-
   // Use the same article-type classifier that feeds editorial selection, so
   // a stale generic "nyhet" label doesn't hide a real analysis or column.
   const articleType = inferArticleType(article);
-  const scoringText = articleType + " " + text;
 
   let score = 30;
 
