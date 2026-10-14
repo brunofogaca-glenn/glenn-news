@@ -56,13 +56,13 @@ export async function GET(request: Request) {
   const now = new Date();
   const localClock = getLocalClock(now);
 
-  // Two UTC cron entries handle Sweden's switch between CET and CEST.
-  // Only the invocation that lands in the 06:00 Stockholm hour performs the refresh.
-  if (localClock.hour !== 6) {
+  // Run the publication only in the 06:30 minute in Stockholm.
+  // The two UTC cron entries handle CET/CEST, but only one should match locally.
+  if (localClock.hour !== 6 || localClock.minute < 30 || localClock.minute > 34) {
     return Response.json({
       ok: true,
       refreshed: false,
-      reason: "Outside the 06:00 Stockholm hour",
+      reason: "Outside the 06:30 Stockholm publication window",
       localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
     });
   }
