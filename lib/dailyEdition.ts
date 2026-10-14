@@ -132,9 +132,9 @@ function isValidArticleLink(value: unknown): value is string {
 }
 
 /**
- * Validate the editorial payload before it can become the saved edition.
- * A small day is allowed, but a structurally incomplete or entirely empty
- * edition is not saved as if it were ready to read.
+ * Validate the editorial payload before it is saved and every time a stored
+ * edition is loaded. A small day is allowed, but an incomplete or entirely
+ * empty edition must not be treated as a readable morning edition.
  */
 function validateDailyEditionForSave(
   edition: DailyEdition,
@@ -354,12 +354,9 @@ async function readBlobEdition(dateKey: string): Promise<DailyEdition | null> {
     const text = await new Response(result.stream).text();
     const parsed = JSON.parse(text) as DailyEdition;
 
-    if (
-      parsed.dateKey !== dateKey ||
-      !Array.isArray(parsed.sections)
-    ) {
-      return null;
-    }
+    // Saved data can be incomplete or corrupted too. Reuse the exact same
+    // checks used before writing a new edition; invalid blobs are ignored.
+    validateDailyEditionForSave(parsed, dateKey);
 
     return {
       ...parsed,
