@@ -334,6 +334,21 @@ function normalizeStoryUrl(value?: string) {
   }
 }
 
+function isValidArticleUrl(value?: string): value is string {
+  if (!value || value.length > 2_048) return false;
+
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      Boolean(url.hostname) &&
+      !/\\s/.test(value)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function normalizeStoryTitle(value?: string) {
   return (value ?? "")
     .trim()
@@ -368,20 +383,34 @@ function completeWithFallbackStories(
   selectCount: number,
   selectedStories: SelectedStory[] = []
 ): SelectedStory[] {
-  const stories = [...selectedStories];
+  const stories: SelectedStory[] = [];
   const seenUrls = new Set<string>();
   const seenTitles = new Set<string>();
 
+  // Defensively revalidate AI-selected stories before they can enter the edition.
   for (const story of selectedStories) {
-    const urlKey = normalizeStoryUrl(story.link);
-    const titleKey = normalizeStoryTitle(story.title);
-    if (urlKey) seenUrls.add(urlKey);
-    if (titleKey) seenTitles.add(titleKey);
+    if (
+      !isValidArticleUrl(story.link) ||
+      !story.title?.trim() ||
+      isDuplicateStory(story, seenUrls, seenTitles)
+    ) {
+      continue;
+    }
+
+    stories.push(story);
+    if (stories.length >= selectCount) return stories;
   }
 
+  // Fill any gaps with the next ranked candidates that have usable URLs.
   for (const candidate of candidates) {
     if (stories.length >= selectCount) break;
-    if (isDuplicateStory(candidate, seenUrls, seenTitles)) continue;
+    if (
+      !isValidArticleUrl(candidate.link) ||
+      !candidate.title?.trim() ||
+      isDuplicateStory(candidate, seenUrls, seenTitles)
+    ) {
+      continue;
+    }
 
     stories.push({
       ...candidate,
@@ -390,6 +419,13 @@ function completeWithFallbackStories(
         "Automatiskt urval baserat på relevans, färskhet och innehållstyp.",
       articleType: candidate.articleType ?? "nyhet",
     });
+  }
+
+  if (stories.length < selectCount) {
+    console.warn(
+      "Editorial selection has fewer valid stories than requested:",
+      { requested: selectCount, selected: stories.length }
+    );
   }
 
   return stories;
@@ -683,7 +719,12 @@ ${JSON.stringify(
       }
 
       const candidate = candidates.find(article => article.id === itemId);
-      if (!candidate || isDuplicateStory(candidate, seenUrls, seenTitles)) {
+      if (
+        !candidate ||
+        !isValidArticleUrl(candidate.link) ||
+        !candidate.title?.trim() ||
+        isDuplicateStory(candidate, seenUrls, seenTitles)
+      ) {
         continue;
       }
 
