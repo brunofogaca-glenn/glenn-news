@@ -16,7 +16,7 @@ export type QualityWeeklyCandidate = WeeklyCandidate & {
   isNewswire: boolean;
 };
 
-export function isNewswireCandidate(article: Pick<WeeklyCandidate, "source" | "title">): boolean {
+export function isNewswireCandidate(article: Pick<WeeklyCandidate, "title"> & { source?: string }): boolean {
   return NEWSWIRE_SOURCE.test(article.source ?? "") || WIRE_TITLE.test(article.title ?? "");
 }
 
