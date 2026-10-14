@@ -453,7 +453,34 @@ export async function getTodayDailyEdition(
   const existing = await readBlobEdition(dateKey);
   if (existing) return existing;
 
-  return generateMorningEdition(profile);
+  try {
+    return await generateMorningEdition(profile);
+  } catch (error) {
+    console.error(
+      "Dagens morgonedition kunde inte skapas. Försöker visa senaste fungerande editionen.",
+      { dateKey, error }
+    );
+
+    // getSavedDailyEditions validates every stored edition and returns only
+    // readable blobs, newest first. Never show today's failed/invalid blob
+    // as the fallback for today.
+    const previousEditions = await getSavedDailyEditions(30);
+    const previousEdition = previousEditions.find(
+      edition => edition.dateKey < dateKey
+    );
+
+    if (previousEdition) {
+      console.warn("Showing previous edition as fallback:", {
+        requestedDateKey: dateKey,
+        fallbackDateKey: previousEdition.dateKey,
+      });
+      return previousEdition;
+    }
+
+    // Keep the homepage usable even when there is no historical edition
+    // available. The page can identify and clearly label this empty state.
+    return createWaitingEdition(dateKey);
+  }
 }
 
 /**
