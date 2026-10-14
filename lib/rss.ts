@@ -37,6 +37,94 @@ function normalizeArticleUrl(value?: string) {
   }
 }
 
+const TITLE_STOPWORDS = new Set([
+  "och", "att", "det", "den", "de", "en", "ett", "i", "på", "av", "för",
+  "med", "mot", "om", "som", "till", "från", "efter", "innan", "nu",
+  "har", "hade", "blir", "blev", "är", "var", "the", "a", "an", "and",
+  "to", "of", "in", "on", "for", "with", "after", "as", "at", "by",
+  "is", "are", "was", "were", "has", "have", "had", "will", "from",
+]);
+
+function normalizeArticleTitle(value?: string) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+    .trim();
+}
+
+function getHeadlineTokens(value: string) {
+  return new Set(
+    normalizeArticleTitle(value)
+      .split(/\\s+/)
+      .filter(token => token.length > 2 && !TITLE_STOPWORDS.has(token))
+  );
+}
+
+/**
+ * Conservative title matching catches near-identical headlines without
+ * merging stories that merely mention the same team, person, or event.
+ * Short headlines are matched only when their normalized wording is exact.
+ */
+function isDuplicateHeadline(
+  title: string,
+  seenTitles: Map<string, Set<string>>,
+  titleKeysByToken: Map<string, Set<string>>
+) {
+  const normalizedTitle = normalizeArticleTitle(title);
+  if (!normalizedTitle) return false;
+  if (seenTitles.has(normalizedTitle)) return true;
+
+  const tokens = getHeadlineTokens(normalizedTitle);
+  if (tokens.size < 4) return false;
+
+  const candidateKeys = new Set<string>();
+  for (const token of tokens) {
+    for (const key of titleKeysByToken.get(token) ?? []) {
+      candidateKeys.add(key);
+    }
+  }
+
+  for (const key of candidateKeys) {
+    const previousTokens = seenTitles.get(key);
+    if (!previousTokens) continue;
+
+    let shared = 0;
+    for (const token of tokens) {
+      if (previousTokens.has(token)) shared += 1;
+    }
+
+    const smaller = Math.min(tokens.size, previousTokens.size);
+    const union = tokens.size + previousTokens.size - shared;
+    const containment = smaller ? shared / smaller : 0;
+    const jaccard = union ? shared / union : 0;
+
+    if (shared >= 4 && containment >= 0.8 && jaccard >= 0.65) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function rememberHeadline(
+  title: string,
+  seenTitles: Map<string, Set<string>>,
+  titleKeysByToken: Map<string, Set<string>>
+) {
+  const normalizedTitle = normalizeArticleTitle(title);
+  if (!normalizedTitle || seenTitles.has(normalizedTitle)) return;
+
+  const tokens = getHeadlineTokens(normalizedTitle);
+  seenTitles.set(normalizedTitle, tokens);
+
+  for (const token of tokens) {
+    const keys = titleKeysByToken.get(token) ?? new Set<string>();
+    keys.add(normalizedTitle);
+    titleKeysByToken.set(token, keys);
+  }
+}
+
 function extractImageFromContent(
   html: string
 ) {
@@ -246,6 +334,8 @@ const [feeds, webArticles] =
   // Keep exact URL duplicates from RSS feeds out of the editorial pool.
   // URL variants and title-level duplicates are handled in later cleanup steps.
   const seen = new Set<string>();
+  const seenTitles = new Map<string, Set<string>>();
+  const titleKeysByToken = new Map<string, Set<string>>();
 
   feeds.forEach(
     (feedResult, index) => {
@@ -314,13 +404,17 @@ const [feeds, webArticles] =
         }
 
         const articleUrlKey = normalizeArticleUrl(article.link);
-        if (articleUrlKey && seen.has(articleUrlKey)) {
+        if (
+          (articleUrlKey && seen.has(articleUrlKey)) ||
+          isDuplicateHeadline(article.title, seenTitles, titleKeysByToken)
+        ) {
           return;
         }
 
         if (articleUrlKey) {
           seen.add(articleUrlKey);
         }
+        rememberHeadline(article.title, seenTitles, titleKeysByToken);
 
         result[
           finalCategory as keyof typeof result
@@ -338,8 +432,7 @@ const [feeds, webArticles] =
           !article.title ||
           !article.link ||
           isNaN(date) ||
-          date <= cutoff ||
-          seen.has(normalizeArticleUrl(article.link))
+          date <= cutoff
         ) {
           return;
         }
@@ -351,7 +444,16 @@ const [feeds, webArticles] =
           return;
         }
 
-        seen.add(normalizeArticleUrl(article.link));
+        const articleUrlKey = normalizeArticleUrl(article.link);
+        if (
+          (articleUrlKey && seen.has(articleUrlKey)) ||
+          isDuplicateHeadline(article.title, seenTitles, titleKeysByToken)
+        ) {
+          return;
+        }
+
+        if (articleUrlKey) seen.add(articleUrlKey);
+        rememberHeadline(article.title, seenTitles, titleKeysByToken);
         result[category].push(article);
       });
     }
