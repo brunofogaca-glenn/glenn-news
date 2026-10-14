@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { rankArticles } from "./ranker";
-import { inferArticleType } from "./articleType";
+import { ARTICLE_TYPES, inferArticleType } from "./articleType";
 import {
   getOgImage,
 } from "./articleImage";
