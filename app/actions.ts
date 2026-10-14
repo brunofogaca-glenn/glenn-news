@@ -3,7 +3,6 @@
 import { revalidateTag } from "next/cache";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { addWeeklyReadLink } from "@/lib/weeklyRead";
-import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
 import { getReaderProfile } from "@/lib/readerProfile";
@@ -16,9 +15,7 @@ export async function refreshNews() {
   await getCachedSportDay();
   revalidateTag("glenn-news-market-day", { expire: 0 });
   await getCachedMarketDay();
-  revalidateTag("glenn-news-edition-meta", { expire: 0 });
-  const editionMeta = await getCachedEditionMeta();
-  return { refreshedAt: editionMeta.updatedAt };
+  return { sourcesRefreshedAt: new Date().toISOString() };
 }
 
 
@@ -35,14 +32,10 @@ export async function retryMorningEdition() {
   const profile = await getReaderProfile();
   const edition = await generateMorningEdition(profile);
 
-  revalidateTag("glenn-news-edition-meta", { expire: 0 });
-  const editionMeta = await getCachedEditionMeta();
-
   return {
     dateKey: edition.dateKey,
     generatedAt: edition.generatedAt,
     totalArticles: edition.totalArticles,
-    updatedAt: editionMeta.updatedAt,
   };
 }
 
