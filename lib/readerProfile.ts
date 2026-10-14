@@ -6,14 +6,14 @@ export type ReaderProfile = {
   articleType: Record<string, number>;
   source: Record<string, number>;
   topic: Record<string, number>;
-  semanticCategory: Record<string, number>;
-  semanticArticleType: Record<string, number>;
-  semanticTopic: Record<string, number>;
-  semanticTag: Record<string, number>;
-  entity: Record<string, number>;
-  geography: Record<string, number>;
-  eventKey: Record<string, number>;
-  semanticClicks: number;
+  semanticCategory?: Record<string, number>;
+  semanticArticleType?: Record<string, number>;
+  semanticTopic?: Record<string, number>;
+  semanticTag?: Record<string, number>;
+  entity?: Record<string, number>;
+  geography?: Record<string, number>;
+  eventKey?: Record<string, number>;
+  semanticClicks?: number;
   totalClicks: number;
   lastUpdated: string | null;
 };
@@ -97,6 +97,17 @@ function addWeightedValue(map: Record<string, number>, value: unknown, weight: n
   map[key] = (map[key] ?? 0) + weight;
 }
 
+function mergeWeightedMaps(
+  base?: Record<string, number>,
+  addition?: Record<string, number>
+): Record<string, number> {
+  const merged = { ...(base ?? {}) };
+  for (const [key, value] of Object.entries(addition ?? {})) {
+    merged[key] = (merged[key] ?? 0) + value;
+  }
+  return merged;
+}
+
 function mergeProfiles(
   base: ReaderProfile,
   addition: ReaderProfile
@@ -134,26 +145,14 @@ function mergeProfiles(
       (merged.topic[key] ?? 0) + value;
   }
 
-  const semanticMapKeys = [
-    "semanticCategory",
-    "semanticArticleType",
-    "semanticTopic",
-    "semanticTag",
-    "entity",
-    "geography",
-    "eventKey",
-  ] as const;
-
-  for (const field of semanticMapKeys) {
-    const target = merged[field] ?? {};
-    const source = addition[field] ?? {};
-    for (const [key, value] of Object.entries(source)) {
-      target[key] = (target[key] ?? 0) + value;
-    }
-    merged[field] = target;
-  }
-
-  merged.semanticClicks += addition.semanticClicks ?? 0;
+  merged.semanticCategory = mergeWeightedMaps(merged.semanticCategory, addition.semanticCategory);
+  merged.semanticArticleType = mergeWeightedMaps(merged.semanticArticleType, addition.semanticArticleType);
+  merged.semanticTopic = mergeWeightedMaps(merged.semanticTopic, addition.semanticTopic);
+  merged.semanticTag = mergeWeightedMaps(merged.semanticTag, addition.semanticTag);
+  merged.entity = mergeWeightedMaps(merged.entity, addition.entity);
+  merged.geography = mergeWeightedMaps(merged.geography, addition.geography);
+  merged.eventKey = mergeWeightedMaps(merged.eventKey, addition.eventKey);
+  merged.semanticClicks = (merged.semanticClicks ?? 0) + (addition.semanticClicks ?? 0);
 
   merged.totalClicks += addition.totalClicks;
 
@@ -410,7 +409,9 @@ function addSemanticWeight(
   value: unknown,
   weight: number
 ) {
-  addWeightedValue(profile[key], value, weight);
+  const map = profile[key] ?? {};
+  addWeightedValue(map, value, weight);
+  profile[key] = map;
 }
 
 async function getSemanticEventProfile(): Promise<ReaderProfile> {
