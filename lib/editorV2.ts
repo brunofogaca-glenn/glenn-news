@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { rankArticles } from "./ranker";
+import { inferArticleType } from "./articleType";
 import {
   getOgImage,
 } from "./articleImage";
@@ -60,89 +61,6 @@ export type EditorialSection = {
   stories: SelectedStory[];
   allArticles?: SelectedStory[];
 };
-
-const ARTICLE_TYPES = [
-  "krönika",
-  "analys",
-  "intervju",
-  "reportage",
-  "kommentar",
-  "nyhet",
-  "notis",
-  "guide",
-  "recension",
-  "övrigt",
-];
-
-function inferArticleType(
-  article: Article
-): string {
-  if (article.articleType) {
-    return article.articleType;
-  }
-
-  const text = (
-    `${article.title} ${article.description ?? ""}`
-  ).toLowerCase();
-
-  if (
-    /krönika|krönikor|krönikör/.test(text)
-  ) {
-    return "krönika";
-  }
-
-  if (
-    /analys|expert|bedömer|så kan|därför/.test(
-      text
-    )
-  ) {
-    return "analys";
-  }
-
-  if (
-    /intervju|intervjuar|säger till/.test(
-      text
-    )
-  ) {
-    return "intervju";
-  }
-
-  if (
-    /reportage|berättar|på plats|möter/.test(
-      text
-    )
-  ) {
-    return "reportage";
-  }
-
-  if (
-    /kommentar|ledare|opinion/.test(text)
-  ) {
-    return "kommentar";
-  }
-
-  if (
-    /guide|så gör du|tips|så fungerar/.test(
-      text
-    )
-  ) {
-    return "guide";
-  }
-
-  if (
-    /recension|betyg|recenserar/.test(text)
-  ) {
-    return "recension";
-  }
-
-  if (
-    /notis|i korthet/.test(text)
-  ) {
-    return "notis";
-  }
-
-  return "nyhet";
-}
 
 function profileForPrompt(
   profile: ReaderProfile

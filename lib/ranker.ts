@@ -1,4 +1,5 @@
 import { clusterTopics } from "./topicCluster";
+import { inferArticleType } from "./articleType";
 import type { ReaderProfile } from "./readerProfile";
 
 type Article = {
@@ -304,44 +305,42 @@ function calculateReadingScore(
   article: Article
 ) {
   const text =
-    (article.title + " " + (article.description ?? "")).toLowerCase();
+    (article.title + " " + (article.description ?? "")).toLocaleLowerCase("sv-SE");
 
-  const articleType =
-    (article.articleType ?? "").toLowerCase();
-
-  const scoringText =
-    articleType + " " + text;
+  // Use the same article-type classifier that feeds editorial selection, so
+  // a stale generic "nyhet" label doesn't hide a real analysis or column.
+  const articleType = inferArticleType(article);
+  const scoringText = articleType + " " + text;
 
   let score = 30;
 
-  if (/krönika|krönikör|kolumn/.test(scoringText)) {
+  if (articleType === "krönika") {
     score = 100;
-  } else if (/analys|expert|därför|bedömer/.test(scoringText)) {
+  } else if (articleType === "analys") {
     score = 90;
-  } else if (/intervju|intervjuar/.test(scoringText)) {
+  } else if (articleType === "intervju") {
     score = 85;
-  } else if (/reportage|på plats|möter|berättar/.test(scoringText)) {
+  } else if (articleType === "reportage") {
     score = 80;
-  } else if (/kommentar|ledare|opinion/.test(scoringText)) {
+  } else if (articleType === "kommentar") {
     score = 75;
-  } else if (/recension|recenserar|betyg/.test(scoringText)) {
+  } else if (articleType === "recension") {
     score = 70;
-  } else if (/guide|tips|så fungerar/.test(scoringText)) {
+  } else if (articleType === "guide") {
     score = 55;
-  } else if (/notis|i korthet/.test(scoringText)) {
+  } else if (articleType === "notis") {
     score = 15;
   }
 
   const descriptionLength =
     (article.description ?? "").length;
 
+  // A longer description is a weak depth signal, never a replacement for type.
   return Math.min(
     120,
-    score +
-      Math.min(20, Math.round(descriptionLength / 120))
+    score + Math.min(20, Math.round(descriptionLength / 120))
   );
 }
-
 
 function calculateProfileAffinity(
   article: Article,
