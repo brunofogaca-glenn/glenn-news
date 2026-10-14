@@ -1,7 +1,6 @@
 import { inferArticleType } from "./articleType";
 import type { WeeklyCandidate } from "./weekFocusCandidates";
 
-const DEEP_TYPES = new Set(["krönika", "analys", "intervju", "reportage", "kommentar", "recension"]);
 const GENERIC_TYPES = new Set(["nyhet", "övrigt", "notis"]);
 const TITLE_STOP_WORDS = new Set([
   "och", "att", "den", "det", "som", "för", "med", "till", "från", "har", "om", "på", "av",

@@ -119,6 +119,9 @@ function buildCandidates(
 ) {
   const stories = collectWeeklyCandidates(editions, readLinks);
   const curatedStories = curateWeeklyCandidates(stories);
+  const qualityByLink = new Map(
+    curatedStories.map(story => [story.link, story.qualityScore] as const)
+  );
 
   const metadataByLink = new Map(
     curatedStories.map(story => [
@@ -150,7 +153,7 @@ function buildCandidates(
   );
 
   const byQuality = [...ranked].sort(
-    (a, b) => (b.qualityScore ?? 0) - (a.qualityScore ?? 0)
+    (a, b) => (qualityByLink.get(b.link ?? "") ?? 0) - (qualityByLink.get(a.link ?? "") ?? 0)
   );
 
   const byNews = [...ranked].sort(
@@ -188,7 +191,7 @@ function buildCandidates(
   byNews.slice(0, 15).forEach(add);
   ranked
     .filter(article => preferredTypes.has(article.articleType ?? ""))
-    .sort((a, b) => (b.qualityScore ?? 0) - (a.qualityScore ?? 0))
+    .sort((a, b) => (qualityByLink.get(b.link ?? "") ?? 0) - (qualityByLink.get(a.link ?? "") ?? 0))
     .slice(0, 25)
     .forEach(add);
 
@@ -206,8 +209,8 @@ function buildCandidates(
     selectionReason: metadataByLink.get(article.link ?? "")?.selectionReason ?? "",
     newsScore: article.newsScore,
     readingScore: article.readingScore,
-    qualityScore: article.qualityScore,
-    isNewswire: article.isNewswire,
+    qualityScore: qualityByLink.get(article.link ?? "") ?? 0,
+    isNewswire: isNewswireCandidate(article),
     topic: article.topic,
   }));
 }
