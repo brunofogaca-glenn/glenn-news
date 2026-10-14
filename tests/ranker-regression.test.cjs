@@ -390,3 +390,55 @@ test("feed health metrics separate slow responses from source failures and prior
   assert.equal(ordered.find(feed => feed.name === "långsam").status, "ok",
     "slow timing is a separate signal and does not turn a healthy source into an error");
 });
+
+test("production morning edition contract keeps Stockholm scheduling, validation, retries and fallback messaging aligned", () => {
+  const schedules = JSON.parse(fs.readFileSync(require.resolve("../vercel.json"), "utf8")).crons;
+  assert.deepEqual(
+    schedules.map(cron => [cron.path, cron.schedule]),
+    [
+      ["/api/cron/refresh-news", "30 4 * * *"],
+      ["/api/cron/refresh-news", "34 4 * * *"],
+      ["/api/cron/refresh-news", "38 4 * * *"],
+      ["/api/cron/refresh-news", "30 5 * * *"],
+      ["/api/cron/refresh-news", "34 5 * * *"],
+      ["/api/cron/refresh-news", "38 5 * * *"],
+    ],
+    "UTC schedules cover the 06:30 Stockholm publication window through both CET and CEST"
+  );
+
+  const cron = fs.readFileSync(require.resolve("../app/api/cron/refresh-news/route.ts"), "utf8");
+  assert.match(cron, /const TIME_ZONE = "Europe\\/Stockholm"/);
+  assert.match(cron, /localClock\.hour !== 6 \|\| localClock\.minute < 30 \|\| localClock\.minute > 39/);
+  assert.match(cron, /localClock\.minute > 30 && await hasFreshMorningEditionForToday\(\)/,
+    "follow-up cron runs skip a valid edition rather than generating it twice");
+  assert.match(cron, /const edition = await generateMorningEdition\(profile\)/);
+
+  const actions = fs.readFileSync(require.resolve("../app/actions.ts"), "utf8");
+  const manualRefresh = actions.slice(
+    actions.indexOf("export async function refreshNews()"),
+    actions.indexOf("export async function retryMorningEdition()")
+  );
+  assert.doesNotMatch(manualRefresh, /generateMorningEdition/,
+    "refreshing supplemental panels must not regenerate the saved morning edition");
+  assert.match(manualRefresh, /morningEditionChanged: false/);
+  assert.match(manualRefresh, /Promise\.all\(/);
+  const retry = actions.slice(actions.indexOf("export async function retryMorningEdition()"));
+  assert.match(retry, /generateMorningEdition\(profile\)/,
+    "explicit recovery must be able to generate the missing edition");
+
+  const edition = fs.readFileSync(require.resolve("../lib/dailyEdition.ts"), "utf8");
+  const validateBeforeSave = edition.indexOf("validateDailyEditionForSave(edition, dateKey);", edition.indexOf("export async function generateMorningEdition"));
+  const saveEdition = edition.indexOf("const saved = await saveBlobEdition(edition);", validateBeforeSave);
+  const failIfNotSaved = edition.indexOf("if (!saved)", saveEdition);
+  assert.ok(validateBeforeSave >= 0 && saveEdition > validateBeforeSave && failIfNotSaved > saveEdition,
+    "an edition must be validated before being persisted and a failed save must fail the publication");
+  assert.match(edition, /validateDailyEditionForSave\(parsed, dateKey\)/,
+    "stored editions must be validated on read as well");
+
+  const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
+  assert.match(home, /getTodayDailyEdition\(profile\)/);
+  assert.match(home, /Reservedition · inte dagens nyhetsurval/);
+  assert.match(home, /Morgoneditionen är inte tillgänglig/);
+  assert.match(home, /RetryMorningEditionButton/,
+    "the homepage must clearly label fallback/empty states and offer a recovery path");
+});
