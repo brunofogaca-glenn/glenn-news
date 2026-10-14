@@ -121,6 +121,8 @@ async function checkRssFeed(feed: (typeof FEEDS)[number]): Promise<FeedHealth> {
       status: "error",
       responseMs: Date.now() - started,
       articles24h: 0,
+      latestArticleAt: null,
+      latestArticleAgeHours: null,
       detail: error instanceof Error ? error.message : "Okänt fel",
     };
   }
@@ -160,6 +162,8 @@ async function checkWebSource(source: (typeof WEB_SOURCES)[number]): Promise<Fee
       status: "error",
       responseMs: Date.now() - started,
       articles24h: 0,
+      latestArticleAt: null,
+      latestArticleAgeHours: null,
       detail: error instanceof Error ? error.message : "Okänt fel",
     };
   }
