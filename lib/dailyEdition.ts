@@ -104,6 +104,173 @@ function filterPreviouslyPublished<T extends { link?: string; title?: string }>(
   });
 }
 
+const EXPECTED_SECTION_TITLES: Record<string, string> = {
+  elfsborg: "Elfsborg",
+  boras: "Lokalt",
+  sverige: "Sverige",
+  varlden: "Världen",
+  ekonomi: "Ekonomi",
+  sport: "Sport",
+  livsstil: "Kultur, Mat & Livsstil",
+};
+
+function isValidArticleLink(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim() || value.length > 2_048) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      Boolean(url.hostname) &&
+      !/\\s/.test(value)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate the editorial payload before it can become the saved edition.
+ * A small day is allowed, but a structurally incomplete or entirely empty
+ * edition is not saved as if it were ready to read.
+ */
+function validateDailyEditionForSave(
+  edition: DailyEdition,
+  expectedDateKey: string
+) {
+  const errors: string[] = [];
+
+  if (edition.dateKey !== expectedDateKey || !isValidDateKey(edition.dateKey)) {
+    errors.push("dateKey is missing, invalid, or does not match the requested edition date");
+  }
+
+  if (
+    typeof edition.generatedAt !== "string" ||
+    !Number.isFinite(Date.parse(edition.generatedAt))
+  ) {
+    errors.push("generatedAt is missing or is not a valid timestamp");
+  }
+
+  if (
+    !Number.isInteger(edition.totalArticles) ||
+    edition.totalArticles < 0
+  ) {
+    errors.push("totalArticles must be a non-negative integer");
+  }
+
+  if (!Array.isArray(edition.sections)) {
+    errors.push("sections must be an array");
+  } else {
+    const keys = edition.sections.map(section => section?.key);
+    const missingKeys = Object.keys(EXPECTED_SECTION_TITLES).filter(
+      key => !keys.includes(key)
+    );
+    const unexpectedKeys = keys.filter(
+      key => typeof key !== "string" || !(key in EXPECTED_SECTION_TITLES)
+    );
+    const duplicateKeys = keys.filter(
+      (key, index) => keys.indexOf(key) !== index
+    );
+
+    if (edition.sections.length !== Object.keys(EXPECTED_SECTION_TITLES).length) {
+      errors.push("the edition must contain all seven configured sections");
+    }
+    if (missingKeys.length) errors.push("missing sections: " + missingKeys.join(", "));
+    if (unexpectedKeys.length) errors.push("unexpected section keys are present");
+    if (duplicateKeys.length) errors.push("duplicate section keys: " + [...new Set(duplicateKeys)].join(", "));
+
+    for (const section of edition.sections) {
+      if (!section || typeof section !== "object") {
+        errors.push("a section is not an object");
+        continue;
+      }
+
+      if (section.title !== EXPECTED_SECTION_TITLES[section.key]) {
+        errors.push("section title mismatch for " + String(section.key));
+      }
+
+      if (typeof section.summary !== "string") {
+        errors.push("section summary is missing for " + String(section.key));
+      }
+
+      if (!Array.isArray(section.stories)) {
+        errors.push("stories must be an array for " + String(section.key));
+        continue;
+      }
+
+      section.stories.forEach((story, index) => {
+        const prefix = String(section.key) + " story " + String(index + 1);
+
+        if (!story || typeof story !== "object") {
+          errors.push(prefix + " is not an object");
+          return;
+        }
+        if (typeof story.title !== "string" || !story.title.trim()) {
+          errors.push(prefix + " has no title");
+        }
+        if (!isValidArticleLink(story.link)) {
+          errors.push(prefix + " has no valid HTTP(S) article URL");
+        }
+        if (typeof story.aiSummary !== "string") {
+          errors.push(prefix + " has no valid aiSummary field");
+        }
+        if (typeof story.selectionReason !== "string") {
+          errors.push(prefix + " has no valid selectionReason field");
+        }
+        if (typeof story.articleType !== "string" || !story.articleType.trim()) {
+          errors.push(prefix + " has no article type");
+        }
+      });
+
+      if (
+        section.key === "elfsborg" &&
+        section.allArticles !== undefined &&
+        !Array.isArray(section.allArticles)
+      ) {
+        errors.push("Elfsborg allArticles must be an array when present");
+      }
+    }
+  }
+
+  const selectedStoryCount = Array.isArray(edition.sections)
+    ? edition.sections.reduce(
+        (sum, section) => sum + (Array.isArray(section?.stories) ? section.stories.length : 0),
+        0
+      )
+    : 0;
+
+  if (edition.totalArticles <= 0) {
+    errors.push("the source pool contains no articles");
+  }
+  if (selectedStoryCount <= 0) {
+    errors.push("no readable stories were selected");
+  }
+
+  if (errors.length) {
+    console.error("Morning edition validation failed:", {
+      dateKey: expectedDateKey,
+      errors,
+    });
+    throw new Error(
+      "Morgonens edition klarade inte kvalitetskontrollen: " + errors.join("; ")
+    );
+  }
+
+  const emptySections = edition.sections
+    .filter(section => section.stories.length === 0)
+    .map(section => section.key);
+
+  if (emptySections.length) {
+    console.warn("Morning edition has sections with no selected stories:", {
+      dateKey: expectedDateKey,
+      sections: emptySections,
+      note: "Empty categories are allowed when their source pool is genuinely thin.",
+    });
+  }
+}
+
 async function buildDailyEdition(
   dateKey: string,
   profile: ReaderProfile,
@@ -337,6 +504,8 @@ export async function generateMorningEdition(
   ) as typeof news;
 
   const edition = await buildDailyEdition(dateKey, profile, null, filteredNews);
+  validateDailyEditionForSave(edition, dateKey);
+
   const saved = await saveBlobEdition(edition);
 
   if (!saved) {
