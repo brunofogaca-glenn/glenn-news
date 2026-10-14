@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import { rankArticles } from "./ranker";
 import { canonicalizeLink, collectWeeklyCandidates, type WeeklyCandidate } from "./weekFocusCandidates";
+import { curateWeeklyCandidates, isNewswireCandidate } from "./weekFocusQuality";
+import { inferArticleType } from "./articleType";
 import { buildWeeklyInterestProfile } from "./weekFocusInterests";
 import {
   getSavedDailyEditions,
@@ -116,9 +118,10 @@ function buildCandidates(
   profile: ReaderProfile
 ) {
   const stories = collectWeeklyCandidates(editions, readLinks);
+  const curatedStories = curateWeeklyCandidates(stories);
 
   const metadataByLink = new Map(
-    stories.map(story => [
+    curatedStories.map(story => [
       story.link,
       {
         category: story.category,
@@ -128,7 +131,10 @@ function buildCandidates(
     ])
   );
 
-  const ranked = rankArticles(stories, profile);
+  const ranked = rankArticles(
+    curatedStories.map(story => ({ ...story, articleType: inferArticleType(story) })),
+    profile
+  );
 
   const preferredTypes = new Set([
     "krönika",
@@ -143,6 +149,10 @@ function buildCandidates(
     (a, b) => (b.readingScore ?? 0) - (a.readingScore ?? 0)
   );
 
+  const byQuality = [...ranked].sort(
+    (a, b) => (b.qualityScore ?? 0) - (a.qualityScore ?? 0)
+  );
+
   const byNews = [...ranked].sort(
     (a, b) =>
       (b.newsScore ?? b.score ?? 0) -
@@ -151,23 +161,35 @@ function buildCandidates(
 
   const selected: typeof ranked = [];
   const selectedLinks = new Set<string>();
+  let selectedNewswireCount = 0;
+  const MAX_NEWSWIRE_CANDIDATES = 12;
 
   function add(article: typeof ranked[number]) {
     const key = article.link || article.title;
+    const isNewswire = isNewswireCandidate(article);
 
-    if (!key || selectedLinks.has(key)) {
+    if (
+      !key ||
+      selectedLinks.has(key) ||
+      (isNewswire && selectedNewswireCount >= MAX_NEWSWIRE_CANDIDATES)
+    ) {
       return;
     }
 
     selectedLinks.add(key);
+    if (isNewswire) selectedNewswireCount += 1;
     selected.push(article);
   }
 
-  byReading.slice(0, 35).forEach(add);
-  byNews.slice(0, 35).forEach(add);
+  // Put reading depth and original reporting ahead of raw news volume.
+  // Wire material remains eligible but is capped when there are alternatives.
+  byReading.slice(0, 25).forEach(add);
+  byQuality.slice(0, 35).forEach(add);
+  byNews.slice(0, 15).forEach(add);
   ranked
     .filter(article => preferredTypes.has(article.articleType ?? ""))
-    .slice(0, 30)
+    .sort((a, b) => (b.qualityScore ?? 0) - (a.qualityScore ?? 0))
+    .slice(0, 25)
     .forEach(add);
 
   return selected.slice(0, 60).map((article, index) => ({
@@ -184,6 +206,8 @@ function buildCandidates(
     selectionReason: metadataByLink.get(article.link ?? "")?.selectionReason ?? "",
     newsScore: article.newsScore,
     readingScore: article.readingScore,
+    qualityScore: article.qualityScore,
+    isNewswire: article.isNewswire,
     topic: article.topic,
   }));
 }
@@ -289,6 +313,8 @@ export async function createWeeklyFocus(
     selectionReason: candidate.selectionReason,
     newsScore: candidate.newsScore,
     readingScore: candidate.readingScore,
+    qualityScore: candidate.qualityScore,
+    isNewswire: candidate.isNewswire,
   }));
 
   const readingHistoryForPrompt = readingHistory.map(item => ({
@@ -322,6 +348,9 @@ export async function createWeeklyFocus(
         "- Välj bara artiklar ur CANDIDATES. id måste motsvara en kandidat; hitta inte på rubriker, artiklar eller länkar.",
         "- CANDIDATES har redan filtrerats så att artiklar som Glenn öppnat under de senaste sju dygnen inte finns med.",
         "- Välj en text som tar ämnet vidare: analys, krönika, intervju, reportage, bakgrund eller granskning väger tyngre än en kort notis.",
+        "- qualityScore signalerar fördjupning och redaktionellt läsvärde; prioritera höga värden när ämnet passar läshistoriken.",
+        "- isNewswire markerar byråmaterial. Använd det när det tillför viktig information, men välj hellre en originell analys, intervju, krönika eller ett reportage om alternativen täcker ämnet lika bra.",
+        "- Nästan identiska rubriker har rensats bort, men kontrollera fortfarande att valen ger olika vinklar och inte bara återberättar samma händelse.",
         "- En ny artikel om samma ämne som Glenn redan läst är bra om den ger en ny vinkel eller fördjupning.",
         "- En artikel och en tydlig ämnesetikett per plats. Dubbletter av artiklar eller ämnen ska undvikas.",
         "- Välj upp till tio ämnen; tvinga inte fram tio om olästa kandidater eller lässignaler inte räcker.",

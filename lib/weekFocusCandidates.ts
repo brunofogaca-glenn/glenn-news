@@ -18,6 +18,8 @@ export type WeeklyCandidate = {
   newsScore?: number;
   readingScore?: number;
   topic?: string;
+  qualityScore?: number;
+  isNewswire?: boolean;
 };
 
 /** Normalize tracking parameters and URL decoration when comparing articles. */

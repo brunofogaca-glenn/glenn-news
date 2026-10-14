@@ -22,6 +22,7 @@ require.extensions[".ts"] = (module, filename) => {
 const { rankArticles } = require("../lib/ranker.ts");
 const { collectWeeklyCandidates, canonicalizeLink } = require("../lib/weekFocusCandidates.ts");
 const { buildWeeklyInterestProfile } = require("../lib/weekFocusInterests.ts");
+const { curateWeeklyCandidates, scoreWeeklyReadingQuality, isNewswireCandidate } = require("../lib/weekFocusQuality.ts");
 
 function emptyProfile() {
   return {
@@ -208,4 +209,34 @@ test("WeekFocus builds explicit interest counts from the actual weekly click his
   assert.equal(profile.topics.find(item => item.label === "IF Elfsborg").articleCount, 2);
   assert.equal(profile.topics.find(item => item.label === "Manchester United").articleCount, 2);
   assert.equal(profile.topTerms.find(item => item.label === "elfsborg").articleCount, 2);
+});
+
+test("WeekFocus prefers deep reads over short syndicated copy and removes near-duplicate titles", () => {
+  const wireBrief = {
+    id: 0, title: "Elfsborg säljer stjärnan till italiensk klubb",
+    description: "Kort notis.", source: "TT Nyhetsbyrån", category: "elfsborg",
+    link: "https://example.com/wire-brief", image: null, date: "2026-10-14",
+    articleType: "nyhet", aiSummary: "", selectionReason: "",
+  };
+  const originalAnalysis = {
+    id: 1, title: "Elfsborg säljer stjärnan till italiensk klubb – analys",
+    description: "En längre genomgång av klubbens strategi, spelarens roll och vad affären innebär för lagbygget. ".repeat(8),
+    source: "Offside", category: "elfsborg", link: "https://example.com/original-analysis",
+    image: null, date: "2026-10-13", articleType: "analys",
+    aiSummary: "Fördjupning med bakgrund och konsekvenser.", selectionReason: "",
+  };
+  const independentInterview = {
+    id: 2, title: "Tränaren berättar om lagets nya spelidé",
+    description: "Ett längre samtal om utveckling, taktik och framtiden.",
+    source: "Lokalredaktionen", category: "sport", link: "https://example.com/interview",
+    image: null, date: "2026-10-12", articleType: "intervju", aiSummary: "", selectionReason: "",
+  };
+
+  assert.equal(isNewswireCandidate(wireBrief), true);
+  assert.ok(scoreWeeklyReadingQuality(originalAnalysis) > scoreWeeklyReadingQuality(wireBrief));
+  const curated = curateWeeklyCandidates([wireBrief, originalAnalysis, independentInterview]);
+  assert.equal(curated.length, 2);
+  assert.equal(curated[0].link, originalAnalysis.link);
+  assert.equal(curated[0].articleType, "analys");
+  assert.equal(curated.some(item => item.link === wireBrief.link), false);
 });
