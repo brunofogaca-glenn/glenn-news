@@ -65,6 +65,11 @@ export default async function WeekFocusPage() {
               <WeeklyStoryLink
                 key={story.link}
                 href={story.link}
+                category="weekfocus"
+                articleType={story.articleType}
+                source={story.source}
+                topic={story.focusTopic}
+                summary={story.aiSummary}
                 className="group block border-b border-slate-300 py-6"
               >
                 <div className="grid gap-5 md:grid-cols-[64px_0.28fr_1fr_0.9fr] md:items-start">
