@@ -39,24 +39,60 @@ export function TrackableLink({
         .trim()
         .slice(0, 300);
 
-    void fetch("/api/events", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        type: "article_click",
-        category,
-        articleType,
-        source,
-        topic,
-        title,
-        link: href,
-      }),
-      keepalive: true,
-    }).catch(() => {
-      // Tracking is intentionally best-effort.
+    // A stable ID lets the endpoint retry one failed write without counting
+    // the same user click twice if the first response was lost.
+    const id = `${Date.now()}-${window.crypto.randomUUID().replaceAll("-", "")}`;
+    const payload = JSON.stringify({
+      type: "article_click",
+      eventId: id,
+      category,
+      articleType,
+      source,
+      topic,
+      title,
+      link: href,
     });
+
+    void sendClickEvent(payload);
+  }
+
+  async function sendClickEvent(payload: string) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const response = await fetch("/api/events", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: payload,
+          keepalive: true,
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+
+        const result = await response.json().catch(() => null) as
+          | { ok?: boolean }
+          | null;
+
+        if (response.ok && result?.ok === true) {
+          return;
+        }
+
+        // Only retry transient server failures. Bad event data should not retry.
+        if (response.status < 500 || attempt === 1) {
+          console.warn("Reader click was not saved.", {
+            status: response.status,
+            responseOk: response.ok,
+          });
+          return;
+        }
+      } catch (error) {
+        if (attempt === 1) {
+          console.warn("Reader click could not reach the tracking endpoint.", error);
+          return;
+        }
+      }
+    }
   }
 
   return (
