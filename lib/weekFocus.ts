@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { rankArticles } from "./ranker";
+import { canonicalizeLink, collectWeeklyCandidates, type WeeklyCandidate } from "./weekFocusCandidates";
 import {
   getSavedDailyEditions,
   getTodayDailyEdition,
@@ -14,25 +15,6 @@ import {
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-type WeeklyCandidate = {
-  id: number;
-  title: string;
-  description: string;
-  source: string;
-  category: string;
-  link: string;
-  image: string | null;
-  date: string;
-  articleType: string;
-  aiSummary: string;
-  selectionReason: string;
-  newsScore?: number;
-  readingScore?: number;
-  topic?: string;
-  focusTopic?: string;
-  topicReadCount?: number;
-};
 
 type WeeklyStory = WeeklyCandidate & {
   id: number;
@@ -67,25 +49,6 @@ function profileForPrompt(profile: ReaderProfile) {
       entities: Object.fromEntries(Object.entries(profile.entity ?? {}).slice(0, 8)),
     },
   };
-}
-
-function canonicalizeLink(value: string) {
-  try {
-    const url = new URL(value);
-    url.hash = "";
-    url.hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-
-    for (const key of [...url.searchParams.keys()]) {
-      if (/^utm_/i.test(key) || /^(fbclid|gclid|dclid|mc_cid|mc_eid|ref_src|campaign)$/i.test(key)) {
-        url.searchParams.delete(key);
-      }
-    }
-
-    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
-    return url.toString().replace(/\?$/, "");
-  } catch {
-    return value.trim().replace(/\/+$/, "");
-  }
 }
 
 function normalizeTopic(value: string) {
@@ -151,42 +114,7 @@ function buildCandidates(
   readLinks: Set<string>,
   profile: ReaderProfile
 ) {
-  const seen = new Set<string>();
-  const stories: WeeklyCandidate[] = [];
-
-  // Newest edition first. If the same article appeared on multiple mornings,
-  // keep the first occurrence so the weekly pool stays clean.
-  for (const edition of editions) {
-    for (const section of edition.sections) {
-      for (const story of section.stories) {
-        const link = story.link ?? "";
-        const canonicalLink = link ? canonicalizeLink(link) : "";
-
-        if (!link || !canonicalLink || readLinks.has(canonicalLink) || seen.has(canonicalLink)) {
-          continue;
-        }
-
-        seen.add(canonicalLink);
-
-        stories.push({
-          id: stories.length,
-          title: story.title,
-          description: story.description ?? "",
-          source: story.source ?? "Okänd källa",
-          category: section.key,
-          link,
-          image: story.image ?? null,
-          date: story.date ?? edition.generatedAt,
-          articleType: story.articleType,
-          aiSummary: story.aiSummary ?? "",
-          selectionReason: story.selectionReason ?? "",
-          newsScore: story.newsScore,
-          readingScore: story.readingScore,
-          topic: story.topic,
-        });
-      }
-    }
-  }
+  const stories = collectWeeklyCandidates(editions, readLinks);
 
   const metadataByLink = new Map(
     stories.map(story => [

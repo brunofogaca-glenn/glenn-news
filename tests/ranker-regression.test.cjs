@@ -20,6 +20,7 @@ require.extensions[".ts"] = (module, filename) => {
 };
 
 const { rankArticles } = require("../lib/ranker.ts");
+const { collectWeeklyCandidates, canonicalizeLink } = require("../lib/weekFocusCandidates.ts");
 
 function emptyProfile() {
   return {
@@ -132,4 +133,58 @@ test("ranking preserves every input story and returns finite scores", () => {
   assert.equal(ranked.length, stories.length);
   assert.equal(new Set(ranked.map(item => item.link)).size, stories.length);
   assert.ok(ranked.every(item => Number.isFinite(item.score) && Number.isFinite(item.newsScore)));
+});
+
+test("WeekFocus includes full-coverage allArticles candidates and de-duplicates them", () => {
+  const selectedStory = {
+    title: "Elfsborgs första analys",
+    description: "Vald till morgoneditionen",
+    source: "Sportredaktionen",
+    link: "https://www.example.com/elfsborg?utm_source=morning",
+    date: "2026-10-14T05:30:00.000Z",
+    articleType: "analys",
+    aiSummary: "Redaktionell sammanfattning",
+    selectionReason: "Vald text",
+    topic: "Elfsborg",
+  };
+  const fullCoverageStory = {
+    title: "En längre oläst Elfsborgsartikel",
+    description: "Finns bara i fullständiga artikelpoolen",
+    source: "Lokalredaktionen",
+    link: "https://example.com/elfsborg-long-read",
+    date: "2026-10-13T05:30:00.000Z",
+    articleType: "reportage",
+  };
+  const alreadyReadStory = {
+    title: "En artikel som redan är läst",
+    source: "Nyhetsbyrån",
+    link: "https://example.com/read?utm_campaign=weekfocus",
+    articleType: "nyhet",
+  };
+
+  const readLinks = new Set([canonicalizeLink(alreadyReadStory.link)]);
+  const candidates = collectWeeklyCandidates([{
+    dateKey: "2026-10-14",
+    generatedAt: "2026-10-14T05:30:00.000Z",
+    totalArticles: 3,
+    storage: "blob",
+    sections: [{
+      key: "elfsborg",
+      title: "Elfsborg",
+      summary: "",
+      stories: [selectedStory],
+      allArticles: [
+        { ...selectedStory, title: "Samma artikel med annan spårningslänk" },
+        fullCoverageStory,
+        alreadyReadStory,
+      ],
+    }],
+  }], readLinks);
+
+  assert.equal(candidates.length, 2);
+  assert.equal(candidates[0].title, selectedStory.title);
+  assert.equal(candidates[1].title, fullCoverageStory.title);
+  assert.equal(candidates[1].category, "elfsborg");
+  assert.equal(new Set(candidates.map(item => canonicalizeLink(item.link))).size, 2);
+  assert.ok(!candidates.some(item => item.title === alreadyReadStory.title));
 });
