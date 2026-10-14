@@ -5,17 +5,32 @@ import { getCachedArticles } from "@/lib/articlesCache";
 import { addWeeklyReadLink } from "@/lib/weeklyRead";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
+import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { getReaderProfile } from "@/lib/readerProfile";
 import { generateMorningEdition } from "@/lib/dailyEdition";
 
+/**
+ * Refresh the underlying source data used by optional homepage panels.
+ * This deliberately does not regenerate today's saved morning edition.
+ */
 export async function refreshNews() {
   revalidateTag("glenn-news-articles", { expire: 0 });
   await getCachedArticles();
+
+  revalidateTag("glenn-news-feed-health", { expire: 0 });
+  await getCachedFeedHealth();
+
   revalidateTag("glenn-news-sport-day", { expire: 0 });
   await getCachedSportDay();
+
   revalidateTag("glenn-news-market-day", { expire: 0 });
   await getCachedMarketDay();
-  return { sourcesRefreshedAt: new Date().toISOString() };
+
+  return {
+    sourcesRefreshedAt: new Date().toISOString(),
+    refreshedSources: ["nyhetsflöden", "flödesstatus", "sport", "marknad"],
+    morningEditionChanged: false,
+  };
 }
 
 
