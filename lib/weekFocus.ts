@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { rankArticles } from "./ranker";
 import { canonicalizeLink, collectWeeklyCandidates, type WeeklyCandidate } from "./weekFocusCandidates";
+import { buildWeeklyInterestProfile } from "./weekFocusInterests";
 import {
   getSavedDailyEditions,
   getTodayDailyEdition,
@@ -219,6 +220,7 @@ export async function createWeeklyFocus(
   const weekStartDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const activity = await getReaderActivitySince(weekStartDate.toISOString(), 250);
   const readingHistory = buildReadingHistory(activity);
+  const weeklyInterestProfile = buildWeeklyInterestProfile(readingHistory);
   const readLinks = new Set(
     activity
       .map(item => item.link)
@@ -327,6 +329,12 @@ export async function createWeeklyFocus(
         "",
         "LÅNGSIKTIG LÄSARPROFIL:",
         JSON.stringify(profileForPrompt(profile)),
+        "",
+        "VECKANS FAKTISKA LÄSINTRESSE (räknat från unika artiklar i READ-HISTORY):",
+        JSON.stringify(weeklyInterestProfile),
+        "- weeklyInterestProfile är en deterministisk sammanräkning av verkliga klick, inte en gissning från den långsiktiga profilen.",
+        "- articleCount betyder antal olika lästa artiklar där signalen förekommer; räkna inte samma signal flera gånger inom en artikel.",
+        "- Använd återkommande ämnen och ord för att prioritera grupperingen, men länka varje valt ämne till giltiga readIds i READ-HISTORY.",
         "",
         "READ-HISTORY:",
         JSON.stringify(readingHistoryForPrompt),

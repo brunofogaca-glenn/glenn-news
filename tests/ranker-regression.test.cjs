@@ -21,6 +21,7 @@ require.extensions[".ts"] = (module, filename) => {
 
 const { rankArticles } = require("../lib/ranker.ts");
 const { collectWeeklyCandidates, canonicalizeLink } = require("../lib/weekFocusCandidates.ts");
+const { buildWeeklyInterestProfile } = require("../lib/weekFocusInterests.ts");
 
 function emptyProfile() {
   return {
@@ -187,4 +188,24 @@ test("WeekFocus includes full-coverage allArticles candidates and de-duplicates 
   assert.equal(candidates[1].category, "elfsborg");
   assert.equal(new Set(candidates.map(item => canonicalizeLink(item.link))).size, 2);
   assert.ok(!candidates.some(item => item.title === alreadyReadStory.title));
+});
+
+test("WeekFocus builds explicit interest counts from the actual weekly click history", () => {
+  const profile = buildWeeklyInterestProfile([
+    { id: 0, title: "Elfsborg analyseras efter segern", category: "sport", articleType: "analys", source: "Borås Tidning", topic: "IF Elfsborg", date: "2026-10-14" },
+    { id: 1, title: "Elfsborg behöver förstärka laget", category: "elfsborg", articleType: "krönika", source: "Borås Tidning", topic: "IF Elfsborg", date: "2026-10-13" },
+    { id: 2, title: "Manchester United ändrar spelsystem", category: "sport", articleType: "reportage", source: "The Guardian", topic: "Manchester United", date: "2026-10-12" },
+    { id: 3, title: "Manchester United söker ny anfallare", category: "sport", articleType: "analys", source: "The Guardian", topic: "Manchester United", date: "2026-10-11" },
+  ]);
+
+  assert.equal(profile.uniqueReadCount, 4);
+  assert.equal(profile.categories[0].label, "sport");
+  assert.equal(profile.categories[0].articleCount, 3);
+  assert.equal(profile.articleTypes[0].label, "analys");
+  assert.equal(profile.articleTypes[0].articleCount, 2);
+  assert.equal(profile.sources[0].label, "Borås Tidning");
+  assert.equal(profile.sources[0].articleCount, 2);
+  assert.equal(profile.topics.find(item => item.label === "IF Elfsborg").articleCount, 2);
+  assert.equal(profile.topics.find(item => item.label === "Manchester United").articleCount, 2);
+  assert.equal(profile.topTerms.find(item => item.label === "elfsborg").articleCount, 2);
 });
