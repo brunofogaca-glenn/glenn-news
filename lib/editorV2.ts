@@ -668,7 +668,7 @@ ${JSON.stringify(
             : "AI-redaktören bedömer att texten är särskilt läsvärd.",
         articleType:
           typeof item.articleType === "string" &&
-          ARTICLE_TYPES.includes(item.articleType)
+          (ARTICLE_TYPES as readonly string[]).includes(item.articleType)
             ? item.articleType
             : candidate.articleType ?? "nyhet",
       });
