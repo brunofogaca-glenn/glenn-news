@@ -127,6 +127,18 @@ function ArticleImage({
 }
 
 export default async function Home() {
+  const profilePromise = withOptionalFallback("reader profile", getReaderProfile(), () => ({
+    category: {},
+    articleType: {},
+    source: {},
+    topic: {},
+    totalClicks: 0,
+    lastUpdated: null,
+  }));
+  // Start the essential edition as soon as the reader profile is ready,
+  // without waiting for slower optional panels such as weather or markets.
+  const editionPromise = profilePromise.then(profile => getTodayDailyEdition(profile));
+
   const [
     profile,
     feedHealth,
@@ -139,15 +151,9 @@ export default async function Home() {
     nationalSnapshot,
     worldSnapshot,
     cultureSnapshot,
+    edition,
   ] = await Promise.all([
-    withOptionalFallback("reader profile", getReaderProfile(), () => ({
-      category: {},
-      articleType: {},
-      source: {},
-      topic: {},
-      totalClicks: 0,
-      lastUpdated: null,
-    })),
+    profilePromise,
     withOptionalFallback("feed health", getCachedFeedHealth(), () => ({
       checkedAt: new Date().toISOString(),
       feeds: [{
@@ -211,9 +217,9 @@ export default async function Home() {
       updatedAt: new Date().toISOString(),
       sourceUrl: "https://www.moviezine.se/kalender",
     })),
+    editionPromise,
   ]);
 
-  const edition = await getTodayDailyEdition(profile);
   const sections = edition.sections;
   const totalArticles = edition.totalArticles;
   const todayDateKey = getStockholmDateKey();
