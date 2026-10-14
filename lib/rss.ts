@@ -2,6 +2,41 @@ import Parser from "rss-parser";
 import { detectCategory } from "./categorizer";
 import { getWebArticles } from "./webSources";
 
+/**
+ * Build a comparison key for article links so tracking tags and cosmetic URL
+ * differences do not produce duplicate stories. Keep non-tracking query
+ * parameters because some publishers use them to identify the actual article.
+ */
+function normalizeArticleUrl(value?: string) {
+  if (!value?.trim()) return "";
+
+  try {
+    const url = new URL(value.trim());
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return value.trim();
+    }
+
+    url.hash = "";
+    url.hostname = url.hostname.toLowerCase().replace(/^www\./i, "");
+
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_.*|fbclid|gclid|mc_cid|mc_eid|ref|source)$/i.test(key)) {
+        url.searchParams.delete(key);
+      }
+    }
+
+    url.searchParams.sort();
+
+    const hostname = url.hostname + (url.port ? ":" + url.port : "");
+    const pathname = url.pathname.replace(/\/+$/, "");
+
+    return (hostname + pathname + url.search).replace(/\/$/, "");
+  } catch {
+    return value.trim();
+  }
+}
+
 function extractImageFromContent(
   html: string
 ) {
@@ -278,12 +313,13 @@ const [feeds, webArticles] =
           return;
         }
 
-        if (article.link && seen.has(article.link)) {
+        const articleUrlKey = normalizeArticleUrl(article.link);
+        if (articleUrlKey && seen.has(articleUrlKey)) {
           return;
         }
 
-        if (article.link) {
-          seen.add(article.link);
+        if (articleUrlKey) {
+          seen.add(articleUrlKey);
         }
 
         result[
@@ -303,7 +339,7 @@ const [feeds, webArticles] =
           !article.link ||
           isNaN(date) ||
           date <= cutoff ||
-          seen.has(article.link)
+          seen.has(normalizeArticleUrl(article.link))
         ) {
           return;
         }
@@ -315,7 +351,7 @@ const [feeds, webArticles] =
           return;
         }
 
-        seen.add(article.link);
+        seen.add(normalizeArticleUrl(article.link));
         result[category].push(article);
       });
     }
