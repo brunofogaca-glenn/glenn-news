@@ -22,6 +22,7 @@ require.extensions[".ts"] = (module, filename) => {
 const { rankArticles } = require("../lib/ranker.ts");
 const { collectWeeklyCandidates, canonicalizeLink } = require("../lib/weekFocusCandidates.ts");
 const { buildWeeklyInterestProfile } = require("../lib/weekFocusInterests.ts");
+const { isSlowResponse, summarizeResponseTimes, prioritizeHealthFeeds, SLOW_RESPONSE_THRESHOLD_MS } = require("../lib/feedHealthMetrics.ts");
 const { createWeeklyFocusFingerprint, getOrCreateWeeklyFocus } = require("../lib/weekFocusCache.ts");
 const { createWeeklyFocus } = require("../lib/weekFocus.ts");
 const { curateWeeklyCandidates, scoreWeeklyReadingQuality, isNewswireCandidate } = require("../lib/weekFocusQuality.ts");
@@ -362,4 +363,30 @@ test("optional homepage source caches refresh on demand and use shorter freshnes
     assert.ok(actions.includes(source), `manual refresh fetches ${source}`);
   }
   assert.ok(actions.includes("morningEditionChanged: false"));
+});
+
+test("feed health metrics separate slow responses from source failures and prioritize actionable issues", () => {
+  const feeds = [
+    { name: "snabb", status: "ok", responseMs: 100 },
+    { name: "gräns", status: "ok", responseMs: SLOW_RESPONSE_THRESHOLD_MS },
+    { name: "långsam", status: "ok", responseMs: 8_000 },
+    { name: "inaktuell", status: "stale", responseMs: 900 },
+    { name: "fel", status: "error", responseMs: 200 },
+    { name: "tom", status: "empty", responseMs: 300 },
+  ];
+
+  const metrics = summarizeResponseTimes(feeds);
+  assert.equal(isSlowResponse(2_499), false);
+  assert.equal(isSlowResponse(2_500), true);
+  assert.equal(metrics.slow, 2);
+  assert.equal(metrics.slowThresholdMs, 2_500);
+  assert.equal(metrics.averageResponseMs, 1_633);
+  assert.equal(metrics.medianResponseMs, 600);
+
+  const ordered = prioritizeHealthFeeds(feeds);
+  assert.deepEqual(ordered.map(feed => feed.name), [
+    "fel", "inaktuell", "tom", "långsam", "gräns", "snabb",
+  ]);
+  assert.equal(ordered.find(feed => feed.name === "långsam").status, "ok",
+    "slow timing is a separate signal and does not turn a healthy source into an error");
 });

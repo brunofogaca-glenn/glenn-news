@@ -1,4 +1,5 @@
 import { getFeedHealth } from "@/lib/feedHealth";
+import { isSlowResponse, prioritizeHealthFeeds, summarizeResponseTimes } from "@/lib/feedHealthMetrics";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,8 @@ function formatLastArticle(value: string | null) {
 
 export default async function HealthPage() {
   const health = await getFeedHealth();
+  const metrics = summarizeResponseTimes(health.feeds);
+  const orderedFeeds = prioritizeHealthFeeds(health.feeds);
 
   return (
     <main className="min-h-screen bg-[#f4f1e8] text-slate-950">
@@ -67,7 +70,7 @@ export default async function HealthPage() {
               <p className="mt-2 font-serif text-base text-slate-600">
                 Kontrollerar varje RSS- och webbkällas svar, svarstid och färskhet.
                 En källa markeras som inaktuell om den senaste daterade artikeln är
-                minst 72 timmar gammal; det behöver inte betyda att källan är trasig.
+                minst 72 timmar gammal. Svarstider på {metrics.slowThresholdMs.toLocaleString("sv-SE")} ms eller mer markeras separat som långsamma — det betyder inte automatiskt att källan är trasig.
               </p>
             </div>
 
@@ -80,19 +83,22 @@ export default async function HealthPage() {
           </div>
         </header>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
           {[
             ["Totalt", health.totals.all],
             ["OK", health.totals.healthy],
             ["Tomt", health.totals.empty],
             ["Inaktuella", health.totals.stale],
             ["Fel", health.totals.errors],
+            ["Långsamma", metrics.slow],
+            ["Snitt ms", metrics.averageResponseMs],
+            ["Median ms", metrics.medianResponseMs],
           ].map(([label, value]) => (
-            <div key={String(label)} className="border border-slate-300 bg-white/40 px-4 py-4">
-              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+            <div key={String(label)} className="border border-slate-300 bg-white/40 px-3 py-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 {label}
               </div>
-              <div className="mt-1 font-serif text-3xl font-black">
+              <div className="mt-1 font-serif text-3xl font-black tabular-nums">
                 {value}
               </div>
             </div>
@@ -104,18 +110,18 @@ export default async function HealthPage() {
             <div>Status</div>
             <div>Källa</div>
             <div>Kategori</div>
-            <div>ms</div>
+            <div>Svarstid</div>
             <div>24 h</div>
             <div>Senaste artikel</div>
             <div>Detalj</div>
           </div>
 
-          {health.feeds.map((feed) => (
+          {orderedFeeds.map((feed) => (
             <div
               key={feed.kind + ":" + feed.url}
               className="grid gap-2 border-b border-slate-300 px-3 py-4 md:grid-cols-[70px_1.1fr_0.55fr_0.4fr_0.4fr_0.85fr_1.4fr] md:items-center md:gap-4"
             >
-              <div>
+              <div className="flex flex-wrap items-start gap-1">
                 <span
                   className={
                     "inline-flex px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] " +
@@ -124,6 +130,11 @@ export default async function HealthPage() {
                 >
                   {statusLabel(feed.status)}
                 </span>
+                {isSlowResponse(feed.responseMs) && (
+                  <span className="inline-flex bg-amber-100 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-900">
+                    Långsam
+                  </span>
+                )}
               </div>
 
               <div className="min-w-0">
@@ -134,7 +145,7 @@ export default async function HealthPage() {
               </div>
 
               <div className="text-sm text-slate-600">{feed.category}</div>
-              <div className="text-sm font-mono">{feed.responseMs}</div>
+              <div className={"text-sm font-mono tabular-nums " + (isSlowResponse(feed.responseMs) ? "font-bold text-amber-800" : "text-slate-700")}>{feed.responseMs} ms</div>
               <div className="text-sm font-bold">{feed.articles24h}</div>
               <div className="text-sm text-slate-600">
                 <div>{formatLastArticle(feed.latestArticleAt)}</div>
