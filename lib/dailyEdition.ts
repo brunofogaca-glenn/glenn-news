@@ -275,15 +275,19 @@ function createWaitingEdition(dateKey: string): DailyEdition {
 }
 
 /**
- * Read-only homepage access: never call the editorial AI or build an edition.
- * The scheduled morning job is the only normal path that generates an edition.
+ * Prefer the scheduled, saved edition. If the cron did not run or failed,
+ * generate and persist the edition on the first homepage request instead of
+ * showing an empty "not available" page. generateMorningEdition is idempotent
+ * once the saved edition exists.
  */
 export async function getTodayDailyEdition(
-  _profile: ReaderProfile
+  profile: ReaderProfile
 ): Promise<DailyEdition> {
   const dateKey = getTodayKey();
   const existing = await readBlobEdition(dateKey);
-  return existing ?? createWaitingEdition(dateKey);
+  if (existing) return existing;
+
+  return generateMorningEdition(profile);
 }
 
 /**
