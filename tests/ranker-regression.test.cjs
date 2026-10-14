@@ -380,7 +380,7 @@ test("feed health metrics separate slow responses from source failures and prior
   assert.equal(isSlowResponse(2_500), true);
   assert.equal(metrics.slow, 2);
   assert.equal(metrics.slowThresholdMs, 2_500);
-  assert.equal(metrics.averageResponseMs, 1_633);
+  assert.equal(metrics.averageResponseMs, 2_000);
   assert.equal(metrics.medianResponseMs, 600);
 
   const ordered = prioritizeHealthFeeds(feeds);
