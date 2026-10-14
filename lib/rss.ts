@@ -208,6 +208,10 @@ const [feeds, webArticles] =
     getWebArticles(),
   ]);
 
+  // Keep exact URL duplicates from RSS feeds out of the editorial pool.
+  // URL variants and title-level duplicates are handled in later cleanup steps.
+  const seen = new Set<string>();
+
   feeds.forEach(
     (feedResult, index) => {
       const feed = FEEDS[index];
@@ -274,22 +278,20 @@ const [feeds, webArticles] =
           return;
         }
 
+        if (article.link && seen.has(article.link)) {
+          return;
+        }
+
+        if (article.link) {
+          seen.add(article.link);
+        }
+
         result[
           finalCategory as keyof typeof result
         ].push(article);
       });
     }
   );
-
-  const seen = new Set<string>();
-
-  Object.values(result).forEach(articles => {
-    articles.forEach(article => {
-      if (article.link) {
-        seen.add(article.link);
-      }
-    });
-  });
 
   (Object.keys(webArticles) as Array<keyof typeof webArticles>).forEach(
     category => {
