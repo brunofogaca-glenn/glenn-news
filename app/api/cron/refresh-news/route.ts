@@ -1,7 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
-import { getCachedEditionMeta } from "@/lib/editionMeta";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
@@ -95,9 +94,9 @@ export async function GET(request: Request) {
   revalidateTag("glenn-news-market-day", { expire: 0 });
   const marketDay = await getCachedMarketDay();
 
-  revalidateTag("glenn-news-edition-meta", { expire: 0 });
-  const editionMeta = await getCachedEditionMeta();
   const dailyHeader = await getDailyHeaderInfo();
+  // Timestamp when source refreshes completed, distinct from edition generation.
+  const sourcesRefreshedAt = new Date().toISOString();
 
   // Generate and persist the one morning edition after refreshing its source data.
   const profile = await getReaderProfile();
@@ -110,7 +109,7 @@ export async function GET(request: Request) {
     refreshedAt: now.toISOString(),
     totalArticles: totalArticles(news),
     feedHealth: feedHealth.totals,
-    editionUpdatedAt: editionMeta.updatedAt,
+    sourcesRefreshedAt,
     morningEditionDate: edition.dateKey,
     morningEditionGeneratedAt: edition.generatedAt,
     morningEditionArticles: edition.totalArticles,
