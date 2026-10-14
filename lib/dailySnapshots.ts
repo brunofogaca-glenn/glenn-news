@@ -960,25 +960,25 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
 const getCachedLocalSnapshotInternal = unstable_cache(
   getLocalSnapshotInternal,
   ["glenn-news-daily-local-v2"],
-  { revalidate: 4 * 60 * 60, tags: ["glenn-news-daily-local"] }
+  { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-local"] }
 );
 
 const getCachedNationalSnapshotInternal = unstable_cache(
   getNationalSnapshotInternal,
   ["glenn-news-daily-national-v3"],
-  { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-national"] }
+  { revalidate: 60 * 60, tags: ["glenn-news-daily-national"] }
 );
 
 const getCachedCultureSnapshotInternal = unstable_cache(
   getCultureSnapshotInternal,
   ["glenn-news-daily-culture-v3"],
-  { revalidate: 12 * 60 * 60, tags: ["glenn-news-daily-culture"] }
+  { revalidate: 4 * 60 * 60, tags: ["glenn-news-daily-culture"] }
 );
 
 const getCachedWorldSnapshotInternal = unstable_cache(
   getWorldSnapshotInternal,
   ["glenn-news-daily-world-v1"],
-  { revalidate: 6 * 60 * 60, tags: ["glenn-news-daily-world"] }
+  { revalidate: 3 * 60 * 60, tags: ["glenn-news-daily-world"] }
 );
 
 export function getCachedLocalSnapshot() {

@@ -8,27 +8,57 @@ import { getCachedMarketDay } from "@/lib/marketDay";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { getReaderProfile } from "@/lib/readerProfile";
 import { generateMorningEdition } from "@/lib/dailyEdition";
+import {
+  getCachedLocalSnapshot,
+  getCachedNationalSnapshot,
+  getCachedCultureSnapshot,
+  getCachedWorldSnapshot,
+} from "@/lib/dailySnapshots";
+import { getCachedWeather } from "@/lib/weather";
+import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 
 /**
  * Refresh the underlying source data used by optional homepage panels.
  * This deliberately does not regenerate today's saved morning edition.
  */
 export async function refreshNews() {
-  revalidateTag("glenn-news-articles", { expire: 0 });
-  await getCachedArticles();
+  const tags = [
+    "glenn-news-articles",
+    "glenn-news-feed-health",
+    "glenn-news-sport-day",
+    "glenn-news-market-day",
+    "glenn-news-daily-local",
+    "glenn-news-daily-national",
+    "glenn-news-daily-culture",
+    "glenn-news-daily-world",
+    "glenn-news-weather",
+    "glenn-news-daily-header",
+  ];
+  for (const tag of tags) {
+    revalidateTag(tag, { expire: 0 });
+  }
 
-  revalidateTag("glenn-news-feed-health", { expire: 0 });
-  await getCachedFeedHealth();
-
-  revalidateTag("glenn-news-sport-day", { expire: 0 });
-  await getCachedSportDay();
-
-  revalidateTag("glenn-news-market-day", { expire: 0 });
-  await getCachedMarketDay();
+  // Fetch all homepage source panels concurrently after invalidating their caches.
+  // This refreshes supplemental data only; the saved morning edition stays unchanged.
+  await Promise.all([
+    getCachedArticles(),
+    getCachedFeedHealth(),
+    getCachedSportDay(),
+    getCachedMarketDay(),
+    getCachedLocalSnapshot(),
+    getCachedNationalSnapshot(),
+    getCachedCultureSnapshot(),
+    getCachedWorldSnapshot(),
+    getCachedWeather(),
+    getDailyHeaderInfo(),
+  ]);
 
   return {
     sourcesRefreshedAt: new Date().toISOString(),
-    refreshedSources: ["nyhetsflöden", "flödesstatus", "sport", "marknad"],
+    refreshedSources: [
+      "nyhetsflöden", "flödesstatus", "sport", "marknad",
+      "lokalt", "Sverige", "kultur", "världen", "väder", "namnsdag och historik",
+    ],
     morningEditionChanged: false,
   };
 }

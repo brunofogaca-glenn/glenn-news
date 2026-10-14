@@ -339,3 +339,27 @@ test("WeekFocus end-to-end selects an unread deep read and reuses output until r
   assert.equal(afterRead.stories.length, 1); assert.notEqual(afterRead.stories[0].link, first.stories[0].link, "marking a story read changes the candidate pool");
   assert.equal(editorCalls, 2, "a changed read state generates a fresh editorial result"); assert.equal(activityCalls, 3);
 });
+
+test("optional homepage source caches refresh on demand and use shorter freshness windows", () => {
+  const snapshots = fs.readFileSync(require.resolve("../lib/dailySnapshots.ts"), "utf8");
+  const actions = fs.readFileSync(require.resolve("../app/actions.ts"), "utf8");
+
+  assert.match(snapshots, /revalidate:\s*2\s*\*\s*60\s*\*\s*60,\s*tags:\s*\["glenn-news-daily-local"\]/);
+  assert.match(snapshots, /revalidate:\s*60\s*\*\s*60,\s*tags:\s*\["glenn-news-daily-national"\]/);
+  assert.match(snapshots, /revalidate:\s*4\s*\*\s*60\s*\*\s*60,\s*tags:\s*\["glenn-news-daily-culture"\]/);
+  assert.match(snapshots, /revalidate:\s*3\s*\*\s*60\s*\*\s*60,\s*tags:\s*\["glenn-news-daily-world"\]/);
+
+  for (const tag of [
+    "glenn-news-daily-local", "glenn-news-daily-national", "glenn-news-daily-culture",
+    "glenn-news-daily-world", "glenn-news-weather", "glenn-news-daily-header",
+  ]) {
+    assert.ok(actions.includes(tag), `manual refresh invalidates ${tag}`);
+  }
+  for (const source of [
+    "getCachedLocalSnapshot()", "getCachedNationalSnapshot()", "getCachedCultureSnapshot()",
+    "getCachedWorldSnapshot()", "getCachedWeather()", "getDailyHeaderInfo()",
+  ]) {
+    assert.ok(actions.includes(source), `manual refresh fetches ${source}`);
+  }
+  assert.ok(actions.includes("morningEditionChanged: false"));
+});
