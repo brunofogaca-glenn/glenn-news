@@ -7,9 +7,27 @@ import type {
   ReaderProfile,
 } from "./readerProfile";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const OPENAI_TIMEOUT_MS = 20_000;
+
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
+
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey,
+      timeout: OPENAI_TIMEOUT_MS,
+      maxRetries: 1,
+    });
+  }
+
+  return openaiClient;
+}
 
 type Article = {
   title: string;
@@ -295,6 +313,99 @@ function fallbackSummary(
   return pieces.join(" ");
 }
 
+function normalizeStoryUrl(value?: string) {
+  if (!value) return "";
+
+  try {
+    const url = new URL(value);
+    url.hash = "";
+
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_.*|fbclid|gclid|mc_cid|mc_eid|ref|source)$/i.test(key)) {
+        url.searchParams.delete(key);
+      }
+    }
+
+    return `${url.hostname.replace(/^www\\./i, "")}${url.pathname}${url.search}`
+      .replace(/\\/$/, "")
+      .toLowerCase();
+  } catch {
+    return value.trim().toLowerCase().replace(/\\/$/, "");
+  }
+}
+
+function normalizeStoryTitle(value?: string) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+    .trim();
+}
+
+function isDuplicateStory(
+  article: Pick<Article, "link" | "title">,
+  seenUrls: Set<string>,
+  seenTitles: Set<string>
+) {
+  const urlKey = normalizeStoryUrl(article.link);
+  const titleKey = normalizeStoryTitle(article.title);
+
+  if (
+    (urlKey && seenUrls.has(urlKey)) ||
+    (titleKey && seenTitles.has(titleKey))
+  ) {
+    return true;
+  }
+
+  if (urlKey) seenUrls.add(urlKey);
+  if (titleKey) seenTitles.add(titleKey);
+
+  return false;
+}
+
+function completeWithFallbackStories(
+  candidates: ReturnType<typeof buildCandidates>,
+  selectCount: number,
+  selectedStories: SelectedStory[] = []
+): SelectedStory[] {
+  const stories = [...selectedStories];
+  const seenUrls = new Set<string>();
+  const seenTitles = new Set<string>();
+
+  for (const story of selectedStories) {
+    const urlKey = normalizeStoryUrl(story.link);
+    const titleKey = normalizeStoryTitle(story.title);
+    if (urlKey) seenUrls.add(urlKey);
+    if (titleKey) seenTitles.add(titleKey);
+  }
+
+  for (const candidate of candidates) {
+    if (stories.length >= selectCount) break;
+    if (isDuplicateStory(candidate, seenUrls, seenTitles)) continue;
+
+    stories.push({
+      ...candidate,
+      aiSummary: candidate.description?.trim() ?? "",
+      selectionReason:
+        "Automatiskt urval baserat på relevans, färskhet och innehållstyp.",
+      articleType: candidate.articleType ?? "nyhet",
+    });
+  }
+
+  return stories;
+}
+
+function fallbackEditorialResult(
+  articles: Article[],
+  candidates: ReturnType<typeof buildCandidates>,
+  selectCount: number
+) {
+  return {
+    summary: fallbackSummary(articles),
+    stories: completeWithFallbackStories(candidates, selectCount),
+  };
+}
+
 async function ensureImages(
   stories: SelectedStory[]
 ) {
@@ -336,8 +447,9 @@ async function runEditorialAI(
     };
   }
 
-  const response =
-    await openai.responses.create({
+  try {
+    const response =
+      await getOpenAIClient().responses.create({
       model: "gpt-5-mini",
       input: `
 Du är Glenns personliga morgonredaktör.
@@ -408,86 +520,102 @@ ${JSON.stringify(
 `,
     });
 
-  try {
-    const parsed =
-      JSON.parse(
-        response.output_text
-      ) as {
-        summary?: string;
-        stories?: Array<{
-          id?: number;
-          articleType?: string;
-          summary?: string;
-          selectionReason?: string;
-        }>;
-      };
+    const rawOutput = response.output_text?.trim();
+    if (!rawOutput) {
+      console.warn(
+        "Editorial AI returned an empty response; using ranked fallback:",
+        categoryKey
+      );
+      return fallbackEditorialResult(articles, candidates, selectCount);
+    }
 
-    const stories =
-      (parsed.stories ?? [])
-        .map(item => {
-          const candidate =
-            candidates.find(
-              article =>
-                article.id ===
-                item.id
-            );
-
-          if (!candidate) {
-            return null;
-          }
-
-          return {
-            ...candidate,
-            aiSummary:
-              item.summary ?? "",
-            selectionReason:
-              item.selectionReason ??
-              "AI-redaktören bedömer att texten är särskilt läsvärd.",
-            articleType:
-              item.articleType &&
-              ARTICLE_TYPES.includes(
-                item.articleType
-              )
-                ? item.articleType
-                : candidate.articleType,
-          };
-        })
-        .filter(
-          (
-            story
-          ): story is NonNullable<typeof story> =>
-            story !== null
-        )
-        .slice(0, selectCount);
-
-    return {
-      summary:
-        parsed.summary?.trim() ||
-        fallbackSummary(articles),
-      stories,
+    const parsed = JSON.parse(rawOutput) as {
+      summary?: unknown;
+      stories?: Array<{
+        id?: unknown;
+        articleType?: unknown;
+        summary?: unknown;
+        selectionReason?: unknown;
+      }>;
     };
-  } catch (error) {
-    console.error(
-      "Editorial AI JSON failed:",
-      error
+
+    const selectedStories: SelectedStory[] = [];
+    const seenIds = new Set<number>();
+    const seenUrls = new Set<string>();
+    const seenTitles = new Set<string>();
+    const requestedStories = Array.isArray(parsed.stories)
+      ? parsed.stories
+      : [];
+
+    for (const item of requestedStories) {
+      const itemId = item?.id;
+      if (
+        typeof itemId !== "number" ||
+        !Number.isInteger(itemId) ||
+        seenIds.has(itemId)
+      ) {
+        continue;
+      }
+
+      const candidate = candidates.find(article => article.id === itemId);
+      if (!candidate || isDuplicateStory(candidate, seenUrls, seenTitles)) {
+        continue;
+      }
+
+      seenIds.add(itemId);
+      selectedStories.push({
+        ...candidate,
+        aiSummary:
+          typeof item.summary === "string" ? item.summary.trim() : "",
+        selectionReason:
+          typeof item.selectionReason === "string" &&
+          item.selectionReason.trim()
+            ? item.selectionReason.trim()
+            : "AI-redaktören bedömer att texten är särskilt läsvärd.",
+        articleType:
+          typeof item.articleType === "string" &&
+          ARTICLE_TYPES.includes(item.articleType)
+            ? item.articleType
+            : candidate.articleType ?? "nyhet",
+      });
+
+      if (selectedStories.length >= selectCount) break;
+    }
+
+    if (selectedStories.length === 0) {
+      console.warn(
+        "Editorial AI returned no valid stories; using ranked fallback:",
+        categoryKey
+      );
+    } else if (selectedStories.length < Math.min(selectCount, candidates.length)) {
+      console.warn(
+        "Editorial AI returned too few valid stories; completing with ranked fallback:",
+        categoryKey,
+        selectedStories.length
+      );
+    }
+
+    const stories = completeWithFallbackStories(
+      candidates,
+      selectCount,
+      selectedStories
     );
 
     return {
       summary:
-        fallbackSummary(articles),
-      stories:
-        candidates
-          .slice(0, selectCount)
-          .map(article => ({
-            ...article,
-            aiSummary:
-              article.description ?? "",
-            selectionReason:
-              "Automatiskt urval baserat på relevans, färskhet och innehållstyp.",
-            articleType:
-              article.articleType,
-          })),
+        typeof parsed.summary === "string" && parsed.summary.trim()
+          ? parsed.summary.trim()
+          : fallbackSummary(articles),
+      stories,
     };
+  } catch (error) {
+    console.error(
+      "Editorial AI failed; using ranked fallback for category:",
+      categoryKey,
+      error
+    );
+
+    return fallbackEditorialResult(articles, candidates, selectCount);
   }
 }
 
