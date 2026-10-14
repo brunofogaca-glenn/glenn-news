@@ -1,5 +1,6 @@
 import { withOptionalFallback } from "@/lib/optionalData";
 import { ManualRefreshButton } from "./components/ManualRefreshButton";
+import { RetryMorningEditionButton } from "./components/RetryMorningEditionButton";
 import { TrackableLink } from "./components/TrackableLink";
 import { getReaderProfile } from "@/lib/readerProfile";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
@@ -326,6 +327,7 @@ export default async function Home() {
               <strong>{formatEditionDate(edition.dateKey)}</strong>. Artiklarna hör till
               det datumet och ska inte tolkas som dagens nyheter.
             </p>
+            <RetryMorningEditionButton />
           </section>
         )}
 
@@ -339,8 +341,9 @@ export default async function Home() {
             </div>
             <p className="mt-1 font-serif text-sm leading-6">
               Dagens edition kunde inte skapas, och ingen tidigare fungerande edition
-              finns att visa. Försök ladda om sidan senare.
+              finns att visa. Du kan försöka skapa dagens upplaga igen.
             </p>
+            <RetryMorningEditionButton />
           </section>
         )}
 
