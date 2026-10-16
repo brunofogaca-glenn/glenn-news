@@ -14,7 +14,7 @@ import type { SupplementalRefreshMeta } from "@/lib/supplementalCache";
 
 export const dynamic = "force-dynamic";
 
-type RefreshedValue = { refreshMeta?: SupplementalRefreshMeta };
+type RefreshedValue = { [key: string]: unknown; refreshMeta?: SupplementalRefreshMeta };
 type Source = {
   name: string;
   tag: string;
