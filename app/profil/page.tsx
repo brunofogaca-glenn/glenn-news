@@ -277,10 +277,22 @@ export default async function ProfilePage() {
   const strongestType = articleTypeEntries[0] ? pretty(articleTypeEntries[0][0]) : null;
   const strongestSource = sourceEntries[0] ? pretty(sourceEntries[0][0]) : null;
 
+  const articleTypePlural: Record<string, string> = {
+    krönika: "krönikor",
+    analys: "analyser",
+    intervju: "intervjuer",
+    reportage: "reportage",
+    kommentar: "kommentarer",
+    nyhet: "nyheter",
+    notis: "notiser",
+    guide: "guider",
+    recension: "recensioner",
+    övrigt: "blandade texter",
+  };
   const profileSummary = strongestTopic
-    ? "Ditt tydligaste innehållsintresse är " + strongestTopic +
-      (strongestType ? ", och du öppnar gärna " + strongestType.toLowerCase() + "s" : "") +
-      (strongestSource ? " från " + strongestSource : "") + "."
+    ? "Ditt tydligaste innehållsintresse är " + strongestTopic + "." +
+      (strongestType ? " Du öppnar särskilt ofta " + (articleTypePlural[articleTypeEntries[0][0]] ?? strongestType.toLowerCase()) + "." : "") +
+      (strongestSource ? " En återkommande källa är " + strongestSource + "." : "")
     : "Ämnesmönstren blir tydligare när fler klickade artiklar har fått semantiska etiketter.";
 
   return (
