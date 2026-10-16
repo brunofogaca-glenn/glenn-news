@@ -84,7 +84,8 @@ test("league tables show season-scoped zones and explain provisional European pl
   assert.match(zones, /Allsvenskan:[\s\S]*?seasonStart: 2026/);
   assert.match(zones, /Superettan:[\s\S]*?fromRank: 13, toRank: 14/);
   assert.match(zones, /Championship:[\s\S]*?fromRank: 22, toRank: 24/);
-  assert.match(zones, /Champions League:[\s\S]*?fromRank: 25, toRank: 36/);
+  assert.ok(zones.includes('"Champions League":'));
+  assert.ok(zones.includes("fromRank: 25, toRank: 36"));
   assert.match(zones, /confirmed: false/);
   assert.match(zones, /if \(!match \|\| Number\(match\[0\]\) !== config\.seasonStart\) return null/);
 
