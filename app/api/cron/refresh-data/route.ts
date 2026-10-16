@@ -1,4 +1,5 @@
 import { revalidateTag } from "next/cache";
+import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
 import { getCachedWeather } from "@/lib/weather";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
@@ -36,16 +37,6 @@ const SOURCES: Source[] = [
 const HOUR_MS = 60 * 60 * 1000;
 const RETRY_MS = 25 * 60 * 1000;
 
-function authorized(request: Request) {
-  const authorization = request.headers.get("authorization");
-  const githubSecret = process.env.GITHUB_CRON_SECRET;
-  const cronSecret = process.env.CRON_SECRET;
-  return Boolean(
-    (githubSecret && authorization === `Bearer ${githubSecret}`) ||
-    (cronSecret && authorization === `Bearer ${cronSecret}`)
-  );
-}
-
 function due(meta: SupplementalRefreshMeta | undefined, now: number) {
   if (!meta) return true;
   if (meta.status === "stale") {
@@ -73,7 +64,7 @@ function describe(
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) {
+  if (!(await authorizeGitHubActionsRefresh(request, "supplemental"))) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
