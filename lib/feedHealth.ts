@@ -1,6 +1,7 @@
 import { FEEDS, parseFeed } from "./rss";
 import { WEB_SOURCES, fetchWebSource } from "./webSources";
 import { canRefreshEditorialSourcesNow } from "./updateSchedule";
+import { recordDiagnostic } from "./diagnosticLog";
 
 export type FeedHealth = {
   kind: "RSS" | "Webb";
@@ -114,6 +115,7 @@ async function checkRssFeed(feed: (typeof FEEDS)[number]): Promise<FeedHealth> {
       detail: getFreshnessDetail(items.length, articles24h, latestArticleAgeHours),
     };
   } catch (error) {
+    await recordDiagnostic({ level: "error", component: "feedHealth.rss", message: "RSS-källa kunde inte kontrolleras", error, context: { source: sourceNameFromUrl(feed.url), category: feed.category } });
     return {
       kind: "RSS",
       name: sourceNameFromUrl(feed.url),
@@ -155,6 +157,7 @@ async function checkWebSource(source: (typeof WEB_SOURCES)[number]): Promise<Fee
       detail: getFreshnessDetail(articles.length, articles24h, latestArticleAgeHours),
     };
   } catch (error) {
+    await recordDiagnostic({ level: "error", component: "feedHealth.web", message: "Webbkälla kunde inte kontrolleras", error, context: { source: source.source, category: source.category } });
     return {
       kind: "Webb",
       name: source.source,

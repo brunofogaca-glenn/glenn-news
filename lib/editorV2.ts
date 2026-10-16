@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { rankArticles } from "./ranker";
+import { recordDiagnostic } from "./diagnosticLog";
 import { ARTICLE_TYPES, inferArticleType } from "./articleType";
 import {
   getOgImage,
@@ -703,6 +704,7 @@ ${JSON.stringify(
       stories,
     };
   } catch (error) {
+    await recordDiagnostic({ level: "error", component: "editorial.ai", message: "AI-redaktören misslyckades; rankat reservurval används", error, context: { category: categoryKey } });
     console.error(
       "Editorial AI failed; using ranked fallback for category:",
       categoryKey,

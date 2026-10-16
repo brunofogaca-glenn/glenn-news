@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:ranker": "node --test tests/ranker-regression.test.cjs",
-    "test:refresh": "node --test tests/data-refresh-regression.test.cjs"
+    "test:refresh": "node --test tests/data-refresh-regression.test.cjs tests/diagnostic-log-regression.test.cjs"
   },
   "dependencies": {
     "next": "16.2.6",
