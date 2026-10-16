@@ -33,7 +33,7 @@ Two independent GitHub Actions workflows run at minutes 03 and 33 each hour beca
 - Supplemental fact data is refreshed through `/api/cron/refresh-data`. The route skips before 01:00 Stockholm time, refreshes sources about hourly and retries stale/failed sources on the next half-hour run.
 - Editorial articles are refreshed through `/api/cron/refresh-articles`. The route skips before 06:00 Stockholm time, refreshes about hourly after success and retries after a substantial failure on the next half-hour run. It records the article count and source health in private Blob storage.
 
-Before enabling the workflows after merge, configure GitHub repository variables `GLENN_NEWS_REFRESH_URL` and `GLENN_NEWS_ARTICLE_REFRESH_URL` to the production URLs ending in `/api/cron/refresh-data` and `/api/cron/refresh-articles`, respectively. Configure the same high-entropy `GITHUB_CRON_SECRET` in GitHub repository secrets and the Vercel project environment. Both refresh routes require a matching Bearer secret and fail closed without it.
+The workflows call the fixed production URLs and authenticate with short-lived GitHub Actions OIDC tokens. They request tokens with audience `https://glenn-news.vercel.app`; each route verifies the token signature against GitHub's published signing keys and restricts access to this repository, the `main` branch, and its specific workflow. Only scheduled and manually dispatched runs on `main` are accepted. No GitHub repository variables, reusable cron secret, or additional Vercel environment variable is required.
 
 ## Snapshot persistence
 
