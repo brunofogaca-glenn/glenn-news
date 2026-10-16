@@ -19,11 +19,16 @@ jobs:
         env:
           REFRESH_URL: https://glenn-news.vercel.app/api/cron/refresh-data
           OIDC_AUDIENCE: https://glenn-news.vercel.app
+          VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
             echo "::error::GitHub Actions did not provide OIDC credentials. Ensure id-token: write is enabled."
+            exit 1
+          fi
+          if [[ -z "$VERCEL_BYPASS_SECRET" ]]; then
+            echo "::error::Add the Vercel automation bypass secret as GitHub Actions secret VERCEL_AUTOMATION_BYPASS_SECRET."
             exit 1
           fi
 
@@ -36,5 +41,6 @@ jobs:
 
           curl --fail-with-body --silent --show-error --max-time 150 \
             --header "Authorization: Bearer $oidc_token" \
+            --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
             --header "Accept: application/json" \
             "$REFRESH_URL"
