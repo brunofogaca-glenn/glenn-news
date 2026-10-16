@@ -31,7 +31,7 @@ const CURRENT_RULES: Record<string, LeagueZoneConfig> = {
       { fromRank: 14, toRank: 14, kind: "playoff-down", label: "Kval mot Superettan", confirmed: true },
       { fromRank: 15, toRank: 16, kind: "relegation", label: "Direkt nedflyttning", confirmed: true },
     ],
-    note: "Europazonen är preliminär: Svenska Cupen och UEFA:s accesslista kan flytta platserna. Placering 14 kvalar mot Allsvenskan enligt SvFF:s tävlingsformat.",
+    note: "Europazonen är preliminär: Svenska Cupen och UEFA:s accesslista kan flytta platserna. Placering 14 spelar kval för att behålla sin plats mot Superettans kvalvinnare.",
   },
   Superettan: {
     seasonStart: 2026,
