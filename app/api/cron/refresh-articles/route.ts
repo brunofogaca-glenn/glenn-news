@@ -1,4 +1,5 @@
 import { revalidateTag } from "next/cache";
+import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { canRefreshEditorialSourcesNow, getStockholmClock } from "@/lib/updateSchedule";
@@ -24,16 +25,6 @@ function stockholmDateKey(date = new Date()) {
   return year + "-" + month + "-" + day;
 }
 
-function authorized(request: Request) {
-  const authorization = request.headers.get("authorization");
-  const githubSecret = process.env.GITHUB_CRON_SECRET;
-  const cronSecret = process.env.CRON_SECRET;
-  return Boolean(
-    (githubSecret && authorization === `Bearer ${githubSecret}`) ||
-    (cronSecret && authorization === `Bearer ${cronSecret}`)
-  );
-}
-
 function totalArticles(news: Record<string, unknown>) {
   return Object.values(news).reduce<number>(
     (sum, value) => sum + (Array.isArray(value) ? value.length : 0),
@@ -57,7 +48,7 @@ function clockLabel(date: Date) {
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) {
+  if (!(await authorizeGitHubActionsRefresh(request, "editorial"))) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
