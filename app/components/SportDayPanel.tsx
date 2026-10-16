@@ -1,4 +1,5 @@
 import type { SportDayData } from "@/lib/sportDay";
+import { getLeagueZoneConfig, getZoneForRank, type ZoneKind } from "@/lib/leagueZones";
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("sv-SE", {
@@ -17,7 +18,20 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+const ZONE_ROW_CLASS: Record<ZoneKind, string> = {
+  champions: "border-l-4 border-l-blue-800 bg-blue-50",
+  europa: "border-l-4 border-l-sky-600 bg-sky-50",
+  conference: "border-l-4 border-l-teal-600 bg-teal-50",
+  promotion: "border-l-4 border-l-emerald-600 bg-emerald-50",
+  "playoff-up": "border-l-4 border-l-amber-500 bg-amber-50",
+  "playoff-down": "border-l-4 border-l-orange-600 bg-orange-50",
+  relegation: "border-l-4 border-l-red-700 bg-red-50",
+  knockout: "border-l-4 border-l-amber-500 bg-amber-50",
+  eliminated: "border-l-4 border-l-slate-500 bg-slate-100",
+};
+
 function Table({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }) {
+  const zoneConfig = getLeagueZoneConfig(data.title, data.season);
   if (!data.rows.length) {
     return (
       <div className="border-y border-slate-300 py-4 text-sm text-slate-500">
@@ -48,10 +62,12 @@ function Table({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }) 
         </thead>
         <tbody>
           {data.rows.map(row => {
+            const zone = zoneConfig ? getZoneForRank(zoneConfig.zones, row.rank) : undefined;
             return (
               <tr
                 key={String(row.teamId ?? row.team) + "-" + String(row.rank)}
-                className="border-b border-slate-200"
+                className={"border-b border-slate-200 " + (zone ? ZONE_ROW_CLASS[zone.kind] : "border-l-4 border-l-transparent")}
+                aria-label={zone?.label}
               >
                 <td className="py-2 font-bold text-slate-500">{row.rank}</td>
                 <td className="px-2 py-2">
@@ -78,6 +94,28 @@ function Table({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }) 
           })}
         </tbody>
       </table>
+      {zoneConfig ? (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <div className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-500">
+            Så tolkas strecken
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            {zoneConfig.zones.map(zone => (
+              <span key={zone.kind + "-" + zone.fromRank} className="inline-flex items-center gap-2 text-[11px] text-slate-600">
+                <span aria-hidden="true" className={"inline-block h-3 w-1.5 " + ZONE_ROW_CLASS[zone.kind].split(" ").filter(token => token.startsWith("border-l-") && !token.startsWith("border-l-4") || token.startsWith("bg-")).join(" ")} />
+                <span>{zone.label}</span>
+              </span>
+            ))}
+          </div>
+          {zoneConfig.note && (
+            <p className="mt-2 text-[10px] leading-4 text-slate-500">{zoneConfig.note}</p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-3 text-[10px] leading-4 text-slate-500">
+          Streck visas när regler för {data.title} {data.season} har verifierats. Vi visar inte gissade placeringszoner.
+        </p>
+      )}
       {data.tableError && (
         <p className="mt-2 text-xs text-slate-500">{data.tableError}</p>
       )}
