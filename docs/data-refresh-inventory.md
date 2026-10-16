@@ -10,7 +10,8 @@ This inventory distinguishes editorial article ingestion from the supplemental f
 | `lib/webSources.ts` / `WEB_SOURCES` | Extract editorial article links from publisher pages | Never fetched before 06:00 |
 | `lib/feedHealth.ts` | Checks the health and freshness of RSS and editorial web sources | Never run before 06:00, because checks perform live requests |
 | `lib/dailyEdition.ts` | Builds and persists the morning edition | Explicit guard prevents editorial fetch before 06:00 |
-| `app/api/cron/refresh-news/route.ts` | Morning publication and article/feed-health refresh | Existing publication window remains 06:30 while the next delivery moves the initial article refresh to 06:00 |
+| `app/api/cron/refresh-articles/route.ts` | Warms the article cache and checks feed health | GitHub Actions calls it at minutes 03 and 33; first eligible run is after 06:00. After success it refreshes hourly; after a substantial failure it retries every 30 minutes |
+| `app/api/cron/refresh-news/route.ts` | Publishes the morning edition | Existing publication/retry window remains around 06:30; it performs a final editorial refresh before edition generation |
 
 The homepage, direct feed-health page, and manual refresh action are also gated so they cannot initiate article-feed requests before 06:00. The sports-panel loader no longer imports or calls the editorial article cache.
 
@@ -27,7 +28,12 @@ The homepage, direct feed-health page, and manual refresh action are also gated 
 | `lib/weather.ts` | Borås forecast (Open-Meteo) | 1 hour | Fetch failure throws so last good snapshot can be reused |
 | `lib/dailyHeader.ts` | Name day and historical event (Tammergård API/Wikimedia) | 7 days per date key | If both upstreams fail, use last good snapshot |
 
-The supplemental refresh endpoint is `/api/cron/refresh-data`. A GitHub Actions workflow calls it at minutes 03 and 33 each hour; a separate workflow calls `/api/cron/refresh-articles` on the same cadence, the handler skips before 01:00 Stockholm time, runs a source when its hourly refresh is due, and uses the intervening half-hour run for sources marked stale or failed. This external schedule is used because the project deployment reported Vercel Hobby's once-per-day Cron restriction. Configure the GitHub repository variable `GLENN_NEWS_REFRESH_URL` with the production endpoint URL, and configure the same high-entropy `GITHUB_CRON_SECRET` in GitHub repository secrets and the Vercel project environment. The endpoint invalidates and refreshes only the relevant supplemental cache tag. It never calls the editorial article cache or editorial feed-health checker.
+Two independent GitHub Actions workflows run at minutes 03 and 33 each hour because the Vercel Hobby plan rejected a subdaily Vercel Cron schedule.
+
+- Supplemental fact data is refreshed through `/api/cron/refresh-data`. The route skips before 01:00 Stockholm time, refreshes sources about hourly and retries stale/failed sources on the next half-hour run.
+- Editorial articles are refreshed through `/api/cron/refresh-articles`. The route skips before 06:00 Stockholm time, refreshes about hourly after success and retries after a substantial failure on the next half-hour run. It records the article count and source health in private Blob storage.
+
+Before enabling the workflows after merge, configure GitHub repository variables `GLENN_NEWS_REFRESH_URL` and `GLENN_NEWS_ARTICLE_REFRESH_URL` to the production URLs ending in `/api/cron/refresh-data` and `/api/cron/refresh-articles`, respectively. Configure the same high-entropy `GITHUB_CRON_SECRET` in GitHub repository secrets and the Vercel project environment. Both refresh routes require a matching Bearer secret and fail closed without it.
 
 ## Snapshot persistence
 
@@ -37,5 +43,12 @@ The supplemental refresh endpoint is `/api/cron/refresh-data`. A GitHub Actions 
 
 - A successful HTTP response can still contain malformed or incomplete content. Source-specific validation should be tightened whenever a provider's response schema is known.
 - Market indices reflect the latest completed trading session; a correct closed-market result is not necessarily stale.
-- The 06:00 editorial ingestion and the existing 06:30 edition-publication cadence are intentionally separate steps. The next delivery should schedule the first article refresh at 06:00 and ensure publication reuses that verified cache rather than fetching it again.
-- Both Vercel cron schedules and GitHub Actions schedule expressions are UTC. The supplemental handler computes gates and refresh metadata in `Europe/Stockholm` to preserve local daylight-saving behavior.
+- The first scheduled article refresh occurs at 06:03 Stockholm time, and the half-hour retry workflow begins then; no RSS or editorial article-source request is permitted before 06:00. The 06:30 publication job still performs a final refresh so the edition can include any stories published since the initial cache warm.
+- GitHub Actions schedule expressions are UTC; route gates and status timestamps use `Europe/Stockholm`. This means the actual first eligible run happens at 06:03 local time in both daylight and standard time, after the route checks the local clock.
+
+
+## League table markers
+
+`lib/leagueZones.ts` only returns a zone configuration when the table season begins in 2026, matching the rules catalogued for this release. Promotion, playoff and relegation bands are based on current domestic competition rules. UEFA league-phase positions follow UEFA's 2026/27 format: ranks 1–8 qualify directly for the round of 16, 9–24 enter the knockout playoffs, and 25–36 are eliminated (https://www.uefa.com/uefachampionsleague/news/0291-1bd88ae04870-e1e038c319e3-1000--champions-league-league-phase-standings-how-teams-level-on-/). European places in domestic leagues are deliberately marked preliminary because UEFA performance places, national cup winners and the access list can change the final cut-offs; the UI explains this rather than presenting them as guaranteed.
+
+The 2026 Swedish league playoff rules use the Swedish Football Association's current guidance (https://www.svenskfotboll.se/serier-cuper/kvalspel/kval). English Premier League provisional Europe bands are based on the league's explanation of how cup winners and UEFA performance slots alter qualification (https://www.premierleague.com/en/news/4671711/how-crystal-palace-uefa-conference-league-final-affects-european-qualification).
