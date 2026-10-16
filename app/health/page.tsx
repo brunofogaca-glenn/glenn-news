@@ -3,6 +3,7 @@ import { isSlowResponse, prioritizeHealthFeeds, summarizeResponseTimes } from "@
 import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
 import { getSupplementalRefreshRun } from "@/lib/supplementalRefreshRun";
 import { getArticleRefreshStatus } from "@/lib/articleRefreshStatus";
+import { HealthLogPanel } from "@/app/components/HealthLogPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +112,8 @@ export default async function HealthPage() {
             </a>
           </div>
         </header>
+
+        <HealthLogPanel />
 
         <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
           {[

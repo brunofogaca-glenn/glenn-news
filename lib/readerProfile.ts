@@ -1,5 +1,6 @@
 import { get, list, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
+import { recordDiagnostic } from "./diagnosticLog";
 
 export type ReaderProfile = {
   category: Record<string, number>;
@@ -330,6 +331,7 @@ async function getEventProfile(): Promise<ReaderProfile> {
 
     return mergeProfiles(emptyProfile(), profile);
   } catch (error) {
+    await recordDiagnostic({ level: "error", component: "readerProfile.read", message: "Kunde inte läsa läsarprofilens klickhistorik", error, context: { operation: "read-profile-events" } });
     console.error(
       "Kunde inte läsa reader events:",
       error

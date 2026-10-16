@@ -1,4 +1,5 @@
 import { get, list, put } from "@vercel/blob";
+import { recordDiagnostic } from "./diagnosticLog";
 import {
   createEditorialSection,
   createSportEditorialSection,
@@ -364,6 +365,7 @@ async function readBlobEdition(dateKey: string): Promise<DailyEdition | null> {
       storage: "blob",
     };
   } catch (error) {
+    await recordDiagnostic({ level: "error", component: "dailyEdition.read", message: "Kunde inte läsa sparad morgonedition", error, context: { operation: "read-edition" } });
     console.error("Kunde inte läsa sparad edition:", dateKey, error);
     return null;
   }
@@ -387,6 +389,7 @@ async function saveBlobEdition(edition: DailyEdition) {
 
     return true;
   } catch (error) {
+    await recordDiagnostic({ level: "error", component: "dailyEdition.save", message: "Kunde inte spara morgonedition", error, context: { operation: "save-edition" } });
     console.error("Kunde inte spara edition:", edition.dateKey, error);
     return false;
   }
@@ -501,6 +504,7 @@ export async function getTodayDailyEdition(
   try {
     return await generateMorningEdition(profile);
   } catch (error) {
+    await recordDiagnostic({ level: "error", component: "dailyEdition.generate", message: "Dagens morgonedition kunde inte skapas; reservutgåva prövas", error, context: { operation: "generate-edition" } });
     console.error(
       "Dagens morgonedition kunde inte skapas. Försöker visa senaste fungerande editionen.",
       { dateKey, error }

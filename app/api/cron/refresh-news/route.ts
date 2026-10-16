@@ -1,4 +1,5 @@
 import { revalidateTag } from "next/cache";
+import { recordDiagnostic } from "@/lib/diagnosticLog";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { getReaderProfile } from "@/lib/readerProfile";
@@ -47,7 +48,7 @@ function isAuthorized(request: Request) {
   return userAgent === "vercel-cron/1.0";
 }
 
-export async function GET(request: Request) {
+async function runRefresh(request: Request) {
   if (!isAuthorized(request)) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
@@ -101,4 +102,24 @@ export async function GET(request: Request) {
     morningEditionGeneratedAt: edition.generatedAt,
     morningEditionArticles: edition.totalArticles,
   });
+}
+
+
+export async function GET(request: Request) {
+  try {
+    return await runRefresh(request);
+  } catch (error) {
+    await recordDiagnostic({
+      level: "error",
+      component: "refresh.morning-edition",
+      message: "Schemalagd uppdatering av morgoneditionen misslyckades",
+      error,
+      context: { route: "/api/cron/refresh-news", operation: "publish-morning-edition" },
+    });
+    console.error("Schemalagd morgonuppdatering misslyckades:", error);
+    return Response.json(
+      { ok: false, error: "Morning edition refresh failed; diagnostic log recorded when storage is available." },
+      { status: 500 }
+    );
+  }
 }

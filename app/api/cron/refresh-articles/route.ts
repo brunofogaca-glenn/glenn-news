@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
+import { recordDiagnostic } from "@/lib/diagnosticLog";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
 import { canRefreshEditorialSourcesNow, getStockholmClock } from "@/lib/updateSchedule";
@@ -127,6 +128,7 @@ export async function GET(request: Request) {
       status,
     }, { status: failed ? 503 : 200 });
   } catch (error) {
+    await recordDiagnostic({ level: "error", component: "refresh.articles", message: "Schemalagd artikeluppdatering misslyckades", error, context: { route: "/api/cron/refresh-articles", operation: "refresh-articles" } });
     message = error instanceof Error ? error.message : String(error);
     const status: ArticleRefreshStatus = {
       dateKey,

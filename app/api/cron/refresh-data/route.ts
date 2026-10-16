@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
+import { recordDiagnostic } from "@/lib/diagnosticLog";
 import { getCachedWeather } from "@/lib/weather";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
@@ -91,6 +92,7 @@ export async function GET(request: Request) {
     const probeIndex = SOURCES.findIndex(item => item.name === source.name);
     const probe = probes[probeIndex];
     if (probe.status === "rejected") {
+      await recordDiagnostic({ level: "error", component: "refresh.supplemental", message: "Kompletterande datakälla gav ett oväntat fel", error: probe.reason, context: { source: source.name, route: "/api/cron/refresh-data" } });
       return describe(source.name, null, probe.reason);
     }
 
@@ -99,6 +101,7 @@ export async function GET(request: Request) {
       const value = await source.load();
       return describe(source.name, value);
     } catch (error) {
+      await recordDiagnostic({ level: "error", component: "refresh.supplemental", message: "Uppdatering av kompletterande datakälla misslyckades", error, context: { source: source.name, route: "/api/cron/refresh-data" } });
       return describe(source.name, probe.value, error);
     }
   }));
