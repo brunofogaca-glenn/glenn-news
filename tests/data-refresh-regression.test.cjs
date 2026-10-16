@@ -16,6 +16,8 @@ test("supplemental and editorial cron workflows use scoped GitHub OIDC", () => {
   assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
   assert.match(workflow, /audience=\$OIDC_AUDIENCE/);
   assert.match(workflow, /https:\/\/glenn-news\.vercel\.app\/api\/cron\/refresh-data/);
+  assert.match(workflow, /VERCEL_AUTOMATION_BYPASS_SECRET/);
+  assert.match(workflow, /x-vercel-protection-bypass: \$VERCEL_BYPASS_SECRET/);
   assert.doesNotMatch(workflow, /GITHUB_CRON_SECRET|GLENN_NEWS_REFRESH_URL/);
 
   const articleWorkflow = read(".github/workflows/refresh-editorial-articles.yml");
@@ -23,6 +25,8 @@ test("supplemental and editorial cron workflows use scoped GitHub OIDC", () => {
   assert.match(articleWorkflow, /id-token: write/);
   assert.match(articleWorkflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
   assert.match(articleWorkflow, /https:\/\/glenn-news\.vercel\.app\/api\/cron\/refresh-articles/);
+  assert.match(articleWorkflow, /VERCEL_AUTOMATION_BYPASS_SECRET/);
+  assert.match(articleWorkflow, /x-vercel-protection-bypass: \$VERCEL_BYPASS_SECRET/);
   assert.doesNotMatch(articleWorkflow, /GITHUB_CRON_SECRET|GLENN_NEWS_ARTICLE_REFRESH_URL/);
 
   const auth = read("lib/githubActionsAuth.ts");
