@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { withLastGoodSnapshot } from "./supplementalCache";
 
 const TIME_ZONE = "Europe/Stockholm";
 
@@ -163,12 +164,7 @@ async function getMarketDayInternal(): Promise<MarketDay> {
     const indices = await fetchAllYahooIndices(cutoffDate);
 
     if (!indices.length) {
-      return {
-        date: cutoffDate,
-        indices: [],
-        source: "Yahoo Finance · historiska stängningar",
-        error: "Yahoo Finance returnerade ingen användbar marknadsdata.",
-      };
+      throw new Error("Yahoo Finance returnerade ingen användbar marknadsdata.");
     }
 
     const date =
@@ -187,13 +183,7 @@ async function getMarketDayInternal(): Promise<MarketDay> {
       error instanceof Error ? error.message : "Okänt fel från marknadskällan.";
 
     console.error("Marketdata misslyckades:", message);
-
-    return {
-      date: cutoffDate,
-      indices: [],
-      source: "Yahoo Finance · historiska stängningar",
-      error: message,
-    };
+    throw error;
   }
 }
 

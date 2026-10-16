@@ -18,6 +18,22 @@ const CATEGORY_LABELS: Record<string, string> = {
   weekfocus: "Veckofokus",
 };
 
+const SEMANTIC_CATEGORY_LABELS: Record<string, string> = {
+  politics: "Politik",
+  economy: "Ekonomi",
+  society: "Samhälle",
+  world: "Världen",
+  local: "Lokalt",
+  sport: "Sport",
+  culture: "Kultur",
+  technology: "Teknik",
+  health: "Hälsa",
+  climate: "Klimat",
+  travel: "Resor",
+  lifestyle: "Livsstil",
+  other: "Övrigt",
+};
+
 function pretty(value: string) {
   return value
     .replaceAll("_", " ")
@@ -201,7 +217,11 @@ export default async function ProfilePage() {
   const categoryEntries = topEntries(profile.category, 6);
   const articleTypeEntries = topEntries(profile.articleType, 6);
   const sourceEntries = topEntries(profile.source, 8);
-  const topicEntries = topEntries(profile.topic, 10);
+  const semanticCategoryEntries = topEntries(profile.semanticCategory ?? {}, 6);
+  const semanticTopicEntries = topEntries(profile.semanticTopic ?? {}, 8);
+  const semanticTagEntries = topEntries(profile.semanticTag ?? {}, 10);
+  const entityEntries = topEntries(profile.entity ?? {}, 8);
+  const geographyEntries = topEntries(profile.geography ?? {}, 6);
 
   const recentActivity = activity;
   const now = Date.now();
@@ -264,28 +284,32 @@ export default async function ProfilePage() {
     0
   );
 
-  const strongestCategory = categoryEntries[0]
-    ? CATEGORY_LABELS[categoryEntries[0][0]] ??
-      pretty(categoryEntries[0][0])
-    : "–";
+  const strongestCategory = semanticCategoryEntries[0]
+    ? SEMANTIC_CATEGORY_LABELS[semanticCategoryEntries[0][0]] ?? pretty(semanticCategoryEntries[0][0])
+    : categoryEntries[0]
+      ? CATEGORY_LABELS[categoryEntries[0][0]] ?? pretty(categoryEntries[0][0])
+      : "–";
+  const strongestTopic = semanticTopicEntries[0]?.[0] ?? null;
+  const strongestType = articleTypeEntries[0] ? pretty(articleTypeEntries[0][0]) : null;
+  const strongestSource = sourceEntries[0] ? pretty(sourceEntries[0][0]) : null;
 
-  const strongestType = articleTypeEntries[0]
-    ? pretty(articleTypeEntries[0][0])
-    : null;
-  const strongestSource = sourceEntries[0]
-    ? pretty(sourceEntries[0][0])
-    : null;
-
-  const profileSummary =
-    strongestType && strongestSource
-      ? "Du läser mest " +
-        strongestCategory.toLowerCase() +
-        ", med en tydlig dragning mot " +
-        strongestType.toLowerCase() +
-        " från " +
-        strongestSource +
-        "."
-      : "Mönstret blir tydligare ju mer du läser.";
+  const articleTypePlural: Record<string, string> = {
+    krönika: "krönikor",
+    analys: "analyser",
+    intervju: "intervjuer",
+    reportage: "reportage",
+    kommentar: "kommentarer",
+    nyhet: "nyheter",
+    notis: "notiser",
+    guide: "guider",
+    recension: "recensioner",
+    övrigt: "blandade texter",
+  };
+  const profileSummary = strongestTopic
+    ? "Ditt tydligaste innehållsintresse är " + strongestTopic + "." +
+      (strongestType ? " Du öppnar särskilt ofta " + (articleTypePlural[articleTypeEntries[0][0]] ?? strongestType.toLowerCase()) + "." : "") +
+      (strongestSource ? " En återkommande källa är " + strongestSource + "." : "")
+    : "Ämnesmönstren blir tydligare när fler klickade artiklar har fått semantiska etiketter.";
 
   return (
     <main className="min-h-screen bg-[#f4f1e8] text-slate-950">
@@ -383,8 +407,8 @@ export default async function ProfilePage() {
               </h2>
             </div>
             <InterestBars
-              entries={categoryEntries}
-              labels={CATEGORY_LABELS}
+              entries={semanticCategoryEntries.length ? semanticCategoryEntries : categoryEntries}
+              labels={{ ...SEMANTIC_CATEGORY_LABELS, ...CATEGORY_LABELS }}
               emptyText="Vi behöver några fler läsningar för att se ett mönster."
             />
           </section>
@@ -430,23 +454,25 @@ export default async function ProfilePage() {
 
           <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
             <div>
-              {topicEntries.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {topicEntries.slice(0, 8).map(([topic, value]) => (
-                    <span
-                      key={topic}
-                      className="border border-slate-400 bg-[#ece7d8] px-3 py-2 text-sm"
-                    >
-                      {topic}
-                      <span className="ml-2 text-xs text-slate-400">
-                        {Math.round(value)}
+              {semanticTopicEntries.length ? (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {semanticTopicEntries.map(([topic]) => (
+                      <span
+                        key={topic}
+                        className="border border-slate-400 bg-[#ece7d8] px-3 py-2 text-sm"
+                      >
+                        {topic}
                       </span>
-                    </span>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    Baserat på {profile.semanticClicks ?? 0} klickade artiklar som har klassificerats. Enskilda rubriker visas i läshistoriken, inte som egna långsiktiga intressen.
+                  </p>
+                </>
               ) : (
                 <p className="font-serif text-base leading-7 text-slate-500">
-                  Några fler läsningar behövs innan vi kan se tydliga ämnen.
+                  Semantiska intressen visas här när klickade artiklar har hunnit klassificeras i bakgrunden.
                 </p>
               )}
             </div>
@@ -622,30 +648,54 @@ export default async function ProfilePage() {
           <section className="border-b-2 border-slate-950 pb-9">
             <div className="mb-5 border-b border-slate-300 pb-3">
               <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
-                Ämnen
+                Taggning
               </div>
               <h2 className="mt-1 font-serif text-2xl font-black">
-                Återkommande intressen
+                Vad artiklarna handlar om
               </h2>
             </div>
 
-            {topicEntries.length ? (
+            {semanticTagEntries.length ? (
               <div className="flex flex-wrap gap-2">
-                {topicEntries.map(([topic, value]) => (
-                  <span
-                    key={topic}
-                    className="border border-slate-400 bg-[#ece7d8] px-3 py-2 text-sm"
-                  >
-                    {topic}
-                    <span className="ml-2 text-xs text-slate-400">
-                      {Math.round(value)}
-                    </span>
+                {semanticTagEntries.map(([tag]) => (
+                  <span key={tag} className="border border-slate-400 bg-[#ece7d8] px-3 py-2 text-sm">
+                    {tag}
                   </span>
                 ))}
               </div>
             ) : (
               <p className="font-serif text-base leading-7 text-slate-500">
-                När du läser mer börjar återkommande ämnen dyka upp här.
+                Innehållstaggar visas när fler artiklar har klassificerats.
+              </p>
+            )}
+          </section>
+
+          <section className="border-b-2 border-slate-950 pb-9">
+            <div className="mb-5 border-b border-slate-300 pb-3">
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
+                Entiteter och geografi
+              </div>
+              <h2 className="mt-1 font-serif text-2xl font-black">
+                Lag, personer och platser
+              </h2>
+            </div>
+
+            {entityEntries.length || geographyEntries.length ? (
+              <div className="flex flex-wrap gap-2">
+                {entityEntries.map(([entity]) => (
+                  <span key={"entity-" + entity} className="border border-slate-400 px-3 py-2 text-sm">
+                    {entity}
+                  </span>
+                ))}
+                {geographyEntries.map(([place]) => (
+                  <span key={"place-" + place} className="border border-dashed border-slate-400 px-3 py-2 text-sm text-slate-600">
+                    {place}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="font-serif text-base leading-7 text-slate-500">
+                Lag, personer, organisationer och platser visas när klassificeringen hittar tydliga entiteter.
               </p>
             )}
           </section>

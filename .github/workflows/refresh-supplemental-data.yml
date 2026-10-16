@@ -1,0 +1,46 @@
+name: Refresh supplemental data
+
+on:
+  schedule:
+    # Avoid the top of the hour, when hosted schedulers are more likely to be delayed.
+    - cron: "3,33 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  refresh-supplemental-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call Glenn News supplemental refresh endpoint
+        env:
+          REFRESH_URL: https://glenn-news.vercel.app/api/cron/refresh-data
+          OIDC_AUDIENCE: https://glenn-news.vercel.app
+          VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+            echo "::error::GitHub Actions did not provide OIDC credentials. Ensure id-token: write is enabled."
+            exit 1
+          fi
+          if [[ -z "$VERCEL_BYPASS_SECRET" ]]; then
+            echo "::error::Add the Vercel automation bypass secret as GitHub Actions secret VERCEL_AUTOMATION_BYPASS_SECRET."
+            exit 1
+          fi
+
+          oidc_response="$(curl --fail-with-body --silent --show-error --max-time 20 \
+            --get \
+            --data-urlencode "audience=$OIDC_AUDIENCE" \
+            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL")"
+          oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
+
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            --header "Authorization: Bearer $oidc_token" \
+            --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
+            --header "Accept: application/json" \
+            "$REFRESH_URL"

@@ -2,6 +2,7 @@ import Parser from "rss-parser";
 import { detectCategory } from "./categorizer";
 import { getWebArticles } from "./webSources";
 import { normalizeArticleUrl } from "./articleUrl";
+import { canRefreshEditorialSourcesNow } from "./updateSchedule";
 
 /**
  * Build a comparison key for article links so tracking tags and cosmetic URL
@@ -254,6 +255,10 @@ export type Article = {
   articleType?: string;
 };
 export async function parseFeed(url: string) {
+  if (!canRefreshEditorialSourcesNow()) {
+    throw new Error("RSS-hämtning är spärrad före 06.00 Europe/Stockholm.");
+  }
+
   const response = await fetch(url, {
     signal: AbortSignal.timeout(10000),
     headers: {
@@ -276,6 +281,10 @@ export async function parseFeed(url: string) {
   return parser.parseString(xml);
 }
 export async function getArticles(daysBack = 1) {
+  if (!canRefreshEditorialSourcesNow()) {
+    throw new Error("Artikelhämtning är spärrad före 06.00 Europe/Stockholm.");
+  }
+
   const result = {
     elfsborg: [] as Article[],
     boras: [] as Article[],

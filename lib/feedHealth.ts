@@ -1,5 +1,6 @@
 import { FEEDS, parseFeed } from "./rss";
 import { WEB_SOURCES, fetchWebSource } from "./webSources";
+import { canRefreshEditorialSourcesNow } from "./updateSchedule";
 
 export type FeedHealth = {
   kind: "RSS" | "Webb";
@@ -170,6 +171,10 @@ async function checkWebSource(source: (typeof WEB_SOURCES)[number]): Promise<Fee
 }
 
 export async function getFeedHealth() {
+  if (!canRefreshEditorialSourcesNow()) {
+    throw new Error("Kontroll av artikelkällor är spärrad före 06.00 Europe/Stockholm.");
+  }
+
   const [rss, web] = await Promise.all([
     Promise.all(FEEDS.map(checkRssFeed)),
     Promise.all(WEB_SOURCES.map(checkWebSource)),

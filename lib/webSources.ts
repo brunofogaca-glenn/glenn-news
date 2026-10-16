@@ -1,3 +1,5 @@
+import { canRefreshEditorialSourcesNow } from "./updateSchedule";
+
 type WebArticle = {
   title: string;
   description: string;
@@ -260,6 +262,10 @@ function extractArticles(html: string, source: WebSourceConfig) {
 }
 
 export async function fetchWebSource(source: WebSourceConfig) {
+  if (!canRefreshEditorialSourcesNow()) {
+    throw new Error("Hämtning av artikelwebbkällor är spärrad före 06.00 Europe/Stockholm.");
+  }
+
   const response = await fetch(source.url, {
     signal: AbortSignal.timeout(10000),
     headers: {

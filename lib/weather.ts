@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { withLastGoodSnapshot } from "./supplementalCache";
 
 export type DailyWeather = {
   date: string;
@@ -91,16 +92,12 @@ async function fetchWeather(): Promise<WeatherForecast> {
     };
   } catch (error) {
     console.error("Väderhämtning misslyckades:", error);
-    return {
-      location: "Borås",
-      days: [],
-      fetchedAt: new Date().toISOString(),
-    };
+    throw error;
   }
 }
 
 const getCachedWeatherInternal = unstable_cache(
-  async () => fetchWeather(),
+  async () => withLastGoodSnapshot("weather-boras", fetchWeather),
   ["glenn-news-weather-boras-v1"],
   {
     revalidate: 60 * 60,

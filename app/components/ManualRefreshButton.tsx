@@ -32,7 +32,7 @@ export function ManualRefreshButton() {
         const refreshedAt = formatRefreshTime(result.sourcesRefreshedAt);
 
         setStatusMessage(
-          `Källor uppdaterade${refreshedAt ? ` kl. ${refreshedAt}` : ""}. Dagens morgonedition är oförändrad.`
+          `Källor uppdaterade${refreshedAt ? ` kl. ${refreshedAt}` : ""}.${result.editorialRefreshDeferred ? " Artikelkällor uppdateras från 06.00." : " Dagens morgonedition är oförändrad."}`
         );
 
         // Refresh server-rendered source panels without a full page reload.

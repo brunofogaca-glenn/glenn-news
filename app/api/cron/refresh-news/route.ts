@@ -1,9 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
-import { getDailyHeaderInfo } from "@/lib/dailyHeader";
-import { getCachedSportDay } from "@/lib/sportDayCache";
-import { getCachedMarketDay } from "@/lib/marketDay";
 import { getReaderProfile } from "@/lib/readerProfile";
 import {
   generateMorningEdition,
@@ -88,16 +85,6 @@ export async function GET(request: Request) {
   revalidateTag("glenn-news-feed-health", { expire: 0 });
   const feedHealth = await getCachedFeedHealth();
 
-  revalidateTag("glenn-news-sport-day", { expire: 0 });
-  const sportDay = await getCachedSportDay();
-
-  revalidateTag("glenn-news-market-day", { expire: 0 });
-  const marketDay = await getCachedMarketDay();
-
-  const dailyHeader = await getDailyHeaderInfo();
-  // Timestamp when source refreshes completed, distinct from edition generation.
-  const sourcesRefreshedAt = new Date().toISOString();
-
   // Generate and persist the one morning edition after refreshing its source data.
   const profile = await getReaderProfile();
   const edition = await generateMorningEdition(profile);
@@ -109,20 +96,9 @@ export async function GET(request: Request) {
     refreshedAt: now.toISOString(),
     totalArticles: totalArticles(news),
     feedHealth: feedHealth.totals,
-    sourcesRefreshedAt,
+    articleFeedsTouched: true,
     morningEditionDate: edition.dateKey,
     morningEditionGeneratedAt: edition.generatedAt,
     morningEditionArticles: edition.totalArticles,
-    dailyHeader,
-    sport: {
-      results: sportDay.results.length,
-      upcoming: sportDay.upcoming.length,
-      provider: sportDay.provider,
-    },
-    market: {
-      date: marketDay.date,
-      indices: marketDay.indices.length,
-      source: marketDay.source,
-    },
   });
 }

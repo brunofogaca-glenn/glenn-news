@@ -7,6 +7,7 @@ import {
 } from "./editorV2";
 import { getCachedArticles } from "./articlesCache";
 import type { ReaderProfile } from "./readerProfile";
+import { canRefreshEditorialSourcesNow } from "./updateSchedule";
 
 const TIME_ZONE = "Europe/Stockholm";
 const EDITION_PREFIX = "glenn-news/editions/";
@@ -490,6 +491,13 @@ export async function getTodayDailyEdition(
   const existing = await readBlobEdition(dateKey);
   if (existing) return existing;
 
+  // Do not let a pre-06:00 homepage visit trigger hidden RSS requests.
+  if (!canRefreshEditorialSourcesNow()) {
+    const previousEditions = await getSavedDailyEditions(30);
+    const previousEdition = previousEditions.find(edition => edition.dateKey < dateKey);
+    return previousEdition ?? createWaitingEdition(dateKey);
+  }
+
   try {
     return await generateMorningEdition(profile);
   } catch (error) {
@@ -527,6 +535,10 @@ export async function getTodayDailyEdition(
 export async function generateMorningEdition(
   profile: ReaderProfile
 ): Promise<DailyEdition> {
+  if (!canRefreshEditorialSourcesNow()) {
+    throw new Error("Morgonutgåvan får inte hämta nyhetsartiklar före 06.00 Europe/Stockholm.");
+  }
+
   const dateKey = getTodayKey();
   const existing = await readBlobEdition(dateKey);
   const previousKeys = await getPreviousEditionKeys(dateKey);

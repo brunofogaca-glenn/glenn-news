@@ -1,4 +1,5 @@
 import { withOptionalFallback } from "@/lib/optionalData";
+import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
 import { ManualRefreshButton } from "./components/ManualRefreshButton";
 import { RetryMorningEditionButton } from "./components/RetryMorningEditionButton";
 import { TrackableLink } from "./components/TrackableLink";
@@ -23,7 +24,6 @@ import {
   getCachedNationalSnapshot,
   getCachedWorldSnapshot,
 } from "@/lib/dailySnapshots";
-import { QuoteDivider } from "./components/QuoteDivider";
 import { ReaderCount } from "./components/ReaderCount";
 
 export const dynamic = "force-dynamic";
@@ -166,22 +166,28 @@ export default async function Home() {
     edition,
   ] = await Promise.all([
     profilePromise,
-    withOptionalFallback("feed health", getCachedFeedHealth(), () => ({
-      checkedAt: new Date().toISOString(),
-      feeds: [{
-        kind: "Webb" as const,
-        name: "Flödesstatus kunde inte hämtas",
-        url: "/health",
-        category: "system",
-        status: "error" as const,
-        responseMs: 0,
-        articles24h: 0,
-        latestArticleAt: null,
-        latestArticleAgeHours: null,
-        detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
-      }],
-      totals: { all: 1, healthy: 0, empty: 0, stale: 0, errors: 1 },
-    })),
+    canRefreshEditorialSourcesNow()
+      ? withOptionalFallback("feed health", getCachedFeedHealth(), () => ({
+          checkedAt: new Date().toISOString(),
+          feeds: [{
+            kind: "Webb" as const,
+            name: "Flödesstatus kunde inte hämtas",
+            url: "/health",
+            category: "system",
+            status: "error" as const,
+            responseMs: 0,
+            articles24h: 0,
+            latestArticleAt: null,
+            latestArticleAgeHours: null,
+            detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
+          }],
+          totals: { all: 1, healthy: 0, empty: 0, stale: 0, errors: 1 },
+        }))
+      : Promise.resolve({
+          checkedAt: new Date().toISOString(),
+          feeds: [],
+          totals: { all: 0, healthy: 0, empty: 0, stale: 0, errors: 0 },
+        }),
     withOptionalFallback("daily header", getDailyHeaderInfo(), () => ({
       namedays: [],
       historicalEvent: null,
@@ -539,10 +545,6 @@ export default async function Home() {
           </section>
         )}
 
-        {elfsborg && (
-          <QuoteDivider sectionKey="elfsborg" index={0} />
-        )}
-
         <div className="mt-9 grid gap-9">
           {otherSections.map((section, sectionIndex) => (
             <div key={section.key}>
@@ -674,12 +676,6 @@ export default async function Home() {
                 ))}
               </div>
               </section>
-              {sectionIndex < otherSections.length - 1 && (
-                <QuoteDivider
-                  sectionKey={section.key}
-                  index={sectionIndex}
-                />
-              )}
             </div>
           ))}
         </div>
