@@ -1,4 +1,5 @@
 import { withOptionalFallback } from "@/lib/optionalData";
+import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
 import { ManualRefreshButton } from "./components/ManualRefreshButton";
 import { RetryMorningEditionButton } from "./components/RetryMorningEditionButton";
 import { TrackableLink } from "./components/TrackableLink";
@@ -166,22 +167,28 @@ export default async function Home() {
     edition,
   ] = await Promise.all([
     profilePromise,
-    withOptionalFallback("feed health", getCachedFeedHealth(), () => ({
-      checkedAt: new Date().toISOString(),
-      feeds: [{
-        kind: "Webb" as const,
-        name: "Flödesstatus kunde inte hämtas",
-        url: "/health",
-        category: "system",
-        status: "error" as const,
-        responseMs: 0,
-        articles24h: 0,
-        latestArticleAt: null,
-        latestArticleAgeHours: null,
-        detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
-      }],
-      totals: { all: 1, healthy: 0, empty: 0, stale: 0, errors: 1 },
-    })),
+    canRefreshEditorialSourcesNow()
+      ? withOptionalFallback("feed health", getCachedFeedHealth(), () => ({
+          checkedAt: new Date().toISOString(),
+          feeds: [{
+            kind: "Webb" as const,
+            name: "Flödesstatus kunde inte hämtas",
+            url: "/health",
+            category: "system",
+            status: "error" as const,
+            responseMs: 0,
+            articles24h: 0,
+            latestArticleAt: null,
+            latestArticleAgeHours: null,
+            detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
+          }],
+          totals: { all: 1, healthy: 0, empty: 0, stale: 0, errors: 1 },
+        }))
+      : Promise.resolve({
+          checkedAt: new Date().toISOString(),
+          feeds: [],
+          totals: { all: 0, healthy: 0, empty: 0, stale: 0, errors: 0 },
+        }),
     withOptionalFallback("daily header", getDailyHeaderInfo(), () => ({
       namedays: [],
       historicalEvent: null,

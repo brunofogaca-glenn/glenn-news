@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { withLastGoodSnapshot } from "./supplementalCache";
 
 export type DailyHeaderInfo = {
   namedays: string[];
@@ -8,6 +9,7 @@ export type DailyHeaderInfo = {
     title?: string;
     link?: string;
   } | null;
+  warnings?: string[];
 };
 
 type NamedayResponse = Array<{
@@ -76,6 +78,14 @@ async function fetchDailyHeader(month: string, day: string): Promise<DailyHeader
     ),
   ]);
 
+  if (!namedayResponse.ok && !historyResponse.ok) {
+    throw new Error("Namnsdags- och historikkällorna svarade inte.");
+  }
+
+  const warnings: string[] = [];
+  if (!namedayResponse.ok) warnings.push("Namnsdagskällan HTTP " + namedayResponse.status);
+  if (!historyResponse.ok) warnings.push("Historikkällan HTTP " + historyResponse.status);
+
   const namedays: string[] = [];
 
   if (namedayResponse.ok) {
@@ -111,6 +121,7 @@ async function fetchDailyHeader(month: string, day: string): Promise<DailyHeader
   return {
     namedays,
     historicalEvent,
+    warnings,
   };
 }
 
@@ -127,7 +138,7 @@ export async function getDailyHeaderInfo() {
   const dateKey = month + day;
 
   return unstable_cache(
-    () => fetchDailyHeader(month, day),
+    () => withLastGoodSnapshot("daily-header-" + dateKey, () => fetchDailyHeader(month, day)),
     ["glenn-news-daily-header-v1", dateKey],
     {
       revalidate: 7 * 24 * 60 * 60,

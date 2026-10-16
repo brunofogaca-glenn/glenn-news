@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { getCachedArticles } from "./articlesCache";
+
 
 type ApiFootballFixture = {
   fixture?: { id?: number; date?: string; status?: { short?: string }; };
@@ -134,6 +134,7 @@ export type SportDayData = {
     sportmonks: boolean;
   };
   fetchedAt: string;
+  warnings?: string[];
 };
 
 const STOCKHOLM_TIME_ZONE = "Europe/Stockholm";
@@ -860,6 +861,14 @@ async function enrichElfsborg(
 export async function fetchSportDay(): Promise<SportDayData> {
   if (!process.env.API_FOOTBALL_KEY) {
     const selectedLeague = await fetchSelectedLeagueTable();
+    if (!selectedLeague?.rows.length) {
+      throw new Error("FotMob returned no usable league table; API-Football is not configured.");
+    }
+    const warnings = [
+      selectedLeague?.tableError ? "Tabell: " + selectedLeague.tableError : null,
+      selectedLeague?.scorersError ? "Skytteliga: " + selectedLeague.scorersError : null,
+    ].filter((value): value is string => Boolean(value));
+
     return {
       results: [],
       upcoming: [],
@@ -869,28 +878,22 @@ export async function fetchSportDay(): Promise<SportDayData> {
         sportmonks: Boolean(process.env.SPORTMONKS_TOKEN),
       },
       fetchedAt: new Date().toISOString(),
+      warnings,
     };
   }
 
   try {
-    const [yesterday, today, articleBuckets] = await Promise.all([
+    // Keep this data path independent from editorial RSS feeds. Match priority
+    // uses stable league and club signals so this panel can refresh from 01:00.
+    const [yesterday, today] = await Promise.all([
       apiFootballGet("/fixtures", { date: localYesterday(), timezone: STOCKHOLM_TIME_ZONE }),
       apiFootballGet("/fixtures", { date: localToday(), timezone: STOCKHOLM_TIME_ZONE }),
-      getCachedArticles().catch(error => {
-        console.error("Sportartiklar kunde inte hämtas för matchprioriteringen:", error);
-        return null;
-      }),
     ]);
 
-    const matchArticles: MatchArticle[] = [
-      ...(articleBuckets?.elfsborg ?? []),
-      ...(articleBuckets?.fotboll ?? []),
-      ...(articleBuckets?.sport ?? []),
-      ...(articleBuckets?.sverige ?? []),
-    ];
+    const matchArticles: MatchArticle[] = [];
 
-    // Rank all fixtures from the selected competitions by favourite teams, derby weight,
-    // and how directly the current football coverage discusses the teams.
+    // Rank fixtures by selected competitions, favourite teams, and derby weight.
+    // Editorial RSS is intentionally not consulted before the 06:00 article window.
     const results = (yesterday ?? [])
       .filter(fixture => isFinished(fixture) && isSelectedSportFixture(fixture))
       .map(fixture => ({
@@ -938,24 +941,21 @@ export async function fetchSportDay(): Promise<SportDayData> {
 
     const selectedLeague = await fetchSelectedLeagueTable();
 
+    const warnings = [
+      selectedLeague?.tableError ? "Tabell: " + selectedLeague.tableError : null,
+      selectedLeague?.scorersError ? "Skytteliga: " + selectedLeague.scorersError : null,
+    ].filter((value): value is string => Boolean(value));
+
     return {
       results: enrichedResults,
       upcoming,
       selectedLeague,
       provider: { apiFootball: true, sportmonks: Boolean(process.env.SPORTMONKS_TOKEN) },
       fetchedAt: new Date().toISOString(),
+      warnings,
     };
   } catch (error) {
     console.error("Sportdata misslyckades:", error);
-    return {
-      results: [],
-      upcoming: [],
-      selectedLeague: null,
-      provider: {
-        apiFootball: true,
-        sportmonks: Boolean(process.env.SPORTMONKS_TOKEN),
-      },
-      fetchedAt: new Date().toISOString(),
-    };
+    throw error;
   }
 }

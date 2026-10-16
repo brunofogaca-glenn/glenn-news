@@ -1,5 +1,6 @@
 import { getFeedHealth } from "@/lib/feedHealth";
 import { isSlowResponse, prioritizeHealthFeeds, summarizeResponseTimes } from "@/lib/feedHealthMetrics";
+import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,14 @@ function formatLastArticle(value: string | null) {
 }
 
 export default async function HealthPage() {
-  const health = await getFeedHealth();
+  const editorialSourcesAllowed = canRefreshEditorialSourcesNow();
+  const health = editorialSourcesAllowed
+    ? await getFeedHealth()
+    : {
+        checkedAt: new Date().toISOString(),
+        feeds: [],
+        totals: { all: 0, healthy: 0, empty: 0, stale: 0, errors: 0 },
+      };
   const metrics = summarizeResponseTimes(health.feeds);
   const orderedFeeds = prioritizeHealthFeeds(health.feeds);
 
@@ -68,7 +76,9 @@ export default async function HealthPage() {
                 Flödesstatus
               </h1>
               <p className="mt-2 font-serif text-base text-slate-600">
-                Kontrollerar varje RSS- och webbkällas svar, svarstid och färskhet.
+                {editorialSourcesAllowed
+                  ? "Kontrollerar varje RSS- och webbkällas svar, svarstid och färskhet."
+                  : "Kontroll av artikelkällor görs tidigast från 06.00 svensk tid för att undvika nattliga RSS-hämtningar."}
                 En källa markeras som inaktuell om den senaste daterade artikeln är
                 minst 72 timmar gammal. Svarstider på {metrics.slowThresholdMs.toLocaleString("sv-SE")} ms eller mer markeras separat som långsamma — det betyder inte automatiskt att källan är trasig.
               </p>
@@ -78,7 +88,7 @@ export default async function HealthPage() {
               href="/health"
               className="inline-flex w-fit border border-slate-500 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700 hover:border-slate-950 hover:text-slate-950"
             >
-              ↻ Kör ny kontroll
+              {editorialSourcesAllowed ? "↻ Kör ny kontroll" : "Kontrollera från 06.00"}
             </a>
           </div>
         </header>

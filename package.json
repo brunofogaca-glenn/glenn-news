@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run test:ranker && next build",
+    "build": "npm run test:ranker && npm run test:refresh && next build",
     "start": "next start",
     "lint": "eslint",
-    "test:ranker": "node --test tests/ranker-regression.test.cjs"
+    "test:ranker": "node --test tests/ranker-regression.test.cjs",
+    "test:refresh": "node --test tests/data-refresh-regression.test.cjs"
   },
   "dependencies": {
     "next": "16.2.6",

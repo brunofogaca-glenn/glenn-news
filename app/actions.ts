@@ -16,15 +16,15 @@ import {
 } from "@/lib/dailySnapshots";
 import { getCachedWeather } from "@/lib/weather";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
+import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
 
 /**
  * Refresh the underlying source data used by optional homepage panels.
  * This deliberately does not regenerate today's saved morning edition.
  */
 export async function refreshNews() {
-  const tags = [
-    "glenn-news-articles",
-    "glenn-news-feed-health",
+  const editorialSourcesAllowed = canRefreshEditorialSourcesNow();
+  const supplementalTags = [
     "glenn-news-sport-day",
     "glenn-news-market-day",
     "glenn-news-daily-local",
@@ -34,15 +34,17 @@ export async function refreshNews() {
     "glenn-news-weather",
     "glenn-news-daily-header",
   ];
+  const tags = editorialSourcesAllowed
+    ? ["glenn-news-articles", "glenn-news-feed-health", ...supplementalTags]
+    : supplementalTags;
+
   for (const tag of tags) {
     revalidateTag(tag, { expire: 0 });
   }
 
-  // Fetch all homepage source panels concurrently after invalidating their caches.
-  // This refreshes supplemental data only; the saved morning edition stays unchanged.
+  // Before 06:00, refresh supplemental panels only. Feed-health checks also
+  // fetch editorial RSS, so they must follow the same publication window.
   await Promise.all([
-    getCachedArticles(),
-    getCachedFeedHealth(),
     getCachedSportDay(),
     getCachedMarketDay(),
     getCachedLocalSnapshot(),
@@ -51,18 +53,19 @@ export async function refreshNews() {
     getCachedWorldSnapshot(),
     getCachedWeather(),
     getDailyHeaderInfo(),
+    ...(editorialSourcesAllowed ? [getCachedArticles(), getCachedFeedHealth()] : []),
   ]);
 
   return {
     sourcesRefreshedAt: new Date().toISOString(),
     refreshedSources: [
-      "nyhetsflöden", "flödesstatus", "sport", "marknad",
-      "lokalt", "Sverige", "kultur", "världen", "väder", "namnsdag och historik",
+      ...(editorialSourcesAllowed ? ["nyhetsflöden", "flödesstatus"] : []),
+      "sport", "marknad", "lokalt", "Sverige", "kultur", "världen", "väder", "namnsdag och historik",
     ],
+    editorialRefreshDeferred: !editorialSourcesAllowed,
     morningEditionChanged: false,
   };
 }
-
 
 /**
  * Explicitly retry the current day's edition after a homepage fallback.
@@ -71,6 +74,10 @@ export async function refreshNews() {
  * valid edition already exists.
  */
 export async function retryMorningEdition() {
+  if (!canRefreshEditorialSourcesNow()) {
+    throw new Error("Morgonutgåvan kan inte återskapas före 06.00 svensk tid.");
+  }
+
   revalidateTag("glenn-news-articles", { expire: 0 });
   await getCachedArticles();
 

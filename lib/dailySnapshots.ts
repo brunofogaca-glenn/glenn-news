@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { withLastGoodSnapshot } from "./supplementalCache";
 
 const TIME_ZONE = "Europe/Stockholm";
 
@@ -17,6 +18,7 @@ export type LocalSnapshot = {
   meetings: SnapshotLink[];
   updatedAt: string;
   sources: Array<{ title: string; url: string }>;
+  warnings?: string[];
 };
 
 export type NationalSnapshot = {
@@ -24,6 +26,7 @@ export type NationalSnapshot = {
   news: SnapshotLink[];
   updatedAt: string;
   sources: Array<{ title: string; url: string }>;
+  warnings?: string[];
 };
 
 export type WorldMarketIndicator = {
@@ -382,8 +385,19 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
     fetchHtml(BORAS_CALENDAR_URL),
   ]);
 
+  if (borasHtml.status === "rejected" && calendarHtml.status === "rejected") {
+    throw new Error("Borås.com och Borås Stad svarade inte.");
+  }
+
   let events: SnapshotLink[] = [];
   let meetings: SnapshotLink[] = [];
+  const warnings: string[] = [];
+  if (borasHtml.status === "rejected") {
+    warnings.push("Borås.com: " + (borasHtml.reason instanceof Error ? borasHtml.reason.message : String(borasHtml.reason)));
+  }
+  if (calendarHtml.status === "rejected") {
+    warnings.push("Borås Stad: " + (calendarHtml.reason instanceof Error ? calendarHtml.reason.message : String(calendarHtml.reason)));
+  }
 
   if (borasHtml.status === "fulfilled") {
     events = parseJsonLdEvents(borasHtml.value, LOCAL_EVENTS_URL);
@@ -401,6 +415,7 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
     events: events.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")).slice(0, 5),
     meetings,
     updatedAt: new Date().toISOString(),
+    warnings,
     sources: [
       { title: "Borås.com · evenemang", url: LOCAL_EVENTS_URL },
       { title: "Borås Stad · kalender", url: BORAS_CALENDAR_URL },
@@ -562,7 +577,7 @@ async function getRiksdagNews() {
     return parseRiksdagNews(await fetchHtml(RIKSDAG_NEWS_URL));
   } catch (error) {
     console.error("Riksdagens nyhetssida kunde inte hämtas:", error);
-    return [];
+    throw error;
   }
 }
 
@@ -596,15 +611,31 @@ async function getNationalSnapshotInternal(): Promise<NationalSnapshot> {
     getRiksdagNews(),
   ]);
 
+  if (agendaHtml.status === "rejected" && newsResult.status === "rejected") {
+    throw new Error("Riksdagens dagordning och nyhetsflöde svarade inte.");
+  }
+
   const agenda = agendaHtml.status === "fulfilled"
     ? parseRiksdagAgenda(agendaHtml.value).slice(0, 8)
     : [];
   const news = newsResult.status === "fulfilled" ? newsResult.value : [];
+  const warnings: string[] = [];
+  if (agendaHtml.status === "rejected") {
+    warnings.push("Riksdagens dagordning: " + (agendaHtml.reason instanceof Error ? agendaHtml.reason.message : String(agendaHtml.reason)));
+  }
+  if (newsResult.status === "rejected") {
+    warnings.push("Riksdagens nyheter: " + (newsResult.reason instanceof Error ? newsResult.reason.message : String(newsResult.reason)));
+  }
+
+  if (agenda.length === 0 && news.length === 0) {
+    throw new Error("Riksdagens källor gav inget användbart innehåll.");
+  }
 
   return {
     agenda,
     news,
     updatedAt: new Date().toISOString(),
+    warnings,
     sources: [
       { title: "Riksdagen · planerade ärenden", url: RIKSDAG_AGENDA_URL },
       { title: "Riksdagen · aktuellt", url: RIKSDAG_NEWS_URL },
@@ -696,12 +727,7 @@ function parseMovieCalendar(html: string) {
 }
 
 async function getCultureSnapshotInternal(): Promise<CultureSnapshot> {
-  let films: SnapshotLink[] = [];
-  try {
-    films = parseMovieCalendar(await fetchHtml(MOVIEZINE_CALENDAR_URL));
-  } catch (error) {
-    console.error("MovieZine-kalendern kunde inte hämtas:", error);
-  }
+  const films = parseMovieCalendar(await fetchHtml(MOVIEZINE_CALENDAR_URL));
 
   return {
     films,
@@ -933,12 +959,20 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
     getWorldGdp(),
   ]);
 
+  if (settled.every(result => result.status === "rejected")) {
+    throw new Error("Alla globala datakällor misslyckades.");
+  }
+
   const markets = settled[0].status === "fulfilled" ? settled[0].value : [];
   const rates: WorldRate[] = [];
   if (settled[1].status === "fulfilled") rates.push(settled[1].value);
   if (settled[2].status === "fulfilled") rates.push(settled[2].value);
   if (settled[3].status === "fulfilled") rates.push(settled[3].value);
   const gdp = settled[4].status === "fulfilled" ? settled[4].value : [];
+
+  if (markets.length === 0 && rates.length === 0 && gdp.length === 0) {
+    throw new Error("Globala datakällor returnerade inga användbara värden.");
+  }
 
   const warnings: string[] = [];
   settled.forEach((result, index) => {
@@ -958,25 +992,25 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
 }
 
 const getCachedLocalSnapshotInternal = unstable_cache(
-  getLocalSnapshotInternal,
+  () => withLastGoodSnapshot("local-snapshot", getLocalSnapshotInternal),
   ["glenn-news-daily-local-v2"],
   { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-local"] }
 );
 
 const getCachedNationalSnapshotInternal = unstable_cache(
-  getNationalSnapshotInternal,
+  () => withLastGoodSnapshot("national-snapshot", getNationalSnapshotInternal),
   ["glenn-news-daily-national-v3"],
   { revalidate: 60 * 60, tags: ["glenn-news-daily-national"] }
 );
 
 const getCachedCultureSnapshotInternal = unstable_cache(
-  getCultureSnapshotInternal,
+  () => withLastGoodSnapshot("culture-snapshot", getCultureSnapshotInternal),
   ["glenn-news-daily-culture-v3"],
   { revalidate: 4 * 60 * 60, tags: ["glenn-news-daily-culture"] }
 );
 
 const getCachedWorldSnapshotInternal = unstable_cache(
-  getWorldSnapshotInternal,
+  () => withLastGoodSnapshot("world-snapshot", getWorldSnapshotInternal),
   ["glenn-news-daily-world-v1"],
   { revalidate: 3 * 60 * 60, tags: ["glenn-news-daily-world"] }
 );

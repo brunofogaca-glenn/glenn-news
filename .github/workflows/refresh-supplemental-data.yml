@@ -1,0 +1,31 @@
+name: Refresh supplemental data
+
+on:
+  schedule:
+    # Avoid the top of the hour, when hosted schedulers are more likely to be delayed.
+    - cron: "3,33 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-supplemental-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call Glenn News supplemental refresh endpoint
+        env:
+          REFRESH_URL: ${{ vars.GLENN_NEWS_REFRESH_URL }}
+          REFRESH_SECRET: ${{ secrets.GITHUB_CRON_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$REFRESH_URL" || -z "$REFRESH_SECRET" ]]; then
+            echo "::error::Configure repository variable GLENN_NEWS_REFRESH_URL and secret GITHUB_CRON_SECRET."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            --header "Authorization: Bearer $REFRESH_SECRET" \
+            --header "Accept: application/json" \
+            "$REFRESH_URL"
