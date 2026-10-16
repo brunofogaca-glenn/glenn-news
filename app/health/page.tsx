@@ -1,6 +1,7 @@
 import { getFeedHealth } from "@/lib/feedHealth";
 import { isSlowResponse, prioritizeHealthFeeds, summarizeResponseTimes } from "@/lib/feedHealthMetrics";
 import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
+import { getSupplementalRefreshRun } from "@/lib/supplementalRefreshRun";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ function formatLastArticle(value: string | null) {
 
 export default async function HealthPage() {
   const editorialSourcesAllowed = canRefreshEditorialSourcesNow();
+  const supplementalRun = await getSupplementalRefreshRun();
   const health = editorialSourcesAllowed
     ? await getFeedHealth()
     : {
@@ -113,6 +115,85 @@ export default async function HealthPage() {
               </div>
             </div>
           ))}
+        </section>
+
+        <section className="mt-8 border-y-2 border-slate-950 py-5">
+          <div className="flex flex-col gap-2 border-b border-slate-300 pb-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
+                Kompletterande datakällor
+              </div>
+              <h2 className="mt-1 font-serif text-2xl font-black">
+                Nattlig uppdatering
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Den här statusen läses ur sparad körlogg och triggar inga externa API-anrop.
+              </p>
+            </div>
+            <div className="text-xs text-slate-500">
+              {supplementalRun
+                ? "Senast körd " + formatCheckedAt(supplementalRun.checkedAt)
+                : "Ingen körning sparad ännu"}
+            </div>
+          </div>
+
+          {supplementalRun ? (
+            <>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  ["Uppdateringsförsök", supplementalRun.refreshedSources],
+                  ["Fel", supplementalRun.failures],
+                  ["Inaktuella", supplementalRun.stale],
+                  ["Resultat", supplementalRun.ok ? "OK" : "Behöver åtgärd"],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="border border-slate-300 bg-white/40 px-3 py-3">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">{label}</div>
+                    <div className="mt-1 font-serif text-2xl font-black tabular-nums">{value}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 divide-y divide-slate-200">
+                {supplementalRun.sources.map(source => {
+                  const statusText = source.status === "fresh"
+                    ? "Uppdaterad"
+                    : source.status === "stale"
+                      ? "Äldre reservdata"
+                      : source.status === "failed"
+                        ? "Fel"
+                        : source.status === "cached"
+                          ? "Cache OK"
+                          : "Okänd";
+                  const statusClassName = source.status === "fresh" || source.status === "cached"
+                    ? "bg-emerald-100 text-emerald-900"
+                    : source.status === "stale"
+                      ? "bg-amber-100 text-amber-900"
+                      : source.status === "failed"
+                        ? "bg-red-100 text-red-900"
+                        : "bg-slate-100 text-slate-700";
+                  return (
+                    <div key={source.name} className="grid gap-2 py-3 sm:grid-cols-[1.2fr_0.8fr_0.8fr_1.4fr] sm:items-center">
+                      <div className="font-bold text-sm">{source.name}</div>
+                      <div>
+                        <span className={"inline-flex px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] " + statusClassName}>
+                          {statusText}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Senast lyckad: {formatLastArticle(source.lastSuccessAt)}
+                      </div>
+                      <div className="text-xs leading-5 text-slate-500">
+                        {source.error ?? (source.persistent ? "Reservdata lagrad" : "Ingen beständig snapshot bekräftad")}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <p className="mt-4 font-serif text-sm leading-6 text-slate-500">
+              Inga resultat finns ännu. När schemaläggningen körs och kan spara status visas källornas utfall här.
+            </p>
+          )}
         </section>
 
         <div className="mt-8 border-y-2 border-slate-950">
