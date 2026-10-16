@@ -2,6 +2,7 @@ import { getFeedHealth } from "@/lib/feedHealth";
 import { isSlowResponse, prioritizeHealthFeeds, summarizeResponseTimes } from "@/lib/feedHealthMetrics";
 import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
 import { getSupplementalRefreshRun } from "@/lib/supplementalRefreshRun";
+import { getArticleRefreshStatus } from "@/lib/articleRefreshStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,19 @@ function statusClass(status: "ok" | "empty" | "stale" | "error") {
   }
 
   return "bg-red-100 text-red-900";
+}
+
+function stockholmDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find(part => part.type === "year")?.value ?? "0000";
+  const month = parts.find(part => part.type === "month")?.value ?? "00";
+  const day = parts.find(part => part.type === "day")?.value ?? "00";
+  return year + "-" + month + "-" + day;
 }
 
 function formatCheckedAt(value: string) {
@@ -54,7 +68,10 @@ function formatLastArticle(value: string | null) {
 
 export default async function HealthPage() {
   const editorialSourcesAllowed = canRefreshEditorialSourcesNow();
-  const supplementalRun = await getSupplementalRefreshRun();
+  const [supplementalRun, articleRefresh] = await Promise.all([
+    getSupplementalRefreshRun(),
+    getArticleRefreshStatus(stockholmDateKey()),
+  ]);
   const health = editorialSourcesAllowed
     ? await getFeedHealth()
     : {
@@ -115,6 +132,54 @@ export default async function HealthPage() {
               </div>
             </div>
           ))}
+        </section>
+
+        <section className="mt-8 border-y-2 border-slate-950 py-5">
+          <div className="flex flex-col gap-2 border-b border-slate-300 pb-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">
+                Nyhetsartiklar
+              </div>
+              <h2 className="mt-1 font-serif text-2xl font-black">
+                Morgonhämtning
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Visar sparad status för dagens artikelcache. Att visa denna status gör inga RSS-anrop.
+              </p>
+            </div>
+            <div className="text-xs text-slate-500">
+              {articleRefresh ? "Senaste försök " + formatCheckedAt(articleRefresh.lastAttemptAt) : "Ingen hämtning registrerad i dag"}
+            </div>
+          </div>
+          {articleRefresh ? (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="border-l-2 border-slate-950 pl-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Status</div>
+                <div className={"mt-1 font-serif text-xl font-black " + (articleRefresh.status === "ok" ? "text-emerald-800" : "text-amber-800")}>
+                  {articleRefresh.status === "ok" ? "OK" : "Försök igen"}
+                </div>
+              </div>
+              <div className="border-l-2 border-slate-950 pl-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Cachade artiklar</div>
+                <div className="mt-1 font-serif text-xl font-black tabular-nums">{articleRefresh.articleCount}</div>
+              </div>
+              <div className="border-l-2 border-slate-950 pl-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Källfel</div>
+                <div className="mt-1 font-serif text-xl font-black tabular-nums">{articleRefresh.feedErrors}</div>
+              </div>
+              <div className="border-l-2 border-slate-950 pl-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Senast lyckad</div>
+                <div className="mt-1 text-sm font-bold">{formatLastArticle(articleRefresh.lastSuccessAt)}</div>
+              </div>
+              {articleRefresh.message && (
+                <p className="text-xs leading-5 text-slate-500 sm:col-span-2 lg:col-span-4">{articleRefresh.message}</p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-4 font-serif text-sm leading-6 text-slate-500">
+              Dagens status skapas vid första schemalagda försöket efter 06.00 svensk tid.
+            </p>
+          )}
         </section>
 
         <section className="mt-8 border-y-2 border-slate-950 py-5">
