@@ -18,6 +18,22 @@ const CATEGORY_LABELS: Record<string, string> = {
   weekfocus: "Veckofokus",
 };
 
+const SEMANTIC_CATEGORY_LABELS: Record<string, string> = {
+  politics: "Politik",
+  economy: "Ekonomi",
+  society: "Samhälle",
+  world: "Världen",
+  local: "Lokalt",
+  sport: "Sport",
+  culture: "Kultur",
+  technology: "Teknik",
+  health: "Hälsa",
+  climate: "Klimat",
+  travel: "Resor",
+  lifestyle: "Livsstil",
+  other: "Övrigt",
+};
+
 function pretty(value: string) {
   return value
     .replaceAll("_", " ")
@@ -269,7 +285,7 @@ export default async function ProfilePage() {
   );
 
   const strongestCategory = semanticCategoryEntries[0]
-    ? pretty(semanticCategoryEntries[0][0])
+    ? SEMANTIC_CATEGORY_LABELS[semanticCategoryEntries[0][0]] ?? pretty(semanticCategoryEntries[0][0])
     : categoryEntries[0]
       ? CATEGORY_LABELS[categoryEntries[0][0]] ?? pretty(categoryEntries[0][0])
       : "–";
@@ -392,22 +408,7 @@ export default async function ProfilePage() {
             </div>
             <InterestBars
               entries={semanticCategoryEntries.length ? semanticCategoryEntries : categoryEntries}
-              labels={{
-                politics: "Politik",
-                economy: "Ekonomi",
-                society: "Samhälle",
-                world: "Världen",
-                local: "Lokalt",
-                sport: "Sport",
-                culture: "Kultur",
-                technology: "Teknik",
-                health: "Hälsa",
-                climate: "Klimat",
-                travel: "Resor",
-                lifestyle: "Livsstil",
-                other: "Övrigt",
-                ...CATEGORY_LABELS,
-              }}
+              labels={{ ...SEMANTIC_CATEGORY_LABELS, ...CATEGORY_LABELS }}
               emptyText="Vi behöver några fler läsningar för att se ett mönster."
             />
           </section>
@@ -456,13 +457,12 @@ export default async function ProfilePage() {
               {semanticTopicEntries.length ? (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    {semanticTopicEntries.map(([topic, value]) => (
+                    {semanticTopicEntries.map(([topic]) => (
                       <span
                         key={topic}
                         className="border border-slate-400 bg-[#ece7d8] px-3 py-2 text-sm"
                       >
                         {topic}
-                        <span className="ml-2 text-xs text-slate-400">{Math.round(value)}</span>
                       </span>
                     ))}
                   </div>
@@ -657,9 +657,9 @@ export default async function ProfilePage() {
 
             {semanticTagEntries.length ? (
               <div className="flex flex-wrap gap-2">
-                {semanticTagEntries.map(([tag, value]) => (
+                {semanticTagEntries.map(([tag]) => (
                   <span key={tag} className="border border-slate-400 bg-[#ece7d8] px-3 py-2 text-sm">
-                    {tag}<span className="ml-2 text-xs text-slate-400">{Math.round(value)}</span>
+                    {tag}
                   </span>
                 ))}
               </div>
@@ -682,14 +682,14 @@ export default async function ProfilePage() {
 
             {entityEntries.length || geographyEntries.length ? (
               <div className="flex flex-wrap gap-2">
-                {entityEntries.map(([entity, value]) => (
+                {entityEntries.map(([entity]) => (
                   <span key={"entity-" + entity} className="border border-slate-400 px-3 py-2 text-sm">
-                    {entity}<span className="ml-2 text-xs text-slate-400">{Math.round(value)}</span>
+                    {entity}
                   </span>
                 ))}
-                {geographyEntries.map(([place, value]) => (
+                {geographyEntries.map(([place]) => (
                   <span key={"place-" + place} className="border border-dashed border-slate-400 px-3 py-2 text-sm text-slate-600">
-                    {place}<span className="ml-2 text-xs text-slate-400">{Math.round(value)}</span>
+                    {place}
                   </span>
                 ))}
               </div>
