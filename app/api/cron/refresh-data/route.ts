@@ -11,6 +11,7 @@ import {
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
 import { getStockholmClock } from "@/lib/updateSchedule";
 import type { SupplementalRefreshMeta } from "@/lib/supplementalCache";
+import { saveSupplementalRefreshRun } from "@/lib/supplementalRefreshRun";
 
 export const dynamic = "force-dynamic";
 
@@ -123,15 +124,20 @@ export async function GET(request: Request) {
   const failures = sources.filter(source => source.status === "failed").length;
   const stale = sources.filter(source => source.status === "stale").length;
 
-  return Response.json({
+  const report = {
+    checkedAt: new Date().toISOString(),
     ok: failures === 0 && stale === 0,
     refreshed: dueSources.length > 0,
     localTime: `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`,
     cadence: "hourly; stale sources retry on the next half-hour run",
-    articleFeedsTouched: false,
+    articleFeedsTouched: false as const,
     refreshedSources: dueSources.length,
     failures,
     stale,
     sources,
-  }, { status: failures > 0 || stale > 0 ? 503 : 200 });
+  };
+  const statusSaved = await saveSupplementalRefreshRun(report);
+  return Response.json({ ...report, statusSaved }, {
+    status: failures > 0 || stale > 0 ? 503 : 200,
+  });
 }
