@@ -12,6 +12,13 @@ test("supplemental cron runs every half hour and skips before 01:00 Stockholm", 
   const workflow = read(".github/workflows/refresh-supplemental-data.yml");
   assert.match(workflow, /cron: "3,33 \* \* \* \*"/);
   assert.match(workflow, /GITHUB_CRON_SECRET/);
+  const articleWorkflow = read(".github/workflows/refresh-editorial-articles.yml");
+  assert.match(articleWorkflow, /cron: "3,33 \* \* \* \*"/);
+  assert.match(articleWorkflow, /GLENN_NEWS_ARTICLE_REFRESH_URL/);
+  const articleRoute = read("app/api/cron/refresh-articles/route.ts");
+  assert.match(articleRoute, /canRefreshEditorialSourcesNow\(\)/);
+  assert.match(articleRoute, /RETRY_MS/);
+  assert.match(articleRoute, /getArticleRefreshStatus/);
   const route = read("app/api/cron/refresh-data/route.ts");
   assert.match(route, /if \(clock\.hour < 1\)/);
   assert.match(route, /articleFeedsTouched: false/);
