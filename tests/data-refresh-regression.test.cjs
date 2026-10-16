@@ -71,3 +71,46 @@ test("morning edition generation has a guard before fetching articles", () => {
   assert.ok(guard > generationStart, "06:00 guard should be in the generator");
   assert.ok(fetch > guard, "guard must precede any article cache fetch");
 });
+
+test("quote feature is removed from the homepage", () => {
+  const homepage = read("app/page.tsx");
+  assert.doesNotMatch(homepage, /QuoteDivider|quotes\.ts/);
+  assert.ok(!fs.existsSync(path.join(root, "app/components/QuoteDivider.tsx")));
+  assert.ok(!fs.existsSync(path.join(root, "lib/quotes.ts")));
+});
+
+test("league tables show season-scoped zones and explain provisional European places", () => {
+  const zones = read("lib/leagueZones.ts");
+  assert.match(zones, /Allsvenskan:[\s\S]*?seasonStart: 2026/);
+  assert.match(zones, /Superettan:[\s\S]*?fromRank: 13, toRank: 14/);
+  assert.match(zones, /Championship:[\s\S]*?fromRank: 22, toRank: 24/);
+  assert.match(zones, /Champions League:[\s\S]*?fromRank: 25, toRank: 36/);
+  assert.match(zones, /confirmed: false/);
+  assert.match(zones, /if \(!match \|\| Number\(match\[0\]\) !== config\.seasonStart\) return null/);
+
+  const panel = read("app/components/SportDayPanel.tsx");
+  assert.match(panel, /getZoneForRank/);
+  assert.match(panel, /Så tolkas strecken/);
+  assert.match(panel, /zoneConfig\.note/);
+});
+
+test("reader profile uses semantic interests rather than raw article topics", () => {
+  const profile = read("app/profil/page.tsx");
+  assert.match(profile, /profile\.semanticTopic/);
+  assert.match(profile, /profile\.semanticTag/);
+  assert.match(profile, /profile\.semanticClicks/);
+  assert.match(profile, /profile\.entity/);
+  assert.doesNotMatch(profile, /const topicEntries = topEntries\(profile\.topic/);
+  assert.match(profile, /Vad artiklarna handlar om/);
+  assert.match(profile, /Lag, personer och platser/);
+});
+
+test("supplemental status is persisted and readable from the operations page", () => {
+  const route = read("app/api/cron/refresh-data/route.ts");
+  assert.match(route, /saveSupplementalRefreshRun\(report\)/);
+  const storage = read("lib/supplementalRefreshRun.ts");
+  assert.match(storage, /getSupplementalRefreshRun/);
+  const health = read("app/health/page.tsx");
+  assert.match(health, /getSupplementalRefreshRun/);
+  assert.match(health, /Nattlig uppdatering/);
+});
