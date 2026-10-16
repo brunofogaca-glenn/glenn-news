@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   refresh-editorial-articles:
@@ -16,16 +17,24 @@ jobs:
     steps:
       - name: Refresh editorial article cache
         env:
-          REFRESH_URL: ${{ vars.GLENN_NEWS_ARTICLE_REFRESH_URL }}
-          REFRESH_SECRET: ${{ secrets.GITHUB_CRON_SECRET }}
+          REFRESH_URL: https://glenn-news.vercel.app/api/cron/refresh-articles
+          OIDC_AUDIENCE: https://glenn-news.vercel.app
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$REFRESH_URL" || -z "$REFRESH_SECRET" ]]; then
-            echo "::error::Configure repository variable GLENN_NEWS_ARTICLE_REFRESH_URL and secret GITHUB_CRON_SECRET."
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+            echo "::error::GitHub Actions did not provide OIDC credentials. Ensure id-token: write is enabled."
             exit 1
           fi
+
+          oidc_response="$(curl --fail-with-body --silent --show-error --max-time 20 \
+            --get \
+            --data-urlencode "audience=$OIDC_AUDIENCE" \
+            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL")"
+          oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
+
           curl --fail-with-body --silent --show-error --max-time 240 \
-            --header "Authorization: Bearer $REFRESH_SECRET" \
+            --header "Authorization: Bearer $oidc_token" \
             --header "Accept: application/json" \
             "$REFRESH_URL"
