@@ -18,6 +18,18 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+const ZONE_SWATCH_CLASS: Record<ZoneKind, string> = {
+  champions: "bg-blue-800",
+  europa: "bg-sky-600",
+  conference: "bg-teal-600",
+  promotion: "bg-emerald-600",
+  "playoff-up": "bg-amber-500",
+  "playoff-down": "bg-orange-600",
+  relegation: "bg-red-700",
+  knockout: "bg-amber-500",
+  eliminated: "bg-slate-500",
+};
+
 const ZONE_ROW_CLASS: Record<ZoneKind, string> = {
   champions: "border-l-4 border-l-blue-800 bg-blue-50",
   europa: "border-l-4 border-l-sky-600 bg-sky-50",
@@ -102,7 +114,7 @@ function Table({ data }: { data: NonNullable<SportDayData["selectedLeague"]> }) 
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
             {zoneConfig.zones.map(zone => (
               <span key={zone.kind + "-" + zone.fromRank} className="inline-flex items-center gap-2 text-[11px] text-slate-600">
-                <span aria-hidden="true" className={"inline-block h-3 w-1.5 " + ZONE_ROW_CLASS[zone.kind].split(" ").filter(token => token.startsWith("border-l-") && !token.startsWith("border-l-4") || token.startsWith("bg-")).join(" ")} />
+                <span aria-hidden="true" className={"inline-block h-3 w-1.5 rounded-sm " + ZONE_SWATCH_CLASS[zone.kind]} />
                 <span>{zone.label}</span>
               </span>
             ))}
