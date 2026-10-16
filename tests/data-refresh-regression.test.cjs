@@ -6,24 +6,43 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("supplemental cron runs every half hour and skips before 01:00 Stockholm", () => {
+test("supplemental and editorial cron workflows use scoped GitHub OIDC", () => {
   const config = JSON.parse(read("vercel.json"));
   assert.ok(!config.crons.some((cron) => cron.path === "/api/cron/refresh-data"));
+
   const workflow = read(".github/workflows/refresh-supplemental-data.yml");
   assert.match(workflow, /cron: "3,33 \* \* \* \*"/);
-  assert.match(workflow, /GITHUB_CRON_SECRET/);
+  assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
+  assert.match(workflow, /audience=\$OIDC_AUDIENCE/);
+  assert.match(workflow, /https:\/\/glenn-news\.vercel\.app\/api\/cron\/refresh-data/);
+  assert.doesNotMatch(workflow, /GITHUB_CRON_SECRET|GLENN_NEWS_REFRESH_URL/);
+
   const articleWorkflow = read(".github/workflows/refresh-editorial-articles.yml");
   assert.match(articleWorkflow, /cron: "3,33 \* \* \* \*"/);
-  assert.match(articleWorkflow, /GLENN_NEWS_ARTICLE_REFRESH_URL/);
+  assert.match(articleWorkflow, /id-token: write/);
+  assert.match(articleWorkflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
+  assert.match(articleWorkflow, /https:\/\/glenn-news\.vercel\.app\/api\/cron\/refresh-articles/);
+  assert.doesNotMatch(articleWorkflow, /GITHUB_CRON_SECRET|GLENN_NEWS_ARTICLE_REFRESH_URL/);
+
+  const auth = read("lib/githubActionsAuth.ts");
+  assert.match(auth, /createRemoteJWKSet/);
+  assert.match(auth, /jwtVerify/);
+  assert.match(auth, /payload\.repository === REPOSITORY/);
+  assert.match(auth, /payload\.ref === MAIN_REF/);
+  assert.match(auth, /payload\.workflow_ref === ALLOWED_WORKFLOWS\[workflow\]/);
+
   const articleRoute = read("app/api/cron/refresh-articles/route.ts");
+  assert.match(articleRoute, /authorizeGitHubActionsRefresh\(request, "editorial"\)/);
   assert.match(articleRoute, /canRefreshEditorialSourcesNow\(\)/);
   assert.match(articleRoute, /RETRY_MS/);
   assert.match(articleRoute, /getArticleRefreshStatus/);
+
   const route = read("app/api/cron/refresh-data/route.ts");
+  assert.match(route, /authorizeGitHubActionsRefresh\(request, "supplemental"\)/);
   assert.match(route, /if \(clock\.hour < 1\)/);
   assert.match(route, /articleFeedsTouched: false/);
   assert.doesNotMatch(route, /getCachedArticles|getCachedFeedHealth|getArticles\(/);
-  assert.ok(route.includes("GITHUB_CRON_SECRET"));
   assert.ok(!route.includes("user-agent"));
 
   const snapshots = read("lib/supplementalCache.ts");
