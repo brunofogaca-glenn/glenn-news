@@ -70,6 +70,7 @@ export type CultureSnapshot = {
   updatedAt: string;
   sourceUrl: string;
   reviewSourceUrl: string;
+  warnings?: string[];
 };
 
 const LOCAL_EVENTS_URL = "https://www.boras.com/evenemang/";
@@ -779,11 +780,27 @@ async function getAlbumReviews(): Promise<SnapshotLink[]> {
 }
 
 async function getCultureSnapshotInternal(): Promise<CultureSnapshot> {
-  const [movieHtml, albumReviews] = await Promise.all([
+  const [movieResult, reviewResult] = await Promise.allSettled([
     fetchHtml(MOVIEZINE_CALENDAR_URL),
     getAlbumReviews(),
   ]);
-  const films = parseMovieCalendar(movieHtml);
+
+  if (movieResult.status === "rejected" && reviewResult.status === "rejected") {
+    const movieError = movieResult.reason instanceof Error ? movieResult.reason.message : String(movieResult.reason);
+    const reviewError = reviewResult.reason instanceof Error ? reviewResult.reason.message : String(reviewResult.reason);
+    throw new Error("Kulturkällorna kunde inte hämtas. " + movieError + " " + reviewError);
+  }
+
+  const films = movieResult.status === "fulfilled" ? parseMovieCalendar(movieResult.value) : [];
+  const albumReviews = reviewResult.status === "fulfilled" ? reviewResult.value : [];
+  const warnings: string[] = [];
+
+  if (movieResult.status === "rejected") {
+    warnings.push("MovieZine: " + (movieResult.reason instanceof Error ? movieResult.reason.message : String(movieResult.reason)));
+  }
+  if (reviewResult.status === "rejected") {
+    warnings.push("DN:s skivrecensioner: " + (reviewResult.reason instanceof Error ? reviewResult.reason.message : String(reviewResult.reason)));
+  }
 
   return {
     films,
@@ -791,6 +808,7 @@ async function getCultureSnapshotInternal(): Promise<CultureSnapshot> {
     updatedAt: new Date().toISOString(),
     sourceUrl: MOVIEZINE_CALENDAR_URL,
     reviewSourceUrl: DN_ALBUM_REVIEWS_RSS_URL,
+    warnings: warnings.length ? warnings : undefined,
   };
 }
 
@@ -1081,8 +1099,16 @@ export function getCachedNationalSnapshot() {
   return getCachedNationalSnapshotInternal();
 }
 
-export function getCachedCultureSnapshot() {
-  return getCachedCultureSnapshotInternal();
+export async function getCachedCultureSnapshot() {
+  const snapshot = await getCachedCultureSnapshotInternal();
+  // Older persisted snapshots predate albumReviews; normalize them for safe rendering.
+  return {
+    ...snapshot,
+    albumReviews: Array.isArray(snapshot.albumReviews) ? snapshot.albumReviews : [],
+    reviewSourceUrl: typeof snapshot.reviewSourceUrl === "string" && snapshot.reviewSourceUrl.length
+      ? snapshot.reviewSourceUrl
+      : DN_ALBUM_REVIEWS_RSS_URL,
+  };
 }
 
 export function getCachedWorldSnapshot() {
