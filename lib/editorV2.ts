@@ -808,13 +808,20 @@ export async function createSportEditorialSection(
     const key = normalizeStoryUrl(story.link) || normalizeStoryTitle(story.title);
     return key && !footballKeys.has(key);
   });
-  const balancedOtherStories = [...otherStories];
-  const fallbackNeeded = Math.max(0, 2 - balancedOtherStories.length);
-  footballFallback.slice(0, fallbackNeeded).forEach((story, index) => {
-    balancedOtherStories.push({ ...story, id: 2000 + index, sportGroup: "fotboll" as const });
-  });
+  const fallbackStories = footballFallback.slice(
+    0,
+    Math.max(0, 2 - otherStories.length)
+  ).map((story, index) => ({
+    ...story,
+    id: 2000 + index,
+    sportGroup: "fotboll" as const,
+  }));
 
-  const stories = [...footballStories, ...balancedOtherStories].slice(0, 10);
+  const stories: SelectedStory[] = [
+    ...footballStories,
+    ...otherStories,
+    ...fallbackStories,
+  ].slice(0, 10);
 
   return {
     key: "sport",
