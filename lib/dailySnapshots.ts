@@ -66,8 +66,10 @@ export type WorldSnapshot = {
 
 export type CultureSnapshot = {
   films: SnapshotLink[];
+  albumReviews: SnapshotLink[];
   updatedAt: string;
   sourceUrl: string;
+  reviewSourceUrl: string;
 };
 
 const LOCAL_EVENTS_URL = "https://www.boras.com/evenemang/";
@@ -75,6 +77,7 @@ const BORAS_CALENDAR_URL = "https://www.boras.se/kalender.4.42986d2b155b56f85333
 const RIKSDAG_NEWS_URL = "https://www.riksdagen.se/sv/aktuellt/";
 const RIKSDAG_AGENDA_URL = "https://www.riksdagen.se/sv/dokument-och-lagar/dokument/uttag/planerade-arenden-for-kammaren_h6d1plan/";
 const MOVIEZINE_CALENDAR_URL = "https://www.moviezine.se/kalender";
+const DN_ALBUM_REVIEWS_RSS_URL = "https://www.dn.se/rss/om/skivrecensioner/";
 
 const MONTHS: Record<string, number> = {
   januari: 1, jan: 1, februari: 2, feb: 2, mars: 3, mar: 3,
@@ -726,13 +729,68 @@ function parseMovieCalendar(html: string) {
   );
 }
 
+function parseAlbumReviewsRss(xml: string): SnapshotLink[] {
+  const reviews: SnapshotLink[] = [];
+  const pattern = /<item\\b[^>]*>([\\s\\S]*?)<\\/item>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(xml)) !== null) {
+    const block = match[1];
+    const title = rssTag(block, "title");
+    const url = absoluteUrl(rssTag(block, "link"), DN_ALBUM_REVIEWS_RSS_URL);
+    const description = rssTag(block, "description");
+    const rawDate = rssTag(block, "pubDate") || rssTag(block, "dc:date") || rssTag(block, "date");
+    const timestamp = rawDate ? new Date(rawDate).getTime() : NaN;
+    const date = Number.isFinite(timestamp) ? new Date(timestamp).toISOString().slice(0, 10) : undefined;
+
+    if (!title || title.length < 4 || !url) continue;
+    reviews.push({
+      title,
+      url,
+      date,
+      dateLabel: date ? dateLabel(date) : undefined,
+      description: description.length > 20 ? description.slice(0, 220) : undefined,
+      kind: "skivrecension",
+    });
+    if (reviews.length >= 6) break;
+  }
+
+  return dedupeEntries(reviews);
+}
+
+async function getAlbumReviews(): Promise<SnapshotLink[]> {
+  const response = await fetch(DN_ALBUM_REVIEWS_RSS_URL, {
+    signal: AbortSignal.timeout(9000),
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; Glenn-News/1.0; culture)",
+      Accept: "application/rss+xml,application/xml,text/xml,*/*",
+    },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error("HTTP " + response.status + " for " + DN_ALBUM_REVIEWS_RSS_URL);
+  }
+
+  const reviews = parseAlbumReviewsRss(await response.text());
+  if (!reviews.length) {
+    throw new Error("DN:s RSS-flöde för skivrecensioner gav inga recensioner.");
+  }
+  return reviews;
+}
+
 async function getCultureSnapshotInternal(): Promise<CultureSnapshot> {
-  const films = parseMovieCalendar(await fetchHtml(MOVIEZINE_CALENDAR_URL));
+  const [movieHtml, albumReviews] = await Promise.all([
+    fetchHtml(MOVIEZINE_CALENDAR_URL),
+    getAlbumReviews(),
+  ]);
+  const films = parseMovieCalendar(movieHtml);
 
   return {
     films,
+    albumReviews,
     updatedAt: new Date().toISOString(),
     sourceUrl: MOVIEZINE_CALENDAR_URL,
+    reviewSourceUrl: DN_ALBUM_REVIEWS_RSS_URL,
   };
 }
 
@@ -1005,7 +1063,7 @@ const getCachedNationalSnapshotInternal = unstable_cache(
 
 const getCachedCultureSnapshotInternal = unstable_cache(
   () => withLastGoodSnapshot("culture-snapshot", getCultureSnapshotInternal),
-  ["glenn-news-daily-culture-v3"],
+  ["glenn-news-daily-culture-v4"],
   { revalidate: 4 * 60 * 60, tags: ["glenn-news-daily-culture"] }
 );
 
