@@ -169,8 +169,8 @@ test("Borås local events prioritize reader interests and keep Borås Stad event
   assert.doesNotMatch(snapshots, /events = dedupeEntries\(\[[\s\S]{0,150}calendarItems\.filter\(item => item\.kind !== "sammanträde"\)/);
   assert.match(snapshots, /events: events\.sort\(\(a, b\) =>/);
   assert.doesNotMatch(snapshots, /events: events\.sort\(\(a, b\) =>[\s\S]{0,180}\.slice\(0, 5\)/);
-  assert.match(snapshots, /local-snapshot-v3/);
-  assert.match(snapshots, /glenn-news-daily-local-v3/);
+  assert.match(snapshots, /local-snapshot-v4/);
+  assert.match(snapshots, /glenn-news-daily-local-v4/);
 
   const panel = read("app/components/DailySnapshotPanels.tsx");
   assert.match(panel, /function rankLocalEvents\(events: LocalSnapshot\["events"\], profile: ReaderProfile\)/);
