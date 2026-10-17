@@ -450,7 +450,8 @@ test("sport editorial selection targets ten stories and prioritizes the four nam
   assert.match(editor, /Övrig sport – balanserad bevakning av flera sporter/);
   assert.match(editor, /profile, 8\)/);
   assert.match(editor, /profile, 2\)/);
-  assert.match(editor, /const stories = \[\.\.\.footballStories, \.\.\.balancedOtherStories\]\.slice\(0, 10\)/);
+  assert.match(editor, /const stories: SelectedStory\\[\\] = \\[/);
+  assert.match(editor, /\\.\\.\\.footballStories,[\\s\\S]*\\.\\.\\.otherStories,[\\s\\S]*\\.\\.\\.fallbackStories,[\\s\\S]*\\]\\.slice\\(0, 10\\)/);
   assert.match(editor, /"allsvenskan",\s*"premier-league",\s*"serie-a",\s*"la-liga"/s);
 });
 
