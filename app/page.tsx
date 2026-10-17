@@ -231,8 +231,10 @@ export default async function Home() {
     })),
     withOptionalFallback("culture snapshot", getCachedCultureSnapshot(), () => ({
       films: [],
+      albumReviews: [],
       updatedAt: new Date().toISOString(),
       sourceUrl: "https://www.moviezine.se/kalender",
+      reviewSourceUrl: "https://www.dn.se/rss/om/skivrecensioner/",
     })),
     editionPromise,
   ]);
