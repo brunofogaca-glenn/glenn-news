@@ -408,15 +408,18 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
   }
   if (calendarHtml.status === "fulfilled") {
     const calendarItems = parseCityCalendar(calendarHtml.value);
+    // Borås Stad is a separate calendar with its own mix of activities.
+    // Keep it for municipal meetings only; public event listings should match Borås.com.
     meetings = calendarItems.filter(item => item.kind === "sammanträde").slice(0, 3);
-    events = dedupeEntries([
-      ...events,
-      ...calendarItems.filter(item => item.kind !== "sammanträde"),
-    ]);
   }
 
   return {
-    events: events.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")).slice(0, 5),
+    // Keep the full 30-day Borås.com candidate list; relevance ranking happens
+    // in the panel using the reader profile, not by taking the earliest five.
+    events: events.sort((a, b) =>
+      (a.date ?? "").localeCompare(b.date ?? "") ||
+      (a.time ?? "99:99").localeCompare(b.time ?? "")
+    ),
     meetings,
     updatedAt: new Date().toISOString(),
     warnings,
@@ -1068,8 +1071,8 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
 }
 
 const getCachedLocalSnapshotInternal = unstable_cache(
-  () => withLastGoodSnapshot("local-snapshot", getLocalSnapshotInternal),
-  ["glenn-news-daily-local-v2"],
+  () => withLastGoodSnapshot("local-snapshot-v3", getLocalSnapshotInternal),
+  ["glenn-news-daily-local-v3"],
   { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-local"] }
 );
 
