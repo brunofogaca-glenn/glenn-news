@@ -232,34 +232,63 @@ export function WorldSnapshotPanel({ data }: { data: WorldSnapshot }) {
 export function CultureSnapshotPanel({ data }: { data: CultureSnapshot }) {
   return (
     <section className="border-y border-slate-300 bg-[#f1e6eb] px-4 py-4 md:px-5 md:py-5">
-      <div className="flex flex-col justify-between gap-2 border-b border-slate-300 pb-3 sm:flex-row sm:items-end">
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-pink-800">Kultur · på bio</div>
-          <h3 className="mt-1 font-serif text-xl font-black md:text-2xl">Veckans filmpremiärer</h3>
-          <p className="mt-1 text-xs text-slate-500">Alla svenska biopremiärer som hittats för de kommande sju dagarna.</p>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="min-w-0">
+          <div className="border-b border-slate-300 pb-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-pink-800">Kultur · på bio</div>
+            <h3 className="mt-1 font-serif text-xl font-black md:text-2xl">Veckans filmpremiärer</h3>
+            <p className="mt-1 text-xs text-slate-500">Alla svenska biopremiärer som hittats för de kommande sju dagarna.</p>
+            <div className="mt-2 text-xs text-slate-500">
+              <SourceLink title="Hela biokalendern" url={data.sourceUrl} />
+            </div>
+          </div>
+
+          {data.films.length ? (
+            <div className="mt-2 grid gap-x-5 lg:grid-cols-1 xl:grid-cols-2">
+              {data.films.map((film, index) => (
+                <a key={film.url + film.date + index} href={film.url} target="_blank" rel="noreferrer" className="group border-b border-slate-200 py-3">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{film.dateLabel ?? film.date}</div>
+                  <div className="mt-1 font-serif font-bold leading-snug group-hover:underline">{film.title}</div>
+                  {film.description ? <div className="mt-1 text-xs leading-5 text-slate-500">{film.description}</div> : null}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 font-serif text-sm text-slate-500">
+              Inga kommande premiärer hittades i de kommande sju dagarna. Öppna MovieZines kalender för den fullständiga listan.
+            </p>
+          )}
         </div>
-        <SourceLink title="Hela biokalendern" url={data.sourceUrl} />
+
+        <div className="min-w-0 border-t border-slate-300 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+          <div className="border-b border-slate-300 pb-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-pink-800">Kultur · musik</div>
+            <h3 className="mt-1 font-serif text-xl font-black md:text-2xl">Senaste skivrecensionerna</h3>
+            <p className="mt-1 text-xs text-slate-500">Nya albumrecensioner från Dagens Nyheter.</p>
+            <div className="mt-2 text-xs text-slate-500">
+              <SourceLink title="DN:s RSS-flöde" url={data.reviewSourceUrl} />
+            </div>
+          </div>
+
+          {data.albumReviews.length ? (
+            <div className="mt-1">
+              {data.albumReviews.slice(0, 6).map((review, index) => (
+                <SmallEntry key={review.url + index} item={review} meta="Skivrecension" />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 font-serif text-sm text-slate-500">
+              Skivrecensionerna kunde inte hämtas just nu. Prova igen senare.
+            </p>
+          )}
+        </div>
       </div>
 
-      {data.films.length ? (
-        <div className="mt-3 grid gap-x-5 md:grid-cols-2 lg:grid-cols-3">
-          {data.films.map((film, index) => (
-            <a key={film.url + film.date + index} href={film.url} target="_blank" rel="noreferrer" className="border-b border-slate-200 py-3 group">
-              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{film.dateLabel ?? film.date}</div>
-              <div className="mt-1 font-serif font-bold leading-snug group-hover:underline">{film.title}</div>
-              {film.description ? <div className="mt-1 text-xs leading-5 text-slate-500">{film.description}</div> : null}
-            </a>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-3 font-serif text-sm text-slate-500">
-          Inga kommande premiärer hittades i de kommande sju dagarna. Öppna MovieZines kalender för den fullständiga listan.
-        </p>
-      )}
       <SourceFooter>
         <span>Hämtad {new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).format(new Date(data.updatedAt))}</span>
-        <span> · Källa: MovieZine</span>
+        <span> · Källor: MovieZine och DN:s skivrecensioner</span>
       </SourceFooter>
     </section>
   );
 }
+

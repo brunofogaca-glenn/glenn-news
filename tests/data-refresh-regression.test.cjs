@@ -138,3 +138,26 @@ test("supplemental status is persisted and readable from the operations page", (
   assert.match(health, /getSupplementalRefreshRun/);
   assert.match(health, /Nattlig uppdatering/);
 });
+
+test("culture panel shows DN album reviews alongside weekly movie premieres", () => {
+  const snapshots = read("lib/dailySnapshots.ts");
+  assert.match(snapshots, /DN_ALBUM_REVIEWS_RSS_URL = "https:\/\/www\.dn\.se\/rss\/om\/skivrecensioner\//);
+  assert.match(snapshots, /function parseAlbumReviewsRss/);
+  assert.match(snapshots, /async function getAlbumReviews/);
+  assert.match(snapshots, /albumReviews: SnapshotLink\[\]/);
+  assert.match(snapshots, /reviewSourceUrl: string/);
+  assert.match(snapshots, /const \[movieResult, reviewResult\] = await Promise\.allSettled\(\[/);
+  assert.match(snapshots, /Array\.isArray\(snapshot\.albumReviews\)/);
+  assert.match(snapshots, /snapshot\.reviewSourceUrl/);
+  assert.match(snapshots, /glenn-news-daily-culture-v4/);
+
+  const panel = read("app/components/DailySnapshotPanels.tsx");
+  assert.match(panel, /Veckans filmpremiärer/);
+  assert.match(panel, /Senaste skivrecensionerna/);
+  assert.match(panel, /data\.albumReviews\.slice\(0, 6\)/);
+  assert.match(panel, /lg:grid-cols-2/);
+
+  const homepage = read("app/page.tsx");
+  assert.match(homepage, /albumReviews: \[\]/);
+  assert.match(homepage, /reviewSourceUrl: "https:\/\/www\.dn\.se\/rss\/om\/skivrecensioner\//);
+});
