@@ -66,6 +66,8 @@ function normalizeInterestText(value: string) {
 function localEventBaseScore(item: LocalSnapshot["events"][number]) {
   const text = normalizeInterestText(item.title + " " + (item.description ?? ""));
 
+  // Treat a full organ-festival programme as one niche series, not as several competing "music" picks.
+  if (/orgel|orgelimprovisation|rorelsemeditation/.test(text)) return 12;
   if (/\belfsborg\b|\ballsvenskan\b|\bfotboll\b|\bfootball\b/.test(text)) return 120;
   if (/boras basket|\bbasket\b|\bishockey\b|\bhockey\b|\bfotboll\b|\bgolf\b/.test(text)) return 105;
   if (/sven ingvars|eva dahlgren|carola|konsert|konserten|\bturne\b|\blive\b|\bmusikkar\b|\bartist\b|\bmusik\b/.test(text)) return 92;
