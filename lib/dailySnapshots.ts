@@ -395,21 +395,6 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
     fetchHtml(BORAS_CALENDAR_URL),
   ]);
 
-  if (borasHtml.status === "rejected" && calendarHtml.status === "rejected") {
-    throw new Error("Borås.com och Borås Stad svarade inte.");
-  }
-
-  let events: SnapshotLink[] = [];
-  let meetings: SnapshotLink[] = [];
-  let eventSource: LocalSnapshot["eventSource"] = "boras.com";
-  const warnings: string[] = [];
-  if (borasHtml.status === "rejected") {
-    warnings.push("Borås.com: " + (borasHtml.reason instanceof Error ? borasHtml.reason.message : String(borasHtml.reason)));
-  }
-  if (calendarHtml.status === "rejected") {
-    warnings.push("Borås Stad: " + (calendarHtml.reason instanceof Error ? calendarHtml.reason.message : String(calendarHtml.reason)));
-  }
-
   const today = todayInStockholm();
   const eventCutoff = addDays(today, 60);
   const scrapedEvents = browserEventsResult.status === "fulfilled" && browserEventsResult.value
@@ -430,8 +415,24 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
         kind: "evenemang",
       }))
     : null;
+  const hasBrowserEvents = Boolean(scrapedEvents && scrapedEvents.length >= 6);
 
-  if (scrapedEvents && scrapedEvents.length >= 6) {
+  if (!hasBrowserEvents && borasHtml.status === "rejected" && calendarHtml.status === "rejected") {
+    throw new Error("Borås.com, Borås Stad och den sparade webbläsarlistan svarade inte.");
+  }
+
+  let events: SnapshotLink[] = [];
+  let meetings: SnapshotLink[] = [];
+  let eventSource: LocalSnapshot["eventSource"] = "boras.com";
+  const warnings: string[] = [];
+  if (borasHtml.status === "rejected" && !hasBrowserEvents) {
+    warnings.push("Borås.com: " + (borasHtml.reason instanceof Error ? borasHtml.reason.message : String(borasHtml.reason)));
+  }
+  if (calendarHtml.status === "rejected" && !hasBrowserEvents) {
+    warnings.push("Borås Stad: " + (calendarHtml.reason instanceof Error ? calendarHtml.reason.message : String(calendarHtml.reason)));
+  }
+
+  if (hasBrowserEvents && scrapedEvents) {
     events = scrapedEvents;
   } else if (borasHtml.status === "fulfilled") {
     events = parseJsonLdEvents(borasHtml.value, LOCAL_EVENTS_URL);
@@ -447,7 +448,6 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
     if (events.length < 4 && publicCityEvents.length > 0) {
       events = publicCityEvents;
       eventSource = "boras-stad-fallback";
-      warnings.push("Borås.com gav för få strukturerade evenemang; reservlistan kommer från Borås Stad.");
     }
   }
 
@@ -460,7 +460,8 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
     eventSource,
     meetings,
     updatedAt: new Date().toISOString(),
-    warnings,
+    // If events were loaded, a failed optional HTML source must not make this snapshot stale.
+    warnings: events.length > 0 ? [] : warnings,
     sources: [
       { title: "Borås.com · evenemang", url: LOCAL_EVENTS_URL },
       { title: "Borås Stad · kalender", url: BORAS_CALENDAR_URL },
