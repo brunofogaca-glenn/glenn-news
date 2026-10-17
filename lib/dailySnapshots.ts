@@ -428,7 +428,8 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
         description: item.description,
         image: item.image,
         kind: "evenemang",
-      }));
+      }))
+    : null;
 
   if (scrapedEvents && scrapedEvents.length >= 6) {
     events = scrapedEvents;
