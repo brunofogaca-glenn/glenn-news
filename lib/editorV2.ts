@@ -720,21 +720,61 @@ function combineSportSummaries(
   otherSummary: string
 ) {
   function firstSentences(value: string) {
-    const sentences =
-      value.match(/[^.!?]+[.!?]+/g) ?? [];
-
-    return sentences
-      .slice(0, 2)
-      .join(" ")
-      .trim();
+    const sentences = value.match(/[^.!?]+[.!?]+/g) ?? [];
+    return sentences.slice(0, 2).join(" ").trim();
   }
 
-  return [
-    firstSentences(footballSummary),
-    firstSentences(otherSummary),
-  ]
+  return [firstSentences(footballSummary), firstSentences(otherSummary)]
     .filter(Boolean)
     .join(" ");
+}
+
+type SportLeagueGroup =
+  | "allsvenskan"
+  | "premier-league"
+  | "serie-a"
+  | "la-liga"
+  | "other-football";
+
+function classifyFootballLeague(article: Article): SportLeagueGroup {
+  const text = `${article.title} ${article.description ?? ""} ${article.source ?? ""}`
+    .toLocaleLowerCase("sv-SE");
+
+  if (/(allsvenskan|svenska cupen|svensk elitfotboll|superettan|ifk göteborg|ifk norrköping|djurgården|hammarby|malmö ff|bk häcken|if elfsborg|norrby)/i.test(text)) return "allsvenskan";
+  if (/(premier league|premiership|manchester united|manchester city|liverpool|arsenal|chelsea|tottenham|newcastle united|aston villa|west ham|everton|nottingham forest|brighton|fulham|crystal palace|wolves|brentford|burnley|sunderland)/i.test(text)) return "premier-league";
+  if (/(serie a|serie-a|italian football|italy|italien|juventus|inter milan|ac milan|napoli|roma|as roma|lazio|atalanta|fiorentina|bologna|torino|udinese|como 1907|parma calcio)/i.test(text)) return "serie-a";
+  if (/(la liga|laliga|spanish football|spain|spanien|real madrid|barcelona|atletico madrid|atlético madrid|girona|real sociedad|athletic bilbao|sevilla fc|real betis|villarreal|valencia cf)/i.test(text)) return "la-liga";
+  return "other-football";
+}
+
+function selectFootballCoverage(
+  candidates: SelectedStory[],
+  maxCount = 8
+): SelectedStory[] {
+  const selected: SelectedStory[] = [];
+  const used = new Set<string>();
+
+  function add(story: SelectedStory) {
+    const key = normalizeStoryUrl(story.link) || normalizeStoryTitle(story.title);
+    if (!key || used.has(key) || selected.length >= maxCount) return;
+    used.add(key);
+    selected.push({ ...story, sportGroup: "fotboll" as const });
+  }
+
+  // Reserve a slot for each named league when recent, relevant coverage exists.
+  const groups: SportLeagueGroup[] = [
+    "allsvenskan",
+    "premier-league",
+    "serie-a",
+    "la-liga",
+  ];
+  for (const group of groups) {
+    const candidate = candidates.find(story => classifyFootballLeague(story) === group);
+    if (candidate) add(candidate);
+  }
+
+  for (const candidate of candidates) add(candidate);
+  return selected;
 }
 
 export async function createSportEditorialSection(
@@ -742,60 +782,54 @@ export async function createSportEditorialSection(
   otherSportArticles: Article[],
   profile: ReaderProfile
 ): Promise<EditorialSection> {
-  const [footballAI, otherAI] =
-    await Promise.all([
-      runEditorialAI(
-        "fotboll",
-        "Fotboll",
-        footballArticles,
-        profile,
-        4
-      ),
-      runEditorialAI(
-        "sport",
-        "Övrig sport",
-        otherSportArticles,
-        profile,
-        2
-      ),
-    ]);
+  const [footballAI, otherAI] = await Promise.all([
+    runEditorialAI("fotboll", "Fotboll – Allsvenskan, Premier League, Serie A, La Liga och övrig fotboll", footballArticles, profile, 8),
+    runEditorialAI("sport", "Övrig sport – balanserad bevakning av flera sporter", otherSportArticles, profile, 2),
+  ]);
 
-  const footballStories =
-    footballAI.stories.map(
-      (story, index) => ({
-        ...story,
-        id: index,
-        sportGroup:
-          "fotboll" as const,
-      })
-    );
+  const footballStories = selectFootballCoverage(footballAI.stories, 8).map((story, index) => ({
+    ...story,
+    id: index,
+    sportGroup: "fotboll" as const,
+  }));
 
-  const otherStories =
-    otherAI.stories.map(
-      (story, index) => ({
-        ...story,
-        id: 1000 + index,
-        sportGroup:
-          "övrig sport" as const,
-      })
-    );
+  const otherStories = otherAI.stories.map((story, index) => ({
+    ...story,
+    id: 1000 + index,
+    sportGroup: "övrig sport" as const,
+  }));
 
-  const stories = [
+  // If there are too few other-sport stories, fill spare places with additional
+  // current football articles instead of letting the section run short.
+  const footballKeys = new Set(footballStories.map(story =>
+    normalizeStoryUrl(story.link) || normalizeStoryTitle(story.title)
+  ));
+  const footballFallback = footballAI.stories.filter(story => {
+    const key = normalizeStoryUrl(story.link) || normalizeStoryTitle(story.title);
+    return key && !footballKeys.has(key);
+  });
+  const fallbackStories = footballFallback.slice(
+    0,
+    Math.max(0, 2 - otherStories.length)
+  ).map((story, index) => ({
+    ...story,
+    id: 2000 + index,
+    sportGroup: "fotboll" as const,
+  }));
+
+  const stories: SelectedStory[] = [
     ...footballStories,
     ...otherStories,
-  ];
+    ...fallbackStories,
+  ].slice(0, 10);
 
   return {
     key: "sport",
     title: "Sport",
-    summary: combineSportSummaries(
-      footballAI.summary,
-      otherAI.summary
-    ),
+    summary: combineSportSummaries(footballAI.summary, otherAI.summary),
     stories,
   };
 }
-
 export async function createEditorialSection(
   categoryKey: string,
   categoryTitle: string,

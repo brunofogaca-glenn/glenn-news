@@ -442,3 +442,22 @@ test("production morning edition contract keeps Stockholm scheduling, validation
   assert.match(home, /RetryMorningEditionButton/,
     "the homepage must clearly label fallback/empty states and offer a recovery path");
 });
+
+
+test("sport editorial selection targets ten stories and prioritizes the four named football leagues when available", () => {
+  const editor = fs.readFileSync(require.resolve("../lib/editorV2.ts"), "utf8");
+  assert.ok(editor.includes("Fotboll – Allsvenskan, Premier League, Serie A, La Liga och övrig fotboll"));
+  assert.ok(editor.includes("Övrig sport – balanserad bevakning av flera sporter"));
+  assert.ok(editor.includes("profile, 8)"));
+  assert.ok(editor.includes("profile, 2)"));
+  assert.ok(editor.includes("const stories: SelectedStory[] = ["));
+  assert.ok(editor.includes("...footballStories") && editor.includes("...otherStories") && editor.includes("...fallbackStories"));
+  assert.ok(editor.includes("].slice(0, 10)"));
+  assert.ok(editor.includes('"allsvenskan",') && editor.includes('"premier-league",') && editor.includes('"serie-a",') && editor.includes('"la-liga",'));
+});
+
+test("sport homepage shows the actual story count and places the other-sport divider after football", () => {
+  const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
+  assert.match(home, /section\.stories\.length.*fotboll först, övrig sport vid tillgång/);
+  assert.match(home, /section\.key === "sport" && index === Math\.min\(8, section\.stories\.length\)/);
+});
