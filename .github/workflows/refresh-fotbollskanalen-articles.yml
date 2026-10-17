@@ -1,0 +1,78 @@
+name: Refresh Fotbollskanalen articles
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/refresh-fotbollskanalen-articles.yml"
+      - "scripts/scrape-fotbollskanalen-articles.mjs"
+      - "app/api/cron/ingest-fotbollskanalen-articles/route.ts"
+      - "lib/fotbollskanalenArticleStore.ts"
+      - "lib/webSources.ts"
+      - "lib/feedHealth.ts"
+      - "lib/githubActionsAuth.ts"
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  scrape-fotbollskanalen-articles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ubuntu-playwright-1.56.0-chromium
+
+      - name: Install Playwright
+        run: npm install --no-save --package-lock=false playwright@1.56.0
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Read Fotbollskanalen through a real browser
+        run: node scripts/scrape-fotbollskanalen-articles.mjs
+
+      - name: Upload validated articles to Glenn News
+        env:
+          INGEST_URL: https://glenn-news.vercel.app/api/cron/ingest-fotbollskanalen-articles
+          OIDC_AUDIENCE: https://glenn-news.vercel.app
+          VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+            echo "::error::GitHub Actions did not provide OIDC credentials. Ensure id-token: write is enabled."
+            exit 1
+          fi
+          if [[ -z "$VERCEL_BYPASS_SECRET" ]]; then
+            echo "::error::Add VERCEL_AUTOMATION_BYPASS_SECRET to GitHub Actions secrets."
+            exit 1
+          fi
+
+          oidc_response="$(curl --fail-with-body --silent --show-error --max-time 20 \
+            --get --data-urlencode "audience=$OIDC_AUDIENCE" \
+            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL")"
+          oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
+
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            --header "Authorization: Bearer $oidc_token" \
+            --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
+            --header "Content-Type: application/json" \
+            --header "Accept: application/json" \
+            --data-binary @fotbollskanalen-articles.json "$INGEST_URL"
