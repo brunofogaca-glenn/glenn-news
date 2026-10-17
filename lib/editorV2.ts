@@ -785,15 +785,26 @@ export async function createSportEditorialSection(
   // Keep a full ranked football pool for league coverage, while asking AI for
   // the best stories from the available source pool.
   const rankedFootball = buildCandidates(footballArticles, profile, false);
+  const rankedFootballStories: SelectedStory[] = rankedFootball.map(candidate => ({
+    ...candidate,
+    aiSummary: candidate.description?.trim() ?? "",
+    selectionReason: "Automatiskt urval baserat på relevans, färskhet och innehållstyp.",
+    articleType: candidate.articleType ?? "nyhet",
+    sportGroup: "fotboll" as const,
+  }));
+  const footballCandidatePool: SelectedStory[] = [
+    ...rankedFootballStories,
+  ];
   const [footballAI, otherAI] = await Promise.all([
     runEditorialAI("fotboll", "Fotboll – Allsvenskan, Premier League, Serie A, La Liga och övrig fotboll", footballArticles, profile, 8),
     runEditorialAI("sport", "Övrig sport – balanserad bevakning av flera sporter", otherSportArticles, profile, 2),
   ]);
+  footballCandidatePool.push(...footballAI.stories);
 
   // Reserve one slot per named league when a current, valid article exists.
   // Fill remaining places with the best AI-selected football stories.
   const footballStories = selectFootballCoverage(
-    [...rankedFootball, ...footballAI.stories],
+    footballCandidatePool,
     8
   ).map((story, index) => ({
     ...story,
@@ -812,7 +823,7 @@ export async function createSportEditorialSection(
   const footballKeys = new Set(footballStories.map(story =>
     normalizeStoryUrl(story.link) || normalizeStoryTitle(story.title)
   ));
-  const footballFallback = [...rankedFootball, ...footballAI.stories].filter(story => {
+  const footballFallback = footballCandidatePool.filter(story => {
     const key = normalizeStoryUrl(story.link) || normalizeStoryTitle(story.title);
     return key && !footballKeys.has(key);
   });
