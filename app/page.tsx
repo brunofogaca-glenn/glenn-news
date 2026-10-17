@@ -573,7 +573,7 @@ export default async function Home() {
 
               {section.key === "boras" && (
                 <div className="mb-6">
-                  <LocalSnapshotPanel data={localSnapshot} />
+                  <LocalSnapshotPanel data={localSnapshot} profile={profile} />
                 </div>
               )}
 
