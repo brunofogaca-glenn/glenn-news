@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { withLastGoodSnapshot } from "./supplementalCache";
+import { getBrowserScrapedBorasEvents } from "./borasEventStore";
 
 const TIME_ZONE = "Europe/Stockholm";
 
@@ -10,6 +11,9 @@ export type SnapshotLink = {
   dateLabel?: string;
   time?: string;
   description?: string;
+  image?: string;
+  venue?: string;
+  endDate?: string;
   kind?: string;
 };
 
@@ -385,7 +389,8 @@ function dedupeEntries(entries: SnapshotLink[]) {
 }
 
 async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
-  const [borasHtml, calendarHtml] = await Promise.allSettled([
+  const [browserEventsResult, borasHtml, calendarHtml] = await Promise.allSettled([
+    getBrowserScrapedBorasEvents(),
     fetchHtml(LOCAL_EVENTS_URL),
     fetchHtml(BORAS_CALENDAR_URL),
   ]);
@@ -405,7 +410,29 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
     warnings.push("Borås Stad: " + (calendarHtml.reason instanceof Error ? calendarHtml.reason.message : String(calendarHtml.reason)));
   }
 
-  if (borasHtml.status === "fulfilled") {
+  const today = todayInStockholm();
+  const eventCutoff = addDays(today, 60);
+  const scrapedEvents = browserEventsResult.status === "fulfilled" && browserEventsResult.value
+    ? browserEventsResult.value.events
+      .filter(item => item.date <= eventCutoff && (item.endDate ?? item.date) >= today)
+      .map(item => ({
+        title: item.title,
+        url: item.url,
+        date: item.date,
+        endDate: item.endDate,
+        dateLabel: item.endDate && item.endDate !== item.date
+          ? dateLabel(item.date) + " – " + dateLabel(item.endDate)
+          : dateLabel(item.date),
+        time: item.time,
+        venue: item.venue,
+        description: item.description,
+        image: item.image,
+        kind: "evenemang",
+      }));
+
+  if (scrapedEvents && scrapedEvents.length >= 6) {
+    events = scrapedEvents;
+  } else if (borasHtml.status === "fulfilled") {
     events = parseJsonLdEvents(borasHtml.value, LOCAL_EVENTS_URL);
   }
   if (calendarHtml.status === "fulfilled") {
@@ -1081,8 +1108,8 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
 }
 
 const getCachedLocalSnapshotInternal = unstable_cache(
-  () => withLastGoodSnapshot("local-snapshot-v4", getLocalSnapshotInternal),
-  ["glenn-news-daily-local-v4"],
+  () => withLastGoodSnapshot("local-snapshot-v5", getLocalSnapshotInternal),
+  ["glenn-news-daily-local-v5"],
   { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-local"] }
 );
 
