@@ -169,8 +169,8 @@ test("Borås local events prioritize reader interests and keep Borås Stad event
   assert.doesNotMatch(snapshots, /events = dedupeEntries\(\[[\s\S]{0,150}calendarItems\.filter\(item => item\.kind !== "sammanträde"\)/);
   assert.match(snapshots, /events: events\.sort\(\(a, b\) =>/);
   assert.doesNotMatch(snapshots, /events: events\.sort\(\(a, b\) =>[\s\S]{0,180}\.slice\(0, 5\)/);
-  assert.match(snapshots, /local-snapshot-v3/);
-  assert.match(snapshots, /glenn-news-daily-local-v3/);
+  assert.match(snapshots, /local-snapshot-v4/);
+  assert.match(snapshots, /glenn-news-daily-local-v4/);
 
   const panel = read("app/components/DailySnapshotPanels.tsx");
   assert.match(panel, /function rankLocalEvents\(events: LocalSnapshot\["events"\], profile: ReaderProfile\)/);
@@ -183,4 +183,21 @@ test("Borås local events prioritize reader interests and keep Borås Stad event
 
   const homepage = read("app/page.tsx");
   assert.match(homepage, /LocalSnapshotPanel data=\{localSnapshot\} profile=\{profile\}/);
+});
+
+test("Borås events use an explicit public-event fallback when Borås.com has no structured listing", () => {
+  const snapshots = read("lib/dailySnapshots.ts");
+  assert.match(snapshots, /eventSource: "boras.com" \| "boras-stad-fallback"/);
+  assert.match(snapshots, /if \(events\.length < 4 && publicCityEvents\.length > 0\)/);
+  assert.match(snapshots, /events = publicCityEvents/);
+  assert.match(snapshots, /eventSource = "boras-stad-fallback"/);
+  assert.match(snapshots, /boras-stad-fallback/);
+  assert.match(snapshots, /glenn-news-daily-local-v4/);
+
+  const panel = read("app/components/DailySnapshotPanels.tsx");
+  assert.match(panel, /Borås.com-listan gick inte att läsa just nu/);
+  assert.match(panel, /Evenemang: Borås Stad \(reservkälla\)/);
+
+  const homepage = read("app/page.tsx");
+  assert.match(homepage, /eventSource: "boras.com" as const/);
 });

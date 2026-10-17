@@ -213,6 +213,7 @@ export default async function Home() {
     withOptionalFallback("local snapshot", getCachedLocalSnapshot(), () => ({
       events: [],
       meetings: [],
+      eventSource: "boras.com" as const,
       updatedAt: new Date().toISOString(),
       sources: [],
     })),
