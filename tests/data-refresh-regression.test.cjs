@@ -169,8 +169,8 @@ test("Borås local events prioritize reader interests and keep Borås Stad event
   assert.doesNotMatch(snapshots, /events = dedupeEntries\(\[[\s\S]{0,150}calendarItems\.filter\(item => item\.kind !== "sammanträde"\)/);
   assert.match(snapshots, /events: events\.sort\(\(a, b\) =>/);
   assert.doesNotMatch(snapshots, /events: events\.sort\(\(a, b\) =>[\s\S]{0,180}\.slice\(0, 5\)/);
-  assert.match(snapshots, /local-snapshot-v4/);
-  assert.match(snapshots, /glenn-news-daily-local-v4/);
+  assert.match(snapshots, /local-snapshot-v5/);
+  assert.match(snapshots, /glenn-news-daily-local-v5/);
 
   const panel = read("app/components/DailySnapshotPanels.tsx");
   assert.match(panel, /function rankLocalEvents\(events: LocalSnapshot\["events"\], profile: ReaderProfile\)/);
@@ -192,7 +192,7 @@ test("Borås events use an explicit public-event fallback when Borås.com has no
   assert.match(snapshots, /events = publicCityEvents/);
   assert.match(snapshots, /eventSource = "boras-stad-fallback"/);
   assert.match(snapshots, /boras-stad-fallback/);
-  assert.match(snapshots, /glenn-news-daily-local-v4/);
+  assert.match(snapshots, /glenn-news-daily-local-v5/);
 
   const panel = read("app/components/DailySnapshotPanels.tsx");
   assert.match(panel, /Borås.com-listan gick inte att läsa just nu/);
@@ -200,4 +200,38 @@ test("Borås events use an explicit public-event fallback when Borås.com has no
 
   const homepage = read("app/page.tsx");
   assert.match(homepage, /eventSource: "boras.com" as const/);
+});
+
+test("Borås events are captured with a real browser and loaded from private cached snapshots", () => {
+  const workflow = read(".github/workflows/refresh-boras-events.yml");
+  assert.ok(workflow.includes('cron: "23 */2 * * *"'));
+  assert.ok(workflow.includes("playwright install --with-deps chromium"));
+  assert.ok(workflow.includes("scripts/scrape-boras-events.mjs"));
+  assert.ok(workflow.includes("/api/cron/ingest-boras-events"));
+  assert.ok(workflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
+  assert.ok(workflow.includes("VERCEL_AUTOMATION_BYPASS_SECRET"));
+
+  const scraper = read("scripts/scrape-boras-events.mjs");
+  assert.ok(scraper.includes("chromium.launch"));
+  assert.ok(scraper.includes('waitForLoadState("networkidle"'));
+  assert.ok(scraper.includes('a[href*="/evenemang/"]'));
+  assert.ok(scraper.includes("Refusing to replace the last good snapshot"));
+
+  const store = read("lib/borasEventStore.ts");
+  assert.ok(store.includes('access: "private"'));
+  assert.ok(store.includes("MAX_AGE_MS"));
+  assert.ok(store.includes("browser-scrape.json"));
+
+  const ingest = read("app/api/cron/ingest-boras-events/route.ts");
+  assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "borasEvents")'));
+  assert.ok(ingest.includes("Färre än sex kommande Borås-evenemang"));
+  assert.ok(ingest.includes('revalidateTag("glenn-news-daily-local"'));
+
+  const auth = read("lib/githubActionsAuth.ts");
+  assert.ok(auth.includes("refresh-boras-events.yml"));
+
+  const snapshots = read("lib/dailySnapshots.ts");
+  assert.ok(snapshots.includes("getBrowserScrapedBorasEvents"));
+  assert.ok(snapshots.includes("glenn-news-daily-local-v5"));
+  assert.ok(snapshots.includes("scrapedEvents.length >= 6"));
 });

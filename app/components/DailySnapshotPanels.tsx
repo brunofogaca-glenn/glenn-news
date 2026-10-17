@@ -32,7 +32,7 @@ function SmallEntry({
   item,
   meta,
 }: {
-  item: { title: string; url: string; dateLabel?: string; time?: string; description?: string };
+  item: { title: string; url: string; dateLabel?: string; time?: string; description?: string; venue?: string; image?: string };
   meta?: string;
 }) {
   return (
@@ -46,10 +46,12 @@ function SmallEntry({
         {item.dateLabel ?? meta ?? "Aktuellt"}
         {item.time ? <div className="mt-0.5 font-mono text-[11px] tracking-normal text-slate-700">{item.time}</div> : null}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
+        {item.venue ? <div className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400">{item.venue}</div> : null}
         <div className="font-serif font-bold leading-snug group-hover:underline">{item.title}</div>
         {item.description ? <div className="mt-1 text-xs leading-5 text-slate-500">{item.description}</div> : null}
       </div>
+      {item.image ? <img src={item.image} alt="" loading="lazy" className="h-12 w-16 shrink-0 self-center rounded-sm object-cover" /> : null}
     </a>
   );
 }

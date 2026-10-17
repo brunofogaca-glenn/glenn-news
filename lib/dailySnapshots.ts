@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { withLastGoodSnapshot } from "./supplementalCache";
+import { getBrowserScrapedBorasEvents } from "./borasEventStore";
 
 const TIME_ZONE = "Europe/Stockholm";
 
@@ -10,6 +11,9 @@ export type SnapshotLink = {
   dateLabel?: string;
   time?: string;
   description?: string;
+  image?: string;
+  venue?: string;
+  endDate?: string;
   kind?: string;
 };
 
@@ -385,27 +389,52 @@ function dedupeEntries(entries: SnapshotLink[]) {
 }
 
 async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
-  const [borasHtml, calendarHtml] = await Promise.allSettled([
+  const [browserEventsResult, borasHtml, calendarHtml] = await Promise.allSettled([
+    getBrowserScrapedBorasEvents(),
     fetchHtml(LOCAL_EVENTS_URL),
     fetchHtml(BORAS_CALENDAR_URL),
   ]);
 
-  if (borasHtml.status === "rejected" && calendarHtml.status === "rejected") {
-    throw new Error("Borås.com och Borås Stad svarade inte.");
+  const today = todayInStockholm();
+  const eventCutoff = addDays(today, 60);
+  const scrapedEvents = browserEventsResult.status === "fulfilled" && browserEventsResult.value
+    ? browserEventsResult.value.events
+      .filter(item => item.date <= eventCutoff && (item.endDate ?? item.date) >= today)
+      .map(item => ({
+        title: item.title,
+        url: item.url,
+        date: item.date,
+        endDate: item.endDate,
+        dateLabel: item.endDate && item.endDate !== item.date
+          ? dateLabel(item.date) + " – " + dateLabel(item.endDate)
+          : dateLabel(item.date),
+        time: item.time,
+        venue: item.venue,
+        description: item.description,
+        image: item.image,
+        kind: "evenemang",
+      }))
+    : null;
+  const hasBrowserEvents = Boolean(scrapedEvents && scrapedEvents.length >= 6);
+
+  if (!hasBrowserEvents && borasHtml.status === "rejected" && calendarHtml.status === "rejected") {
+    throw new Error("Borås.com, Borås Stad och den sparade webbläsarlistan svarade inte.");
   }
 
   let events: SnapshotLink[] = [];
   let meetings: SnapshotLink[] = [];
   let eventSource: LocalSnapshot["eventSource"] = "boras.com";
   const warnings: string[] = [];
-  if (borasHtml.status === "rejected") {
+  if (borasHtml.status === "rejected" && !hasBrowserEvents) {
     warnings.push("Borås.com: " + (borasHtml.reason instanceof Error ? borasHtml.reason.message : String(borasHtml.reason)));
   }
-  if (calendarHtml.status === "rejected") {
+  if (calendarHtml.status === "rejected" && !hasBrowserEvents) {
     warnings.push("Borås Stad: " + (calendarHtml.reason instanceof Error ? calendarHtml.reason.message : String(calendarHtml.reason)));
   }
 
-  if (borasHtml.status === "fulfilled") {
+  if (hasBrowserEvents && scrapedEvents) {
+    events = scrapedEvents;
+  } else if (borasHtml.status === "fulfilled") {
     events = parseJsonLdEvents(borasHtml.value, LOCAL_EVENTS_URL);
   }
   if (calendarHtml.status === "fulfilled") {
@@ -419,7 +448,6 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
     if (events.length < 4 && publicCityEvents.length > 0) {
       events = publicCityEvents;
       eventSource = "boras-stad-fallback";
-      warnings.push("Borås.com gav för få strukturerade evenemang; reservlistan kommer från Borås Stad.");
     }
   }
 
@@ -432,7 +460,8 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
     eventSource,
     meetings,
     updatedAt: new Date().toISOString(),
-    warnings,
+    // If events were loaded, a failed optional HTML source must not make this snapshot stale.
+    warnings: events.length > 0 ? [] : warnings,
     sources: [
       { title: "Borås.com · evenemang", url: LOCAL_EVENTS_URL },
       { title: "Borås Stad · kalender", url: BORAS_CALENDAR_URL },
@@ -1081,8 +1110,8 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
 }
 
 const getCachedLocalSnapshotInternal = unstable_cache(
-  () => withLastGoodSnapshot("local-snapshot-v4", getLocalSnapshotInternal),
-  ["glenn-news-daily-local-v4"],
+  () => withLastGoodSnapshot("local-snapshot-v5", getLocalSnapshotInternal),
+  ["glenn-news-daily-local-v5"],
   { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-local"] }
 );
 
