@@ -211,6 +211,8 @@ test("Borås events are captured with a real browser and loaded from private cac
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-boras-events.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-boras-events"));
+  assert.ok(!workflow.includes("/api/cron/refresh-data"));
+  assert.ok(workflow.includes("invalidate the local snapshot cache"));
   assert.ok(workflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
   assert.ok(workflow.includes("VERCEL_AUTOMATION_BYPASS_SECRET"));
 

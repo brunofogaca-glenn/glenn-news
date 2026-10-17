@@ -46,10 +46,9 @@ jobs:
       - name: Read Borås.com event cards in a real browser
         run: node scripts/scrape-boras-events.mjs
 
-      - name: Upload rendered events and refresh the local snapshot
+      - name: Upload rendered events and invalidate the local snapshot cache
         env:
           INGEST_URL: https://glenn-news.vercel.app/api/cron/ingest-boras-events
-          REFRESH_URL: https://glenn-news.vercel.app/api/cron/refresh-data
           OIDC_AUDIENCE: https://glenn-news.vercel.app
           VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         shell: bash
@@ -73,7 +72,3 @@ jobs:
             --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
             --header "Content-Type: application/json" --header "Accept: application/json" \
             --data-binary @boras-events-scrape.json "$INGEST_URL"
-          curl --fail-with-body --silent --show-error --max-time 150 \
-            --header "Authorization: Bearer $oidc_token" \
-            --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
-            --header "Accept: application/json" "$REFRESH_URL"
