@@ -1,6 +1,14 @@
 name: Refresh Borås events
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/refresh-boras-events.yml"
+      - "scripts/scrape-boras-events.mjs"
+      - "app/api/cron/ingest-boras-events/route.ts"
+      - "lib/borasEventStore.ts"
+      - "lib/dailySnapshots.ts"
   schedule:
     - cron: "23 */2 * * *"
   workflow_dispatch:
