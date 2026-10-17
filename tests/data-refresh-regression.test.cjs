@@ -35,6 +35,9 @@ test("supplemental and editorial cron workflows use scoped GitHub OIDC", () => {
   assert.match(auth, /payload\.repository === REPOSITORY/);
   assert.match(auth, /payload\.ref === MAIN_REF/);
   assert.match(auth, /payload\.workflow_ref === ALLOWED_WORKFLOWS\[workflow\]/);
+  assert.match(auth, /workflow === "borasEvents" && payload\.event_name === "push"/);
+  assert.match(auth, /payload\.repository === REPOSITORY/);
+  assert.match(auth, /payload\.ref === MAIN_REF/);
 
   const articleRoute = read("app/api/cron/refresh-articles/route.ts");
   assert.match(articleRoute, /authorizeGitHubActionsRefresh\(request, "editorial"\)/);

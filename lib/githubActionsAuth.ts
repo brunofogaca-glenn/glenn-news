@@ -45,8 +45,11 @@ export async function authorizeGitHubActionsRefresh(
       payload.repository === REPOSITORY &&
       payload.repository_owner === OWNER &&
       payload.ref === MAIN_REF &&
-      (payload.event_name === "schedule" ||
-        payload.event_name === "workflow_dispatch") &&
+      (
+        payload.event_name === "schedule" ||
+        payload.event_name === "workflow_dispatch" ||
+        (workflow === "borasEvents" && payload.event_name === "push")
+      ) &&
       payload.workflow_ref === ALLOWED_WORKFLOWS[workflow]
     );
   } catch {
