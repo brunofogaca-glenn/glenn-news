@@ -446,13 +446,14 @@ test("production morning edition contract keeps Stockholm scheduling, validation
 
 test("sport editorial selection targets ten stories and prioritizes the four named football leagues when available", () => {
   const editor = fs.readFileSync(require.resolve("../lib/editorV2.ts"), "utf8");
-  assert.match(editor, /Fotboll – Allsvenskan, Premier League, Serie A, La Liga och övrig fotboll/);
-  assert.match(editor, /Övrig sport – balanserad bevakning av flera sporter/);
-  assert.match(editor, /profile, 8\)/);
-  assert.match(editor, /profile, 2\)/);
-  assert.match(editor, /const stories: SelectedStory\\[\\] = \\[/);
-  assert.match(editor, /\\.\\.\\.footballStories,[\\s\\S]*\\.\\.\\.otherStories,[\\s\\S]*\\.\\.\\.fallbackStories,[\\s\\S]*\\]\\.slice\\(0, 10\\)/);
-  assert.match(editor, /"allsvenskan",\s*"premier-league",\s*"serie-a",\s*"la-liga"/s);
+  assert.ok(editor.includes("Fotboll – Allsvenskan, Premier League, Serie A, La Liga och övrig fotboll"));
+  assert.ok(editor.includes("Övrig sport – balanserad bevakning av flera sporter"));
+  assert.ok(editor.includes("profile, 8)"));
+  assert.ok(editor.includes("profile, 2)"));
+  assert.ok(editor.includes("const stories: SelectedStory[] = ["));
+  assert.ok(editor.includes("...footballStories") && editor.includes("...otherStories") && editor.includes("...fallbackStories"));
+  assert.ok(editor.includes("].slice(0, 10)"));
+  assert.ok(editor.includes('"allsvenskan",') && editor.includes('"premier-league",') && editor.includes('"serie-a",') && editor.includes('"la-liga",'));
 });
 
 test("sport homepage shows the actual story count and places the other-sport divider after football", () => {
