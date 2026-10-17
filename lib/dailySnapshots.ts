@@ -731,7 +731,7 @@ function parseMovieCalendar(html: string) {
 
 function parseAlbumReviewsRss(xml: string): SnapshotLink[] {
   const reviews: SnapshotLink[] = [];
-  const pattern = /<item\\b[^>]*>([\\s\\S]*?)<\\/item>/gi;
+  const pattern = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
   let match: RegExpExecArray | null;
 
   while ((match = pattern.exec(xml)) !== null) {
