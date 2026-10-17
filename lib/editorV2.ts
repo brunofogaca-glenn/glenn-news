@@ -568,7 +568,8 @@ GLENNS GRUNDPREFERENSER:
 - Analys, intervju, reportage och kommentar är också starkt prioriterade.
 - Vanliga nyhetsnotiser är främst till för lägesbilden, inte som läsning.
 - Tidigare klick ska påverka urvalet mer när det finns ett tydligt återkommande mönster.
-- Trav och hästkapplöpning ska normalt inte väljas till Övrig sport. Prioritera tennis och andra sporter framför trav.
+- Trav och hästkapplöpning ska normalt inte väljas till Övrig sport. Prioritera andra sporter framför trav.
+${categoryKey === "sport" ? "- Balansera Övrig sport: välj normalt högst en tennisartikel av de två om det finns en annan aktuell sportnyhet av jämförbar kvalitet. Undvik två artiklar om samma sport och använd endast artiklar från underlaget." : ""}
 
 VIKTIGT:
 - Maskinell score är bara ett signalvärde. Gör själv den redaktionella bedömningen.
