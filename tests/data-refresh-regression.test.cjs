@@ -244,3 +244,48 @@ test("Borås events are captured with a real browser and loaded from private cac
   assert.ok(snapshots.includes("glenn-news-daily-local-v5"));
   assert.ok(snapshots.includes("scrapedEvents.length >= 6"));
 });
+
+test("Fotbollskanalen articles use a rendered-browser feed and validated private ingestion", () => {
+  const workflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
+  assert.ok(workflow.includes('cron: "17 * * * *"'));
+  assert.ok(workflow.includes("playwright install --with-deps chromium"));
+  assert.ok(workflow.includes("scripts/scrape-fotbollskanalen-articles.mjs"));
+  assert.ok(workflow.includes("/api/cron/ingest-fotbollskanalen-articles"));
+  assert.ok(workflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
+  assert.ok(workflow.includes("VERCEL_AUTOMATION_BYPASS_SECRET"));
+  assert.ok(!workflow.includes("/api/cron/refresh-articles"));
+
+  const scraper = read("scripts/scrape-fotbollskanalen-articles.mjs");
+  assert.ok(scraper.includes("chromium.launch"));
+  assert.ok(scraper.includes("https://www.fotbollskanalen.se/"));
+  assert.ok(scraper.includes("https://www.fotbollskanalen.se/lag/if-elfsborg-herr"));
+  assert.ok(scraper.includes("https://www.fotbollskanalen.se/skribent/olof-lundh"));
+  assert.ok(scraper.includes('a[href*="/artiklar/"],a[href*="/bloggar/"]'));
+  assert.ok(scraper.includes("parsePublishedDate"));
+  assert.ok(scraper.includes("refusing to replace the previous snapshot"));
+
+  const store = read("lib/fotbollskanalenArticleStore.ts");
+  assert.ok(store.includes('access: "private"'));
+  assert.ok(store.includes("MAX_AGE_MS"));
+  assert.ok(store.includes("browser-articles.json"));
+  assert.ok(store.includes("sourcePages"));
+
+  const ingest = read("app/api/cron/ingest-fotbollskanalen-articles/route.ts");
+  assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "fotbollskanalenArticles")'));
+  assert.ok(ingest.includes("Färre än sex giltiga Fotbollskanalen-artiklar"));
+  assert.ok(ingest.includes('revalidateTag("glenn-news-articles"'));
+  assert.ok(ingest.includes('revalidateTag("glenn-news-feed-health"'));
+
+  const auth = read("lib/githubActionsAuth.ts");
+  assert.ok(auth.includes("refresh-fotbollskanalen-articles.yml"));
+  assert.ok(auth.includes('workflow === "fotbollskanalenArticles" && payload.event_name === "push"'));
+
+  const source = read("lib/webSources.ts");
+  assert.ok(source.includes("getBrowserScrapedFotbollskanalenArticles"));
+  assert.ok(source.includes('source: "Fotbollskanalen – Senaste"'));
+  assert.ok(source.includes("browserSnapshot.articles"));
+
+  const health = read("lib/feedHealth.ts");
+  assert.ok(health.includes("getBrowserScrapedFotbollskanalenArticles"));
+  assert.ok(health.includes("article.sourcePages.includes(source.url)"));
+});
