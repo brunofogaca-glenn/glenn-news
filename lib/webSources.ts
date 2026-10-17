@@ -1,4 +1,5 @@
 import { canRefreshEditorialSourcesNow } from "./updateSchedule";
+import { getBrowserScrapedFotbollskanalenArticles } from "./fotbollskanalenArticleStore";
 
 type WebArticle = {
   title: string;
@@ -28,6 +29,12 @@ export type WebSourceConfig = {
 };
 
 export const WEB_SOURCES: WebSourceConfig[] = [
+  {
+    url: "https://www.fotbollskanalen.se/",
+    domain: "www.fotbollskanalen.se",
+    category: "fotboll",
+    source: "Fotbollskanalen – Senaste",
+  },
   {
     url: "https://www.fotbollskanalen.se/lag/if-elfsborg-herr",
     domain: "www.fotbollskanalen.se",
@@ -299,22 +306,62 @@ export async function getWebArticles() {
     livsstil: [] as WebArticle[],
   };
 
-  const fetched = await Promise.allSettled(
-    WEB_SOURCES.map(fetchWebSource)
+  const fotbollskanalenSources = WEB_SOURCES.filter(
+    source => source.domain === "www.fotbollskanalen.se"
   );
+  const otherSources = WEB_SOURCES.filter(
+    source => source.domain !== "www.fotbollskanalen.se"
+  );
+
+  const [fetched, browserSnapshot] = await Promise.all([
+    Promise.allSettled(otherSources.map(fetchWebSource)),
+    getBrowserScrapedFotbollskanalenArticles(),
+  ]);
 
   fetched.forEach((result, index) => {
     if (result.status !== "fulfilled") {
       console.error(
         "Webbkälla misslyckades:",
-        WEB_SOURCES[index].url,
+        otherSources[index].url,
         result.reason
       );
       return;
     }
 
-    results[WEB_SOURCES[index].category].push(...result.value);
+    results[otherSources[index].category].push(...result.value);
   });
+
+  if (browserSnapshot) {
+    for (const article of browserSnapshot.articles) {
+      results[article.category].push({
+        title: article.title,
+        description: article.description ?? "",
+        link: article.url,
+        date: article.date,
+        source: "Fotbollskanalen",
+        image: article.image ?? null,
+        articleType: article.articleType,
+      });
+    }
+  } else {
+    // Compatibility fallback until the first successful browser import, or if
+    // the saved browser snapshot expires. The normal path uses rendered pages.
+    const legacyResults = await Promise.allSettled(
+      fotbollskanalenSources.map(fetchWebSource)
+    );
+    legacyResults.forEach((result, index) => {
+      if (result.status !== "fulfilled") {
+        console.error(
+          "Fotbollskanalen fallback misslyckades:",
+          fotbollskanalenSources[index].url,
+          result.reason
+        );
+        return;
+      }
+
+      results[fotbollskanalenSources[index].category].push(...result.value);
+    });
+  }
 
   return results;
 }
