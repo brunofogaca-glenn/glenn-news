@@ -16,6 +16,7 @@ export type SnapshotLink = {
 export type LocalSnapshot = {
   events: SnapshotLink[];
   meetings: SnapshotLink[];
+  eventSource: "boras.com" | "boras-stad-fallback";
   updatedAt: string;
   sources: Array<{ title: string; url: string }>;
   warnings?: string[];
@@ -395,6 +396,7 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
 
   let events: SnapshotLink[] = [];
   let meetings: SnapshotLink[] = [];
+  let eventSource: LocalSnapshot["eventSource"] = "boras.com";
   const warnings: string[] = [];
   if (borasHtml.status === "rejected") {
     warnings.push("Borås.com: " + (borasHtml.reason instanceof Error ? borasHtml.reason.message : String(borasHtml.reason)));
@@ -408,18 +410,26 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
   }
   if (calendarHtml.status === "fulfilled") {
     const calendarItems = parseCityCalendar(calendarHtml.value);
-    // Borås Stad is a separate calendar with its own mix of activities.
-    // Keep it for municipal meetings only; public event listings should match Borås.com.
     meetings = calendarItems.filter(item => item.kind === "sammanträde").slice(0, 3);
+
+    // Borås.com's listing is populated client-side; when its server-rendered
+    // HTML contains too few structured events, use only public activities
+    // from Borås Stad as a clearly marked fallback instead of showing an empty panel.
+    const publicCityEvents = calendarItems.filter(item => item.kind !== "sammanträde");
+    if (events.length < 4 && publicCityEvents.length > 0) {
+      events = publicCityEvents;
+      eventSource = "boras-stad-fallback";
+      warnings.push("Borås.com gav för få strukturerade evenemang; reservlistan kommer från Borås Stad.");
+    }
   }
 
   return {
-    // Keep the full 30-day Borås.com candidate list; relevance ranking happens
-    // in the panel using the reader profile, not by taking the earliest five.
+    // Keep the candidate list; relevance ranking happens in the panel using the reader profile.
     events: events.sort((a, b) =>
       (a.date ?? "").localeCompare(b.date ?? "") ||
       (a.time ?? "99:99").localeCompare(b.time ?? "")
     ),
+    eventSource,
     meetings,
     updatedAt: new Date().toISOString(),
     warnings,
@@ -1071,8 +1081,8 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
 }
 
 const getCachedLocalSnapshotInternal = unstable_cache(
-  () => withLastGoodSnapshot("local-snapshot-v3", getLocalSnapshotInternal),
-  ["glenn-news-daily-local-v3"],
+  () => withLastGoodSnapshot("local-snapshot-v4", getLocalSnapshotInternal),
+  ["glenn-news-daily-local-v4"],
   { revalidate: 2 * 60 * 60, tags: ["glenn-news-daily-local"] }
 );
 
