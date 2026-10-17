@@ -15,6 +15,8 @@ const ALLOWED_WORKFLOWS = {
     `${REPOSITORY}/.github/workflows/refresh-supplemental-data.yml@${MAIN_REF}`,
   editorial:
     `${REPOSITORY}/.github/workflows/refresh-editorial-articles.yml@${MAIN_REF}`,
+  borasEvents:
+    `${REPOSITORY}/.github/workflows/refresh-boras-events.yml@${MAIN_REF}`,
 } as const;
 
 export type RefreshWorkflow = keyof typeof ALLOWED_WORKFLOWS;
