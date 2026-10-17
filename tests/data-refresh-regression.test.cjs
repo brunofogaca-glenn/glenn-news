@@ -215,6 +215,10 @@ test("Borås events are captured with a real browser and loaded from private cac
   assert.ok(scraper.includes("chromium.launch"));
   assert.ok(scraper.includes('waitForLoadState("networkidle"'));
   assert.ok(scraper.includes('a[href*="/evenemang/"]'));
+  assert.ok(scraper.includes("node = node.parentElement"));
+  assert.ok(scraper.includes("function parseDates(value)"));
+  assert.ok(scraper.includes("sameMonthRange"));
+  assert.ok(scraper.includes("Borås event extraction diagnostics"));
   assert.ok(scraper.includes("Refusing to replace the last good snapshot"));
 
   const store = read("lib/borasEventStore.ts");
