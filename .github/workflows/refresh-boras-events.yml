@@ -9,6 +9,7 @@ on:
       - "app/api/cron/ingest-boras-events/route.ts"
       - "lib/borasEventStore.ts"
       - "lib/dailySnapshots.ts"
+      - "lib/githubActionsAuth.ts"
   schedule:
     - cron: "23 */2 * * *"
   workflow_dispatch:
