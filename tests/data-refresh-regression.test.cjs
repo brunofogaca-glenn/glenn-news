@@ -146,7 +146,9 @@ test("culture panel shows DN album reviews alongside weekly movie premieres", ()
   assert.match(snapshots, /async function getAlbumReviews/);
   assert.match(snapshots, /albumReviews: SnapshotLink\[\]/);
   assert.match(snapshots, /reviewSourceUrl: string/);
-  assert.match(snapshots, /const \[movieHtml, albumReviews\] = await Promise\.all\(\[/);
+  assert.match(snapshots, /const \\[movieResult, reviewResult\\] = await Promise\\.allSettled\\(\\[/);
+  assert.match(snapshots, /Array\\.isArray\\(snapshot\\.albumReviews\\)/);
+  assert.match(snapshots, /snapshot\\.reviewSourceUrl/);
   assert.match(snapshots, /glenn-news-daily-culture-v4/);
 
   const panel = read("app/components/DailySnapshotPanels.tsx");
