@@ -454,6 +454,8 @@ test("sport editorial selection targets ten stories and prioritizes the four nam
   assert.ok(editor.includes("...footballStories") && editor.includes("...otherStories") && editor.includes("...fallbackStories"));
   assert.ok(editor.includes("].slice(0, 10)"));
   assert.ok(editor.includes('"allsvenskan",') && editor.includes('"premier-league",') && editor.includes('"serie-a",') && editor.includes('"la-liga",'));
+  assert.ok(editor.includes("högst en tennisartikel"));
+  assert.ok(editor.includes("jämförbar kvalitet"));
 });
 
 test("sport homepage shows the actual story count and places the other-sport divider after football", () => {
