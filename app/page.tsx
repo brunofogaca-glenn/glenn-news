@@ -564,7 +564,7 @@ export default async function Home() {
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   {section.key === "sport"
-                    ? "6 texter · 4 fotboll · 2 övrig sport"
+                    ? `${section.stories.length} texter · fotboll först, övrig sport vid tillgång`
                     : "4 texter"}
                 </span>
               </div>
@@ -620,7 +620,7 @@ export default async function Home() {
                     key={String(story.link ?? "") + "-" + String(index)}
                     className="contents"
                   >
-                    {section.key === "sport" && index === 4 && (
+                    {section.key === "sport" && index === Math.min(8, section.stories.length) && (
                       <div className="col-span-full mt-3 border-y border-slate-300 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-700">
                         Övrig sport · 2 texter
                       </div>
