@@ -161,3 +161,26 @@ test("culture panel shows DN album reviews alongside weekly movie premieres", ()
   assert.match(homepage, /albumReviews: \[\]/);
   assert.match(homepage, /reviewSourceUrl: "https:\/\/www\.dn\.se\/rss\/om\/skivrecensioner\//);
 });
+
+test("Borås local events prioritize reader interests and keep Borås Stad events separate", () => {
+  const snapshots = read("lib/dailySnapshots.ts");
+  assert.match(snapshots, /parseJsonLdEvents\(borasHtml\.value, LOCAL_EVENTS_URL\)/);
+  assert.match(snapshots, /meetings = calendarItems\.filter\(item => item\.kind === "sammanträde"\)/);
+  assert.doesNotMatch(snapshots, /events = dedupeEntries\(\[[\s\S]{0,150}calendarItems\.filter\(item => item\.kind !== "sammanträde"\)/);
+  assert.match(snapshots, /events: events\.sort\(\(a, b\) =>/);
+  assert.doesNotMatch(snapshots, /events: events\.sort\(\(a, b\) =>[\s\S]{0,180}\.slice\(0, 5\)/);
+  assert.match(snapshots, /local-snapshot-v3/);
+  assert.match(snapshots, /glenn-news-daily-local-v3/);
+
+  const panel = read("app/components/DailySnapshotPanels.tsx");
+  assert.match(panel, /function rankLocalEvents\(events: LocalSnapshot\["events"\], profile: ReaderProfile\)/);
+  assert.match(panel, /profile\.semanticTopic/);
+  assert.match(panel, /profile\.semanticTag/);
+  assert.match(panel, /profile\.entity/);
+  assert.match(panel, /orgelfestival/);
+  assert.match(panel, /Evenemang från Borås\.com, prioriterade efter dina läsintressen/);
+  assert.match(panel, /rankLocalEvents\(data\.events, profile\)\.slice\(0, 4\)/);
+
+  const homepage = read("app/page.tsx");
+  assert.match(homepage, /LocalSnapshotPanel data=\{localSnapshot\} profile=\{profile\}/);
+});
