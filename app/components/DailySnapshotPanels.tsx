@@ -5,6 +5,7 @@ import type {
   NationalSnapshot,
   WorldSnapshot,
 } from "@/lib/dailySnapshots";
+import type { ReaderProfile } from "@/lib/readerProfile";
 
 function SourceLink({ title, url }: { title: string; url: string }) {
   return (
@@ -53,14 +54,117 @@ function SmallEntry({
   );
 }
 
-export function LocalSnapshotPanel({ data }: { data: LocalSnapshot }) {
+function normalizeInterestText(value: string) {
+  return value
+    .toLocaleLowerCase("sv-SE")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function localEventBaseScore(item: LocalSnapshot["events"][number]) {
+  const text = normalizeInterestText(item.title + " " + (item.description ?? ""));
+
+  if (/\belfsborg\b|\ballsvenskan\b|\bfotboll\b|\bfootball\b/.test(text)) return 120;
+  if (/boras basket|\bbasket\b|\bishockey\b|\bhockey\b|\bfotboll\b|\bgolf\b/.test(text)) return 105;
+  if (/sven ingvars|eva dahlgren|carola|konsert|konserten|\bturne\b|\blive\b|\bmusikkar\b|\bartist\b|\bmusik\b/.test(text)) return 92;
+  if (/stand ?up|komiker|humor|shan anci|teater|musikal|scenforestallning|\bshow\b/.test(text)) return 86;
+  if (/halloween|djurpark|festival|matmarknad|julmarknad|\bmassa\b/.test(text)) return 72;
+  if (/orgel|orgelimprovisation|rorelsemeditation|\byoga\b|\bworkshop\b|\bkurs\b/.test(text)) return 12;
+  return 34;
+}
+
+function interestAliasMatches(term: string, eventText: string) {
+  const key = normalizeInterestText(term);
+  if (key.length < 4) return false;
+  if (eventText.includes(key)) return true;
+
+  if (/elfsborg|allsvenskan|fotboll|football/.test(key)) {
+    return /elfsborg|allsvenskan|fotboll|football|boras arena/.test(eventText);
+  }
+  if (/basket/.test(key)) return /\bbasket\b|boras basket/.test(eventText);
+  if (/hockey/.test(key)) return /hockey|ishockey/.test(eventText);
+  if (/musik|music|konsert|artist/.test(key)) {
+    return /konsert|turne|live|musik|artist|sven ingvars|eva dahlgren|carola|spelning/.test(eventText);
+  }
+  if (/stand ?up|komedi|humor|komiker/.test(key)) {
+    return /stand ?up|komiker|humor|shan anci|\bshow\b/.test(eventText);
+  }
+  if (/teater|musikal|scen/.test(key)) return /teater|musikal|scenforestallning/.test(eventText);
+  if (/\bsport\b/.test(key)) {
+    return /elfsborg|fotboll|basket|hockey|ishockey|golf|sport|match/.test(eventText);
+  }
+  return false;
+}
+
+function getProfileInterestBoost(item: LocalSnapshot["events"][number], profile: ReaderProfile) {
+  const text = normalizeInterestText(item.title + " " + (item.description ?? ""));
+  const maps: Array<{ values?: Record<string, number>; multiplier: number }> = [
+    { values: profile.entity, multiplier: 0.28 },
+    { values: profile.semanticTopic, multiplier: 0.24 },
+    { values: profile.semanticTag, multiplier: 0.20 },
+    { values: profile.topic, multiplier: 0.14 },
+    { values: profile.semanticCategory, multiplier: 0.12 },
+    { values: profile.category, multiplier: 0.08 },
+  ];
+
+  let boost = 0;
+  for (const { values, multiplier } of maps) {
+    const interests = Object.entries(values ?? {})
+      .filter(([term, weight]) => normalizeInterestText(term).length >= 4 && Number.isFinite(weight) && weight > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 16);
+
+    for (const [term, weight] of interests) {
+      if (interestAliasMatches(term, text)) {
+        boost += Math.min(12, Math.max(2, weight * multiplier));
+      }
+    }
+  }
+  return Math.min(36, boost);
+}
+
+function localEventSeriesKey(item: LocalSnapshot["events"][number]) {
+  const text = normalizeInterestText(item.title + " " + (item.description ?? ""));
+  if (/boras orgelfestival|orgel|orgelimprovisation|rorelsemeditation/.test(text)) return "orgelfestival";
+  if (/halloween pa boras djurpark/.test(text)) return "halloween-boras-djurpark";
+  return normalizeInterestText(item.title);
+}
+
+function rankLocalEvents(events: LocalSnapshot["events"], profile: ReaderProfile) {
+  const ranked = events
+    .map(item => ({
+      item,
+      score: localEventBaseScore(item) + getProfileInterestBoost(item, profile),
+    }))
+    .sort((a, b) =>
+      b.score - a.score ||
+      (a.item.date ?? "").localeCompare(b.item.date ?? "") ||
+      (a.item.time ?? "99:99").localeCompare(b.item.time ?? "")
+    );
+
+  const selected: LocalSnapshot["events"] = [];
+  const seenSeries = new Set<string>();
+  for (const candidate of ranked) {
+    const series = localEventSeriesKey(candidate.item);
+    if (seenSeries.has(series)) continue;
+    seenSeries.add(series);
+    selected.push(candidate.item);
+    if (selected.length >= 8) break;
+  }
+  return selected;
+}
+
+export function LocalSnapshotPanel({ data, profile }: { data: LocalSnapshot; profile: ReaderProfile }) {
+  const selectedEvents = rankLocalEvents(data.events, profile).slice(0, 4);
   return (
     <section className="border-y border-slate-300 bg-[#f0eadf] px-4 py-4 md:px-5 md:py-5">
       <div className="flex flex-col justify-between gap-2 border-b border-slate-300 pb-3 sm:flex-row sm:items-end">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-orange-800">Borås · kalendern</div>
-          <h3 className="mt-1 font-serif text-xl font-black md:text-2xl">Händer i närtid</h3>
-          <p className="mt-1 text-xs text-slate-500">Evenemang och kommunala sammanträden de kommande veckorna.</p>
+          <h3 className="mt-1 font-serif text-xl font-black md:text-2xl">Händer i närtid – utvalt för dig</h3>
+          <p className="mt-1 text-xs text-slate-500">Evenemang från Borås.com, prioriterade efter dina läsintressen. Kommunala sammanträden visas separat.</p>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
           {data.sources.map(source => <SourceLink key={source.url} {...source} />)}
@@ -69,12 +173,12 @@ export function LocalSnapshotPanel({ data }: { data: LocalSnapshot }) {
 
       <div className="mt-3 grid gap-5 md:grid-cols-[1.2fr_0.8fr]">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Evenemang</div>
-          {data.events.length ? (
-            data.events.slice(0, 4).map((item, index) => <SmallEntry key={item.date + item.title + index} item={item} />)
+          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Evenemang för dig</div>
+          {selectedEvents.length ? (
+            selectedEvents.map((item, index) => <SmallEntry key={item.url + item.date + index} item={item} />)
           ) : (
             <p className="py-3 font-serif text-sm text-slate-500">
-              Inga kommande evenemang kunde hämtas just nu. Se Borås.coms kalender för hela utbudet.
+              Inga kommande evenemang hittades i Borås.com just nu. Öppna kalendern för hela utbudet.
             </p>
           )}
         </div>
@@ -89,7 +193,7 @@ export function LocalSnapshotPanel({ data }: { data: LocalSnapshot }) {
       </div>
       <SourceFooter>
         <span>Hämtad {new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).format(new Date(data.updatedAt))}</span>
-        <span> · Källor: Borås.com och Borås Stad</span>
+        <span> · Evenemang: Borås.com · sammanträden: Borås Stad</span>
       </SourceFooter>
     </section>
   );
