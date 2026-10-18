@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { AI_MODEL } from "./aiConfig";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -15,7 +16,7 @@ export async function createFrontPage(
   }));
 
   const response = await openai.responses.create({
-    model: "gpt-5-mini",
+    model: AI_MODEL,
     input: `
 Du är chefredaktör för Glenn News.
 

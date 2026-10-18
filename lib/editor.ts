@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { AI_MODEL } from "./aiConfig";
 import { rankArticles } from "./ranker";
 import { getOgImage } from "./articleImage";
 
@@ -39,7 +40,7 @@ export async function createCategorySummary(
 
   const response =
     await openai.responses.create({
-      model: "gpt-5-mini",
+      model: AI_MODEL,
       input: `
 Du är chefredaktör för Glenn News.
 
