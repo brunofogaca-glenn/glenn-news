@@ -580,7 +580,10 @@ VIKTIGT:
 - Läsarprofilen är baserad på tidigare klick och är en signal, inte en absolut sanning.
 - Glenn föredrar normalt få riktigt bra läsningar framför många mediokra.
 - Skriv naturlig och rak svenska.
-- Hitta inte på fakta som inte finns i underlaget.
+- Alla faktapåståenden i sammanfattningen och urvalsmotiveringen måste stödjas av artikelns rubrik, beskrivning eller metadata i underlaget.
+- Använd inte egen bakgrundskunskap för att fylla luckor eller dra slutsatser om orsaker, tidslinje, namn, siffror, citat eller nuläge som underlaget inte stödjer.
+- Om artikelunderlaget är tunt eller tvetydigt, skriv försiktigt och ta bara med det som faktiskt går att belägga. Utelämna osäkra detaljer i stället för att gissa.
+- Urvalsmotiveringen ska förklara textens redaktionella läsvärde, inte lägga till obekräftade bakgrundspåståenden.
 
 LÄSARPROFIL:
 ${JSON.stringify(
