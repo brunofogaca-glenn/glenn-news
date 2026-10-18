@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { AI_MODEL } from "./aiConfig";
 import { rankArticles } from "./ranker";
 import { recordDiagnostic } from "./diagnosticLog";
 import { ARTICLE_TYPES, inferArticleType } from "./articleType";
@@ -537,7 +538,7 @@ async function runEditorialAI(
   try {
     const response =
       await getOpenAIClient().responses.create({
-      model: "gpt-5-mini",
+      model: AI_MODEL,
       input: `
 Du är Glenns personliga morgonredaktör.
 
