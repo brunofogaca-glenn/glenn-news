@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { AI_MODEL } from "./aiConfig";
 import { rankArticles } from "./ranker";
 import { canonicalizeLink, collectWeeklyCandidates, type WeeklyCandidate } from "./weekFocusCandidates";
 import { curateWeeklyCandidates, isNewswireCandidate } from "./weekFocusQuality";
@@ -287,7 +288,7 @@ const defaultWeeklyFocusDependencies: WeeklyFocusDependencies = {
   fingerprint: createWeeklyFocusFingerprint,
   getOrCreate: getOrCreateWeeklyFocus,
   generateEditorResponse: input =>
-    getOpenAIClient().responses.create({ model: "gpt-5-mini", input }),
+    getOpenAIClient().responses.create({ model: AI_MODEL, input }),
 };
 
 export async function createWeeklyFocus(
