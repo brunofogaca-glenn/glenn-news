@@ -1,11 +1,12 @@
 import OpenAI from "openai";
+import { AI_MODEL } from "./aiConfig";
 import { createHash } from "node:crypto";
 import { get, put } from "@vercel/blob";
 import { normalizeArticleUrl } from "./articleUrl";
 
-const CLASSIFICATION_PREFIX = "glenn-news/article-classifications/v1/";
-const CLASSIFICATION_VERSION = 1;
-const MODEL = "gpt-5-mini";
+const CLASSIFICATION_PREFIX = "glenn-news/article-classifications/v2/";
+const CLASSIFICATION_VERSION = 2;
+const MODEL = AI_MODEL;
 const AI_TIMEOUT_MS = 6_500;
 const MAX_INPUT_LENGTH = 1_500;
 
@@ -36,7 +37,7 @@ export type ArticleClassificationInput = {
 };
 
 export type ArticleClassification = {
-  version: 1;
+  version: 2;
   urlHash: string;
   title: string;
   broadCategory: BroadCategory;
@@ -190,7 +191,7 @@ function parseClassification(
     : 0.5;
 
   return {
-    version: 1,
+    version: 2,
     urlHash,
     title: storedTitle || textValue(input.title, 300),
     broadCategory,
