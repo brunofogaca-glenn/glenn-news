@@ -12,7 +12,8 @@ on:
       - "lib/feedHealth.ts"
       - "lib/githubActionsAuth.ts"
   schedule:
-    - cron: "17 * * * *"
+    # Once daily, before the 06:30 Stockholm morning edition in CET and CEST.
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
