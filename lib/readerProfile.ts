@@ -554,7 +554,7 @@ function stockholmDateKey(date = new Date()) {
 
 const getCachedReaderProfileForDate = unstable_cache(
   async (dateKey: string): Promise<ReaderProfile> => {
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateKey)) return emptyProfile();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return emptyProfile();
 
     const [legacy, events, semanticEvents] = await Promise.all([
       getLegacyProfile(),
@@ -725,7 +725,7 @@ export async function getReaderActivitySince(
         const parts = blob.pathname
           .slice(EVENT_PREFIX.length)
           .split(".");
-        if (parts.length !== 6 || parts[5] !== "json") {
+        if (!((parts.length === 6 && parts[5] === "json") || (parts.length === 7 && parts[6] === "json"))) {
           return null;
         }
 
