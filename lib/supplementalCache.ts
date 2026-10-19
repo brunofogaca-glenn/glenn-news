@@ -33,6 +33,33 @@ function warningsOf(value: Record<string, unknown>) {
   );
 }
 
+const VOLATILE_SNAPSHOT_KEYS = new Set([
+  "updatedAt",
+  "fetchedAt",
+  "checkedAt",
+  "generatedAt",
+  "lastAttemptAt",
+  "lastSuccessAt",
+]);
+
+function comparableSnapshotContent(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(comparableSnapshotContent);
+  if (typeof value !== "object" || value === null) return value;
+
+  const record = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.keys(record)
+      .filter(key => key !== "refreshMeta" && !VOLATILE_SNAPSHOT_KEYS.has(key))
+      .sort()
+      .map(key => [key, comparableSnapshotContent(record[key])])
+  );
+}
+
+function snapshotsHaveSameContent(previous: unknown, current: unknown) {
+  return JSON.stringify(comparableSnapshotContent(previous)) ===
+    JSON.stringify(comparableSnapshotContent(current));
+}
+
 async function read<T extends Record<string, unknown>>(key: string): Promise<Envelope<T> | null> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
   try {
@@ -88,8 +115,13 @@ export async function withLastGoodSnapshot<T extends Record<string, unknown>>(
         };
       }
 
+      const previous = await read<T>(key);
       const savedAt = new Date().toISOString();
-      const persistent = await write(key, value, savedAt);
+      // Blob PUTs are advanced operations. Preserve the last-good snapshot
+      // when the payload has not materially changed; volatile fetch timestamps
+      // are excluded from this comparison. Reads are in the larger simple-op quota.
+      const unchanged = Boolean(previous && snapshotsHaveSameContent(previous.value, value));
+      const persistent = unchanged ? true : await write(key, value, savedAt);
       return { ...value, refreshMeta: { status: "fresh" as const, lastAttemptAt: attemptedAt, lastSuccessAt: savedAt, persistent } };
     } catch (error) {
       const previous = await read<T>(key);
