@@ -2,8 +2,8 @@ name: Refresh supplemental data
 
 on:
   schedule:
-    # Avoid the top of the hour, when hosted schedulers are more likely to be delayed.
-    - cron: "3,33 * * * *"
+    # Refresh once daily before the morning edition; manual recovery remains available.
+    - cron: "43 2 * * *"
   workflow_dispatch:
 
 permissions:

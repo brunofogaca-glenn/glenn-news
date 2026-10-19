@@ -11,7 +11,8 @@ on:
       - "lib/dailySnapshots.ts"
       - "lib/githubActionsAuth.ts"
   schedule:
-    - cron: "23 */2 * * *"
+    # Daily early refresh; supplemental snapshots run afterward.
+    - cron: "13 2 * * *"
   workflow_dispatch:
 
 permissions:

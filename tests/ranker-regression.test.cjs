@@ -398,19 +398,19 @@ test("production morning edition contract keeps Stockholm scheduling, validation
     [
       ["/api/cron/refresh-news", "30 4 * * *"],
       ["/api/cron/refresh-news", "34 4 * * *"],
-      ["/api/cron/refresh-news", "38 4 * * *"],
       ["/api/cron/refresh-news", "30 5 * * *"],
       ["/api/cron/refresh-news", "34 5 * * *"],
-      ["/api/cron/refresh-news", "38 5 * * *"],
     ],
-    "UTC schedules cover the 06:30 Stockholm publication window through both CET and CEST"
+    "UTC schedules cover 06:30 plus one 06:34 retry in both CET and CEST"
   );
 
   const cron = fs.readFileSync(require.resolve("../app/api/cron/refresh-news/route.ts"), "utf8");
   assert.ok(cron.includes('const TIME_ZONE = "Europe/Stockholm"'));
   assert.match(cron, /localClock\.hour !== 6 \|\| localClock\.minute < 30 \|\| localClock\.minute > 39/);
   assert.match(cron, /localClock\.minute > 30 && await hasFreshMorningEditionForToday\(\)/,
-    "follow-up cron runs skip a valid edition rather than generating it twice");
+    "the 06:34 invocation checks whether a valid edition already exists");
+  assert.match(cron, /getArticleRefreshStatus\(stockholmDateKey\(now\)\)/,
+    "the retry only repeats editorial work when the previous feed health check failed");
   assert.match(cron, /const edition = await generateMorningEdition\(profile\)/);
 
   const actions = fs.readFileSync(require.resolve("../app/actions.ts"), "utf8");
