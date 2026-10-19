@@ -10,19 +10,11 @@
     },
     {
       "path": "/api/cron/refresh-news",
-      "schedule": "38 4 * * *"
-    },
-    {
-      "path": "/api/cron/refresh-news",
       "schedule": "30 5 * * *"
     },
     {
       "path": "/api/cron/refresh-news",
       "schedule": "34 5 * * *"
-    },
-    {
-      "path": "/api/cron/refresh-news",
-      "schedule": "38 5 * * *"
     }
   ]
 }
