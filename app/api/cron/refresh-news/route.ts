@@ -2,6 +2,7 @@ import { revalidateTag } from "next/cache";
 import { recordDiagnostic } from "@/lib/diagnosticLog";
 import { getCachedArticles } from "@/lib/articlesCache";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
+import { getArticleRefreshStatus, saveArticleRefreshStatus, type ArticleRefreshStatus } from "@/lib/articleRefreshStatus";
 import { getReaderProfile } from "@/lib/readerProfile";
 import {
   generateMorningEdition,
@@ -11,6 +12,8 @@ import {
 export const dynamic = "force-dynamic";
 
 const TIME_ZONE = "Europe/Stockholm";
+const MAX_ERROR_RATE = 0.25;
+const MIN_ERRORS_TO_RETRY = 5;
 
 function getLocalClock(date: Date) {
   const parts = new Intl.DateTimeFormat("sv-SE", {
@@ -36,6 +39,19 @@ function totalArticles(news: Record<string, unknown>): number {
   }, 0);
 }
 
+function stockholmDateKey(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find(part => part.type === "year")?.value ?? "0000";
+  const month = parts.find(part => part.type === "month")?.value ?? "00";
+  const day = parts.find(part => part.type === "day")?.value ?? "00";
+  return year + "-" + month + "-" + day;
+}
+
 function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization");
@@ -56,9 +72,9 @@ async function runRefresh(request: Request) {
   const now = new Date();
   const localClock = getLocalClock(now);
 
-  // Three daily scheduled attempts (06:30, 06:34, 06:38 Stockholm)
-  // cover a transient failure. The duplicate UTC schedules handle CET/CEST;
-  // only the schedule matching the active Swedish offset reaches this window.
+  // Two scheduled attempts (06:30 and 06:34 Stockholm) protect against a
+  // transient failure. Duplicate UTC schedules handle CET/CEST; only the
+  // pair matching Sweden's active offset reaches this publication window.
   if (localClock.hour !== 6 || localClock.minute < 30 || localClock.minute > 39) {
     return Response.json({
       ok: true,
@@ -68,16 +84,18 @@ async function runRefresh(request: Request) {
     });
   }
 
-  // Later scheduled invocations are retries, not a reason to regenerate a
-  // valid edition or refetch every source. Retry only if today's edition is
-  // still missing, invalid, too early, or repeats recent articles.
+  // The 06:34 invocation skips a successful publication. If article-source
+  // health failed at 06:30, allow one retry even if the edition was saved.
   if (localClock.minute > 30 && await hasFreshMorningEditionForToday()) {
-    return Response.json({
-      ok: true,
-      refreshed: false,
-      reason: "Today's morning edition is already published; retry skipped",
-      localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
-    });
+    const previousStatus = await getArticleRefreshStatus(stockholmDateKey(now));
+    if (previousStatus?.status !== "retry") {
+      return Response.json({
+        ok: true,
+        refreshed: false,
+        reason: "Today's morning edition is already published; retry skipped",
+        localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
+      });
+    }
   }
 
   revalidateTag("glenn-news-articles", { expire: 0 });
@@ -85,6 +103,33 @@ async function runRefresh(request: Request) {
 
   revalidateTag("glenn-news-feed-health", { expire: 0 });
   const feedHealth = await getCachedFeedHealth();
+
+  // The morning job owns the daily article refresh status too, avoiding a
+  // separate hourly workflow that repeats the same RSS and health work.
+  const articleCount = totalArticles(news);
+  const errorLimit = Math.max(
+    MIN_ERRORS_TO_RETRY,
+    Math.ceil(feedHealth.totals.all * MAX_ERROR_RATE)
+  );
+  const articleRefreshFailed =
+    articleCount === 0 || feedHealth.totals.errors >= errorLimit;
+  const articleStatus: ArticleRefreshStatus = {
+    dateKey: stockholmDateKey(now),
+    status: articleRefreshFailed ? "retry" : "ok",
+    lastAttemptAt: now.toISOString(),
+    lastSuccessAt: articleRefreshFailed ? null : now.toISOString(),
+    articleCount,
+    feedErrors: feedHealth.totals.errors,
+    staleFeeds: feedHealth.totals.stale,
+    message: articleRefreshFailed
+      ? articleCount === 0
+        ? "Inga artiklar kunde cachas; morgonjobbet försöker igen 06:34."
+        : `${feedHealth.totals.errors} av ${feedHealth.totals.all} artikelkällor rapporterar fel; gränsen för ett lyckat flöde överskreds.`
+      : feedHealth.totals.stale > 0
+        ? `${feedHealth.totals.stale} källor har äldre publicerat innehåll; artikelhämtningen lyckades.`
+        : undefined,
+  };
+  const articleRefreshStatusSaved = await saveArticleRefreshStatus(articleStatus);
 
   // Generate and persist the one morning edition after refreshing its source data.
   const profile = await getReaderProfile();
@@ -95,7 +140,8 @@ async function runRefresh(request: Request) {
     refreshed: true,
     localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
     refreshedAt: now.toISOString(),
-    totalArticles: totalArticles(news),
+    totalArticles: articleCount,
+    articleRefreshStatusSaved,
     feedHealth: feedHealth.totals,
     articleFeedsTouched: true,
     morningEditionDate: edition.dateKey,
