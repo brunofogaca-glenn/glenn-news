@@ -234,7 +234,7 @@ test("Borås events use an explicit public-event fallback when Borås.com has no
 
 test("Borås events are captured with a real browser and loaded from private cached snapshots", () => {
   const workflow = read(".github/workflows/refresh-boras-events.yml");
-  assert.ok(workflow.includes('cron: "23 */2 * * *"'));
+  assert.ok(workflow.includes('cron: "13 2 * * *"'));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-boras-events.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-boras-events"));
@@ -274,7 +274,7 @@ test("Borås events are captured with a real browser and loaded from private cac
 
 test("Fotbollskanalen articles use a rendered-browser feed and validated private ingestion", () => {
   const workflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.ok(workflow.includes('cron: "17 * * * *"'));
+  assert.ok(workflow.includes('cron: "17 3 * * *"'));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-fotbollskanalen-articles.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-fotbollskanalen-articles"));
