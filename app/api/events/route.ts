@@ -1,4 +1,5 @@
 import { after, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { recordReaderEvent, type ReaderEvent, type SemanticReaderClassification } from "@/lib/readerProfile";
 import { classifyClickedArticle } from "@/lib/articleClassification";
 
@@ -111,7 +112,12 @@ export async function POST(request: Request) {
       const saved = await recordReaderEvent(event, body.eventId as string, classification);
       if (!saved) {
         console.error("Reader click could not be persisted after the response was sent.");
+        return;
       }
+
+      // Keep current-day personalization fresh if the reader returns to Glenn News.
+      // The cache is otherwise shared by the morning cron and the first homepage visit.
+      revalidateTag("glenn-news-reader-profile", { expire: 0 });
     });
 
     return NextResponse.json({ ok: true });
