@@ -1,9 +1,8 @@
 name: Refresh editorial articles
 
 on:
-  schedule:
-    # Runs independently from supplemental data, starting at 06:03 Stockholm time.
-    - cron: "3,33 * * * *"
+  # Scheduled article refresh and status are handled by the morning-edition job.
+  # Keep manual dispatch available for recovery and troubleshooting.
   workflow_dispatch:
 
 permissions:
