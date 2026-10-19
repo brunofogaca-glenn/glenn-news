@@ -316,3 +316,27 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
   assert.ok(feedHealth.includes("getBrowserScrapedFotbollskanalenArticles"));
   assert.ok(feedHealth.includes("article.sourcePages.includes(source.url)"));
 });
+
+test("reader click storage writes one enriched Blob event and caches the daily profile", () => {
+  const route = read("app/api/events/route.ts");
+  assert.match(route, /classifyClickedArticle/);
+  assert.match(route, /recordReaderEvent\(event, body\.eventId as string, classification\)/);
+  assert.doesNotMatch(route, /recordSemanticReaderEvent/);
+
+  const profile = read("lib/readerProfile.ts");
+  assert.match(profile, /encodeCompactSemanticClassification\(classification\)/);
+  assert.match(profile, /hasSemanticPayload/);
+  assert.match(profile, /addCompactSemanticClassification/);
+  assert.match(profile, /getCachedReaderProfileForDate/);
+  assert.match(profile, /unstable_cache/);
+  assert.match(profile, /revalidate: 24 \* 60 \* 60/);
+  assert.match(profile, /parts\.length === 7/);
+});
+
+test("supplemental snapshots avoid Advanced PUTs when only fetch timestamps change", () => {
+  const cache = read("lib/supplementalCache.ts");
+  assert.match(cache, /VOLATILE_SNAPSHOT_KEYS/);
+  assert.match(cache, /snapshotsHaveSameContent/);
+  assert.match(cache, /const unchanged = Boolean\(previous && snapshotsHaveSameContent\(previous\.value, value\)\)/);
+  assert.match(cache, /const persistent = unchanged \? true : await write\(key, value, savedAt\)/);
+});
