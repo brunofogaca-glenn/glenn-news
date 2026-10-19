@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { recordReaderEvent, recordSemanticReaderEvent } from "@/lib/readerProfile";
+import { recordReaderEvent, type ReaderEvent, type SemanticReaderClassification } from "@/lib/readerProfile";
 import { classifyClickedArticle } from "@/lib/articleClassification";
 
 type EventPayload = {
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const saved = await recordReaderEvent({
+    const event: ReaderEvent = {
       category: body.category.trim(),
       articleType: body.articleType.trim(),
       source: body.source.trim(),
@@ -87,20 +87,15 @@ export async function POST(request: Request) {
       title: typeof body.title === "string" ? body.title.trim().slice(0, 300) : undefined,
       summary: typeof body.summary === "string" ? body.summary.trim().slice(0, 1_200) : undefined,
       link: body.link,
-    }, body.eventId);
+    };
 
-    if (!saved) {
-      return NextResponse.json(
-        { ok: false, error: "Reader event could not be persisted" },
-        { status: 503 }
-      );
-    }
-
-    // Classification runs after the event is persisted and response work is complete.
-    // AI timeout/failure never turns a successful click write into an error.
+    // Classify and persist the click together. This puts raw and semantic
+    // signals in one Blob object instead of performing two advanced writes.
+    // A classifier failure still records the raw click as a single write.
     after(async () => {
+      let classification: SemanticReaderClassification | undefined;
       try {
-        const classification = await classifyClickedArticle({
+        classification = (await classifyClickedArticle({
           link: body.link as string,
           title: typeof body.title === "string" ? body.title.trim().slice(0, 300) : "",
           summary: typeof body.summary === "string" ? body.summary.trim().slice(0, 1_200) : undefined,
@@ -108,13 +103,14 @@ export async function POST(request: Request) {
           articleType: body.articleType as string,
           source: body.source as string,
           topic: typeof body.topic === "string" ? body.topic.trim().slice(0, 80) : undefined,
-        });
-
-        if (classification) {
-          await recordSemanticReaderEvent(body.eventId as string, classification);
-        }
+        })) ?? undefined;
       } catch (error) {
-        console.warn("AI article classification skipped; click event was saved.", error);
+        console.warn("AI article classification skipped; saving raw click only.", error);
+      }
+
+      const saved = await recordReaderEvent(event, body.eventId as string, classification);
+      if (!saved) {
+        console.error("Reader click could not be persisted after the response was sent.");
       }
     });
 
