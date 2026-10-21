@@ -444,6 +444,14 @@ test("production morning edition contract keeps Stockholm scheduling, validation
 });
 
 
+test("daily edition filters invalid article links before final edition validation", () => {
+  const edition = fs.readFileSync(require.resolve("../lib/dailyEdition.ts"), "utf8");
+  assert.match(edition, /const sectionsWithValidLinks = editorialSections\.map\(section => \(\{/);
+  assert.match(edition, /stories: section\.stories\.filter\(story => isValidArticleLink\(story\.link\)\)/);
+  assert.match(edition, /allArticles: section\.allArticles\.filter\(story => isValidArticleLink\(story\.link\)\)/);
+  assert.match(edition, /enrichEditorialImages\(sectionsWithValidLinks\)/);
+});
+
 test("sport editorial selection targets ten stories and prioritizes the four named football leagues when available", () => {
   const editor = fs.readFileSync(require.resolve("../lib/editorV2.ts"), "utf8");
   assert.ok(editor.includes("Fotboll – Allsvenskan, Premier League, Serie A, La Liga och övrig fotboll"));
