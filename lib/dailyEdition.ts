@@ -323,7 +323,17 @@ async function buildDailyEdition(
           )
     )
   );
-  const sections = await enrichEditorialImages(editorialSections);
+  // A single malformed feed URL must never invalidate the entire morning edition.
+  // Editorial selection normally filters these, but this final boundary also protects
+  // against unexpected values in composed sport coverage.
+  const sectionsWithValidLinks = editorialSections.map(section => ({
+    ...section,
+    stories: section.stories.filter(story => isValidArticleLink(story.link)),
+    ...(section.allArticles
+      ? { allArticles: section.allArticles.filter(story => isValidArticleLink(story.link)) }
+      : {}),
+  }));
+  const sections = await enrichEditorialImages(sectionsWithValidLinks);
 
   const totalArticles = categoryConfig.reduce(
     (sum, category) => sum + articleBuckets[category.key].length,
