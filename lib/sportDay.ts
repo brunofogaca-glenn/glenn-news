@@ -472,18 +472,22 @@ function dailyTableSelections(date = new Date()): DailyTableSelection[] {
 
   // User-requested seasonal coverage: don't force a domestic league when it is
   // between seasons. The date windows are evaluated in Europe/Stockholm time.
-  if (isBetweenMonthDay(stockholmDate, 11, 15, 4, 2)) {
+  if (
+    ["Allsvenskan", "Superettan"].includes(regular.title) &&
+    isBetweenMonthDay(stockholmDate, 11, 15, 4, 2)
+  ) {
     result.push(...SEASONAL_TABLE_FALLBACKS.nordicAutumn);
+    return result;
   }
-  if (isBetweenMonthDay(stockholmDate, 2, 1, 10, 2)) {
-    if (regular.title === "Champions League") {
-      result.push(...SEASONAL_TABLE_FALLBACKS.championsPause);
-    }
-    if (["Premier League", "Championship", "La Liga", "Serie A"].includes(regular.title)) {
-      result.push(...SEASONAL_TABLE_FALLBACKS.summerPause);
-    }
+  if (regular.title === "Champions League" && isBetweenMonthDay(stockholmDate, 2, 1, 10, 2)) {
+    result.push(...SEASONAL_TABLE_FALLBACKS.championsPause);
+    return result;
   }
-  if (["Allsvenskan", "Superettan"].includes(regular.title) && isBetweenMonthDay(stockholmDate, 11, 15, 4, 2)) {
+  if (
+    ["Premier League", "Championship", "La Liga", "Serie A"].includes(regular.title) &&
+    isBetweenMonthDay(stockholmDate, 5, 20, 8, 16)
+  ) {
+    result.push(...SEASONAL_TABLE_FALLBACKS.summerPause);
     return result;
   }
 
