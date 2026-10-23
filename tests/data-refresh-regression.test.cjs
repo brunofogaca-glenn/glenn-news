@@ -164,6 +164,24 @@ test("league tables show season-scoped zones and explain provisional European pl
   assert.match(panel, /zoneConfig\.note/);
 });
 
+test("seasonal league table fallbacks are selected by Stockholm date and fetched in priority order", () => {
+  const sport = read("lib/sportDay.ts");
+  assert.match(sport, /SEASONAL_TABLE_FALLBACKS/);
+  assert.match(sport, /nordicAutumn/);
+  assert.match(sport, /championsPause/);
+  assert.match(sport, /summerPause/);
+  assert.match(sport, /dailyTableSelections\(\)/);
+  assert.match(sport, /for \(const selected of selections\)/);
+  assert.match(sport, /if \(rows\.length > 0\)/);
+});
+
+test("saved edition list requests use the Next Data Cache", () => {
+  const edition = read("lib/dailyEdition.ts");
+  assert.match(edition, /unstable_cache/);
+  assert.match(edition, /glenn-news-saved-edition-date-keys-v1/);
+  assert.match(edition, /revalidate: 10 \* 60/);
+});
+
 test("reader profile uses semantic interests rather than raw article topics", () => {
   const profile = read("app/profil/page.tsx");
   assert.match(profile, /profile\.semanticTopic/);
