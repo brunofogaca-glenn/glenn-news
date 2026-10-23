@@ -119,6 +119,7 @@ export type SportLeagueTable = {
   title: string;
   season: string;
   dayLabel: string;
+  isSeasonalFallback?: boolean;
   rows: SportLeagueTableRow[];
   scorers: SportLeagueScorer[];
   tableError?: string;
@@ -550,19 +551,31 @@ type FotMobStandingRow = {
   pts?: number;
 };
 
+type FotMobTableGroup = {
+  name?: string;
+  title?: string;
+  label?: string;
+  shortName?: string;
+  data?: {
+    leagueId?: number;
+    name?: string;
+    title?: string;
+    leagueName?: string;
+    tableName?: string;
+    table?: {
+      name?: string;
+      title?: string;
+      all?: FotMobStandingRow[];
+    };
+  };
+};
+
 type FotMobLeaguePayload = {
   details?: {
     selectedSeason?: string;
     latestSeason?: string;
   };
-  table?: Array<{
-    data?: {
-      leagueId?: number;
-      table?: {
-        all?: FotMobStandingRow[];
-      };
-    };
-  }>;
+  table?: FotMobTableGroup[];
   stats?: {
     players?: Array<{
       header?: string;
@@ -579,9 +592,43 @@ type FotMobLeaguePayload = {
 };
 
 function normalizeFotMobTableRows(
-  groups: FotMobLeaguePayload["table"]
+  groups: FotMobLeaguePayload["table"],
+  tableGroup?: "norra" | "södra"
 ): SportLeagueTableRow[] {
-  const rows = groups?.flatMap(group => group.data?.table?.all ?? []) ?? [];
+  let selectedGroups = groups ?? [];
+
+  if (tableGroup && selectedGroups.length > 0) {
+    const groupText = (group: FotMobTableGroup) => [
+      group.name,
+      group.title,
+      group.label,
+      group.shortName,
+      group.data?.name,
+      group.data?.title,
+      group.data?.leagueName,
+      group.data?.tableName,
+      group.data?.table?.name,
+      group.data?.table?.title,
+    ].filter(Boolean).join(" ").toLocaleLowerCase("sv-SE").replace(/ö/g, "o");
+
+    const marker = tableGroup === "norra" ? /\bnorra\b/ : /\b(?:sodra|soedra)\b/;
+    const matches = selectedGroups.filter(group => marker.test(groupText(group)));
+
+    if (matches.length > 0) {
+      selectedGroups = matches;
+    } else if (selectedGroups.length >= 2) {
+      // Some FotMob payload variants expose two unlabelled table groups.
+      // FotMob renders Norra first and Södra second; select one rather than
+      // merging the divisions into a misleading 32-team table.
+      selectedGroups = [selectedGroups[tableGroup === "norra" ? 0 : 1]];
+    } else {
+      // Never quietly show a combined/incorrect table if the division cannot
+      // be identified in the provider payload.
+      selectedGroups = [];
+    }
+  }
+
+  const rows = selectedGroups.flatMap(group => group.data?.table?.all ?? []);
 
   return rows
     .filter(row => Boolean(row.name))
@@ -642,77 +689,72 @@ function normalizeFotMobScorers(
 }
 
 async function fetchSelectedLeagueTable(): Promise<SportLeagueTable | null> {
-  const selections = dailyTableSelections();
+  const selected = dailyTableSelection();
   const fallbackSeason = Number(localToday().slice(0, 4)).toString();
-  let lastFailure: SportLeagueTable | null = null;
 
-  for (const selected of selections) {
-    try {
-      const url = new URL("https://www.fotmob.com/api/data/leagues");
-      url.searchParams.set("id", String(selected.fotmobLeagueId));
+  try {
+    const url = new URL("https://www.fotmob.com/api/data/leagues");
+    url.searchParams.set("id", String(selected.fotmobLeagueId));
 
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(10000),
-        headers: {
-          "user-agent": "GlennNews/1.0 (football table)",
-          Accept: "application/json",
-        },
-      });
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        "user-agent": "GlennNews/1.0 (football table)",
+        Accept: "application/json",
+      },
+    });
 
-      if (!response.ok) throw new Error("FotMob returned HTTP " + response.status);
-      if (!response.headers.get("content-type")?.includes("json")) {
-        throw new Error("FotMob returned a non-JSON response");
-      }
-
-      const payload = (await response.json()) as FotMobLeaguePayload;
-      const rows = normalizeFotMobTableRows(payload.table);
-      const scorers = normalizeFotMobScorers(payload.stats, rows);
-      const season =
-        payload.details?.selectedSeason ??
-        payload.details?.latestSeason ??
-        fallbackSeason;
-
-      if (rows.length > 0) {
-        return {
-          leagueId: selected.leagueId,
-          title: selected.title,
-          season,
-          dayLabel: selected.dayLabel,
-          rows,
-          scorers,
-          tableError: undefined,
-          scorersError: scorers.length
-            ? undefined
-            : "FotMob returnerade ingen aktuell skytteliga för " + selected.title + " säsongen " + season + ".",
-        };
-      }
-
-      lastFailure = {
-        leagueId: selected.leagueId,
-        title: selected.title,
-        season,
-        dayLabel: selected.dayLabel,
-        rows: [],
-        scorers: [],
-        tableError: "FotMob returnerade ingen aktuell tabell för " + selected.title + " säsongen " + season + ".",
-        scorersError: "FotMob returnerade ingen aktuell skytteliga för " + selected.title + " säsongen " + season + ".",
-      };
-    } catch (error) {
-      console.error("FotMob tabellhämtning misslyckades:", selected.title, error);
-      lastFailure = {
-        leagueId: selected.leagueId,
-        title: selected.title,
-        season: fallbackSeason,
-        dayLabel: selected.dayLabel,
-        rows: [],
-        scorers: [],
-        tableError: "Den aktuella tabellen för " + selected.title + " kunde inte hämtas från FotMob just nu.",
-        scorersError: "Skytteligan för " + selected.title + " kunde inte hämtas från FotMob just nu.",
-      };
+    if (!response.ok) throw new Error("FotMob returned HTTP " + response.status);
+    if (!response.headers.get("content-type")?.includes("json")) {
+      throw new Error("FotMob returned a non-JSON response");
     }
-  }
 
-  return lastFailure;
+    const payload = (await response.json()) as FotMobLeaguePayload;
+    const rows = normalizeFotMobTableRows(payload.table, selected.tableGroup);
+    const scorers = normalizeFotMobScorers(payload.stats, rows);
+    const season =
+      payload.details?.selectedSeason ??
+      payload.details?.latestSeason ??
+      fallbackSeason;
+
+    if (rows.length === 0) {
+      console.warn("FotMob returned no standings for the scheduled table", selected.title, season);
+    }
+    if (scorers.length === 0) {
+      console.warn("FotMob returned no top scorers for", selected.title, season);
+    }
+
+    // Keep the title and league fixed by the weekday/date schedule even if the
+    // current season has ended or the data provider temporarily omits standings.
+    return {
+      leagueId: selected.leagueId,
+      title: selected.title,
+      season,
+      dayLabel: selected.dayLabel,
+      isSeasonalFallback: selected.isSeasonalFallback,
+      rows,
+      scorers,
+      tableError: rows.length
+        ? undefined
+        : "FotMob returnerade ingen tabell för det fasta tabellvalet " + selected.title + " (" + season + ").",
+      scorersError: scorers.length
+        ? undefined
+        : "FotMob returnerade ingen aktuell skytteliga för " + selected.title + " säsongen " + season + ".",
+    };
+  } catch (error) {
+    console.error("FotMob tabellhämtning misslyckades:", selected.title, error);
+    return {
+      leagueId: selected.leagueId,
+      title: selected.title,
+      season: fallbackSeason,
+      dayLabel: selected.dayLabel,
+      isSeasonalFallback: selected.isSeasonalFallback,
+      rows: [],
+      scorers: [],
+      tableError: "Den schemalagda tabellen för " + selected.title + " kunde inte hämtas från FotMob just nu.",
+      scorersError: "Skytteligan för " + selected.title + " kunde inte hämtas från FotMob just nu.",
+    };
+  }
 }
 
 function apiFootballErrorText(errors: unknown): string {
