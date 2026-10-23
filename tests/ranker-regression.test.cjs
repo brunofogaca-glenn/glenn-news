@@ -140,6 +140,25 @@ test("ranking preserves every input story and returns finite scores", () => {
   assert.ok(ranked.every(item => Number.isFinite(item.score) && Number.isFinite(item.newsScore)));
 });
 
+test("widely covered topic scores more strongly than one-source routine news without unbounded source multiplication", () => {
+  const popular = [
+    article({ title: "Club confirms major manager departure after late-night talks", source: "Outlet A", link: "https://a.example.com/story" }),
+    article({ title: "Club confirms major manager departure after late-night talks", source: "Outlet B", link: "https://b.example.com/story" }),
+    article({ title: "Club confirms major manager departure after late-night talks", source: "Outlet C", link: "https://c.example.com/story" }),
+  ];
+  const routine = article({
+    title: "Local team prepares for routine training session",
+    source: "Single source",
+    link: "https://routine.example.com/story",
+  });
+  const ranked = rankArticles([...popular, routine]);
+  const popularScores = ranked.filter(item => item.title === popular[0].title);
+  const routineRanked = ranked.find(item => item.link === routine.link);
+  assert.ok(popularScores.every(item => item.uniqueSources >= 3));
+  assert.ok(popularScores.every(item => item.newsScore > routineRanked.newsScore));
+  assert.ok(popularScores.every(item => item.score < 400), "the echo signal should remain bounded");
+});
+
 test("WeekFocus includes full-coverage allArticles candidates and de-duplicates them", () => {
   const selectedStory = {
     title: "Elfsborgs första analys",
