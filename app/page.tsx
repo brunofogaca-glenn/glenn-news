@@ -231,11 +231,11 @@ export default async function Home() {
       warnings: ["Världsdata kunde inte hämtas just nu."],
     })),
     withOptionalFallback("culture snapshot", getCachedCultureSnapshot(), () => ({
-      films: [],
+      filmReviews: [],
       albumReviews: [],
       updatedAt: new Date().toISOString(),
-      sourceUrl: "https://www.moviezine.se/kalender",
-      reviewSourceUrl: "https://www.dn.se/rss/om/skivrecensioner/",
+      filmReviewSourceUrl: "https://www.dn.se/rss/om/filmrecensioner/",
+      albumReviewSourceUrl: "https://www.dn.se/rss/om/skivrecensioner/",
     })),
     editionPromise,
   ]);
