@@ -411,6 +411,7 @@ type DailyTableSelection = {
   fotmobLeagueId: number;
   title: string;
   dayLabel: string;
+  fallbackUsed?: boolean;
 };
 
 const DAILY_TABLE_SCHEDULE: Record<string, DailyTableSelection> = {
@@ -423,13 +424,76 @@ const DAILY_TABLE_SCHEDULE: Record<string, DailyTableSelection> = {
   Sunday: { dayLabel: "Söndag", leagueId: 2, fotmobLeagueId: 42, title: "Champions League" },
 };
 
-function dailyTableSelection(): DailyTableSelection {
+const SEASONAL_TABLE_FALLBACKS = {
+  nordicAutumn: [
+    { dayLabel: "Reservtabell", leagueId: 61, fotmobLeagueId: 53, title: "Ligue 1" },
+    { dayLabel: "Reservtabell", leagueId: 88, fotmobLeagueId: 57, title: "Eredivisie" },
+  ],
+  championsPause: [
+    { dayLabel: "Reservtabell", leagueId: 128, fotmobLeagueId: 44, title: "Argentinska Primera División" },
+  ],
+  summerPause: [
+    { dayLabel: "Reservtabell", leagueId: 1040, fotmobLeagueId: 1040, title: "Damallsvenskan" },
+    { dayLabel: "Reservtabell", leagueId: 1084, fotmobLeagueId: 1084, title: "Ettan Norra" },
+    { dayLabel: "Reservtabell", leagueId: 1085, fotmobLeagueId: 1085, title: "Ettan Södra" },
+    { dayLabel: "Reservtabell", leagueId: 103, fotmobLeagueId: 59, title: "Norska Eliteserien" },
+  ],
+} satisfies Record<string, DailyTableSelection[]>;
+
+function stockhomDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: STOCKHOLM_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  return {
+    year: Number(parts.find(part => part.type === "year")?.value ?? "0"),
+    month: Number(parts.find(part => part.type === "month")?.value ?? "0"),
+    day: Number(parts.find(part => part.type === "day")?.value ?? "0"),
+  };
+}
+
+function isBetweenMonthDay(date: { month: number; day: number }, startMonth: number, startDay: number, endMonth: number, endDay: number) {
+  const value = date.month * 100 + date.day;
+  const start = startMonth * 100 + startDay;
+  const end = endMonth * 100 + endDay;
+  return value >= start && value < end;
+}
+
+function dailyTableSelections(date = new Date()): DailyTableSelection[] {
   const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone: STOCKHOLM_TIME_ZONE,
     weekday: "long",
-  }).format(new Date());
+  }).format(date);
+  const regular = DAILY_TABLE_SCHEDULE[weekday] ?? DAILY_TABLE_SCHEDULE.Monday;
+  const stockholmDate = stockhomDateParts(date);
+  const result: DailyTableSelection[] = [];
 
-  return DAILY_TABLE_SCHEDULE[weekday] ?? DAILY_TABLE_SCHEDULE.Monday;
+  // User-requested seasonal coverage: don't force a domestic league when it is
+  // between seasons. The date windows are evaluated in Europe/Stockholm time.
+  if (isBetweenMonthDay(stockholmDate, 11, 15, 4, 2)) {
+    result.push(...SEASONAL_TABLE_FALLBACKS.nordicAutumn);
+  }
+  if (isBetweenMonthDay(stockholmDate, 2, 1, 10, 2)) {
+    if (regular.title === "Champions League") {
+      result.push(...SEASONAL_TABLE_FALLBACKS.championsPause);
+    }
+    if (["Premier League", "Championship", "La Liga", "Serie A"].includes(regular.title)) {
+      result.push(...SEASONAL_TABLE_FALLBACKS.summerPause);
+    }
+  }
+  if (["Allsvenskan", "Superettan"].includes(regular.title) && isBetweenMonthDay(stockholmDate, 11, 15, 4, 2)) {
+    return result;
+  }
+
+  // Preserve the familiar weekday rotation if no seasonal fallback applies.
+  if (result.length === 0) result.push(regular);
+  return result;
+}
+
+function dailyTableSelection(): DailyTableSelection {
+  return dailyTableSelections()[0] ?? DAILY_TABLE_SCHEDULE.Monday;
 }
 
 type FotMobStandingRow = {
