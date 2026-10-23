@@ -44,10 +44,13 @@ export async function getOgImage(
         continue;
       }
 
-      return new URL(
-        contentMatch[1],
-        url
-      ).toString();
+      const imageUrl = new URL(contentMatch[1], url);
+      if (/^(?:data:|javascript:|blob:)$/.test(imageUrl.protocol)) continue;
+      if (imageUrl.protocol === "http:" && /(^|\\.)football-italia\\.net$/i.test(imageUrl.hostname)) {
+        imageUrl.protocol = "https:";
+      }
+      if (imageUrl.protocol !== "https:" && imageUrl.protocol !== "http:") continue;
+      return imageUrl.toString();
     }
 
     return null;
