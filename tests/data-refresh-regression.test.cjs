@@ -148,6 +148,14 @@ test("quote feature is removed from the homepage", () => {
   assert.ok(!fs.existsSync(path.join(root, "lib/quotes.ts")));
 });
 
+test("seasonal league fallback date windows match the requested periods", () => {
+  const sport = read("lib/sportDay.ts");
+  assert.match(sport, /\["Allsvenskan", "Superettan"\][\s\S]*?isBetweenMonthDay\(stockholmDate, 11, 15, 4, 2\)/);
+  assert.match(sport, /regular\.title === "Champions League"[\s\S]*?isBetweenMonthDay\(stockholmDate, 2, 1, 10, 2\)/);
+  assert.match(sport, /"Premier League", "Championship", "La Liga", "Serie A"[\s\S]*?isBetweenMonthDay\(stockholmDate, 5, 20, 8, 16\)/);
+  assert.match(sport, /for \(const selected of selections\)[\s\S]*?rows\.length > 0/);
+});
+
 test("league tables show season-scoped zones and explain provisional European places", () => {
   const zones = read("lib/leagueZones.ts");
   assert.match(zones, /Allsvenskan:[\s\S]*?seasonStart: 2026/);
