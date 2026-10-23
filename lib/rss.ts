@@ -115,11 +115,26 @@ function extractImageFromContent(
   return null;
 }
 
+function normalizeArticleImage(value: unknown) {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw || /^(?:data:|javascript:|blob:)/i.test(raw)) return null;
+  try {
+    const normalized = new URL(raw.startsWith("//") ? "https:" + raw : raw);
+    if (normalized.protocol === "http:" && /(^|\.)football-italia\.net$/i.test(normalized.hostname)) {
+      normalized.protocol = "https:";
+    }
+    if (normalized.protocol !== "https:" && normalized.protocol !== "http:") return null;
+    return normalized.toString();
+  } catch {
+    return null;
+  }
+}
+
 function extractImage(item: any) {
   try {
-    if (item.enclosure?.url) {
-      return item.enclosure.url;
-    }
+    const enclosureUrl = normalizeArticleImage(item.enclosure?.url);
+    if (enclosureUrl) return enclosureUrl;
 
     const mediaContent = item["media:content"];
     const mediaContentUrl =
@@ -127,9 +142,8 @@ function extractImage(item: any) {
         ? mediaContent[0]?.$?.url
         : mediaContent?.$?.url ?? mediaContent?.url;
 
-    if (mediaContentUrl) {
-      return mediaContentUrl;
-    }
+    const normalizedMediaContentUrl = normalizeArticleImage(mediaContentUrl);
+    if (normalizedMediaContentUrl) return normalizedMediaContentUrl;
 
     const mediaThumbnail = item["media:thumbnail"];
     const mediaThumbnailUrl =
@@ -137,16 +151,16 @@ function extractImage(item: any) {
         ? mediaThumbnail[0]?.$?.url
         : mediaThumbnail?.$?.url ?? mediaThumbnail?.url;
 
-    if (mediaThumbnailUrl) {
-      return mediaThumbnailUrl;
-    }
+    const normalizedMediaThumbnailUrl = normalizeArticleImage(mediaThumbnailUrl);
+    if (normalizedMediaThumbnailUrl) return normalizedMediaThumbnailUrl;
 
     if (typeof item["content:encoded"] === "string") {
       const image = extractImageFromContent(
         item["content:encoded"]
       );
 
-      if (image) return image;
+      const normalizedImage = normalizeArticleImage(image);
+      if (normalizedImage) return normalizedImage;
     }
 
     if (typeof item.content === "string") {
@@ -182,7 +196,7 @@ export const FEEDS: FeedConfig[] = [
   { url: "https://www.bt.se/feeds/section/elfsborg/feed.xml", category: "elfsborg" },
   { url: "http://expressen.se/rss/fotboll", category: "fotboll" },
   { url: "http://www.aftonbladet.se/sportbladet/fotboll/rss.xml", category: "fotboll" },
-  { url: "http://www.football-italia.net/rss.xml", category: "fotboll" },
+  { url: "https://football-italia.net/feed/", category: "fotboll" },
   { url: "https://feeds.expressen.se/dinapengar/", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/boras/feed.xml", category: "boras" },
   { url: "https://www.bt.se/feeds/section/kronikor/feed.xml", category: "livsstil", articleType: "krönika" },
