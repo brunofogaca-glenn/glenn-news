@@ -431,18 +431,18 @@ type DailyTableSlot = {
 // YYYY is deliberately omitted: this should not need yearly end-date edits.
 const TABLE_SEASON_WINDOWS = {
   swedishLeagues: {
-    primary: [401, 1130],
-    fallback: [1101, 415],
+    primaryWindow: [401, 1130],
+    fallbackWindow: [1101, 415],
   },
   bigEuropeanLeagues: {
-    primary: [801, 531],
-    fallback: [501, 831],
+    primaryWindow: [801, 531],
+    fallbackWindow: [501, 831],
   },
   championsLeague: {
-    primary: [915, 131],
-    fallback: [201, 1015],
+    primaryWindow: [915, 131],
+    fallbackWindow: [201, 1015],
   },
-} as const satisfies Record<string, { primary: MonthDayWindow; fallback: MonthDayWindow }>;
+} as const satisfies Record<string, { primaryWindow: MonthDayWindow; fallbackWindow: MonthDayWindow }>;
 
 const DAILY_TABLE_SCHEDULE: Record<string, DailyTableSlot> = {
   Monday: {
