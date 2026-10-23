@@ -68,7 +68,9 @@ export function detectCategory(
     text.includes("restaurang") ||
     text.includes("krog") ||
     text.includes("recept") ||
-    /(?:^|[^\\p{L}])mat(?:$|[^\\p{L}])/u.test(text) ||\n    text.includes("matlagning") ||\n    text.includes("matkultur") ||
+    /(?:^|[^\\p{L}])mat(?:$|[^\\p{L}])/u.test(text) ||
+    text.includes("matlagning") ||
+    text.includes("matkultur") ||
     text.includes("bakning") ||
     text.includes("vin") ||
     text.includes("öl")
