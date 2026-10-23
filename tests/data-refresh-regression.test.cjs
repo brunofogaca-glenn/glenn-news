@@ -110,6 +110,29 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(morning, /previousStatus\?\.status !== "retry"/);
 });
 
+test("lifestyle only treats mat as a complete word", () => {
+  const category = read("lib/categorizer.ts");
+  assert.match(category, /\[\^\\p\{L\}\]\)mat/);
+  assert.match(category, /matlagning/);
+  assert.match(category, /matkultur/);
+});
+
+test("economy category outranks lifestyle and Football Italia uses its secure feed", () => {
+  const category = read("lib/categorizer.ts");
+  assert.ok(category.indexOf("ECONOMY signals precede lifestyle") < category.indexOf("// KULTUR / MAT / LIVSSTIL"));
+  const rss = read("lib/rss.ts");
+  assert.match(rss, /https:\/\/football-italia\.net\/feed\//);
+});
+
+test("football editorial chooses a shorter top list without league quotas", () => {
+  const editor = read("lib/editorV2.ts");
+  assert.match(editor, /de största och mest omtalade händelserna från de senaste 24 timmarna/);
+  assert.match(editor, /profile, 6\)/);
+  assert.doesNotMatch(editor, /Reserve a slot for each named league/);
+  assert.doesNotMatch(editor, /function classifyFootballLeague/);
+  assert.doesNotMatch(editor, /const groups: SportLeagueGroup\[\]/);
+});
+
 test("sports data no longer triggers editorial article ingestion", () => {
   const sport = read("lib/sportDay.ts");
   assert.doesNotMatch(sport, /getCachedArticles|articlesCache/);
@@ -132,6 +155,23 @@ test("quote feature is removed from the homepage", () => {
   assert.ok(!fs.existsSync(path.join(root, "lib/quotes.ts")));
 });
 
+test("football league tables use fixed weekday mapping with buffered seasonal overlap windows", () => {
+  const sport = read("lib/sportDay.ts");
+  assert.match(sport, /swedishLeagues:\s*\{\s*primaryWindow: \[401, 1130\],\s*fallbackWindow: \[1101, 415\]/);
+  assert.match(sport, /bigEuropeanLeagues:\s*\{\s*primaryWindow: \[801, 531\],\s*fallbackWindow: \[501, 831\]/);
+  assert.match(sport, /championsLeague:\s*\{\s*primaryWindow: \[915, 131\],\s*fallbackWindow: \[201, 1015\]/);
+  assert.match(sport, /title: "Allsvenskan"[\s\S]*?title: "Ligue 1"/);
+  assert.match(sport, /title: "Superettan"[\s\S]*?title: "Eredivisie"/);
+  assert.match(sport, /title: "La Liga"[\s\S]*?fallback: \{ leagueId: 1084, fotmobLeagueId: 169, title: "Ettan Norra"/);
+  assert.match(sport, /title: "Premier League"[\s\S]*?fallback: \{ leagueId: 103, fotmobLeagueId: 59, title: "Norska Eliteserien"/);
+  assert.match(sport, /title: "Championship"[\s\S]*?fallback: \{ leagueId: 1085, fotmobLeagueId: 169, title: "Ettan Södra"/);
+  assert.match(sport, /title: "Serie A"[\s\S]*?fallback: \{ leagueId: 1040, fotmobLeagueId: 9089, title: "Damallsvenskan"/);
+  assert.match(sport, /title: "Champions League"[\s\S]*?fallback: \{ leagueId: 128, fotmobLeagueId: 112, title: "Liga Profesional Argentina"/);
+  assert.match(sport, /primaryActive \|\| !fallbackActive \? slot\.primary : slot\.fallback/);
+  assert.match(sport, /Selection is determined only by the configured date schedule/);
+});
+
+
 test("league tables show season-scoped zones and explain provisional European places", () => {
   const zones = read("lib/leagueZones.ts");
   assert.match(zones, /Allsvenskan:[\s\S]*?seasonStart: 2026/);
@@ -146,6 +186,25 @@ test("league tables show season-scoped zones and explain provisional European pl
   assert.match(panel, /getZoneForRank/);
   assert.match(panel, /Så tolkas strecken/);
   assert.match(panel, /zoneConfig\.note/);
+});
+
+test("the selected seasonal table does not change based on provider row availability", () => {
+  const sport = read("lib/sportDay.ts");
+  const fetcher = sport.slice(sport.indexOf("async function fetchSelectedLeagueTable"), sport.indexOf("function apiFootballErrorText"));
+  assert.match(fetcher, /const selected = dailyTableSelection\(\)/);
+  assert.match(fetcher, /normalizeFotMobTableRows\(payload\.table, selected\.tableGroup\)/);
+  assert.doesNotMatch(fetcher, /for \(const selected of selections\)/);
+  assert.doesNotMatch(fetcher, /if \(rows\.length > 0\) \{[\s\S]*?return/);
+  assert.match(fetcher, /title: selected\.title/);
+  assert.match(fetcher, /isSeasonalFallback: selected\.isSeasonalFallback/);
+});
+
+
+test("saved edition list requests use the Next Data Cache", () => {
+  const edition = read("lib/dailyEdition.ts");
+  assert.match(edition, /unstable_cache/);
+  assert.match(edition, /glenn-news-saved-edition-date-keys-v1/);
+  assert.match(edition, /revalidate: 10 \* 60/);
 });
 
 test("reader profile uses semantic interests rather than raw article topics", () => {

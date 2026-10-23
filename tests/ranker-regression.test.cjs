@@ -140,6 +140,25 @@ test("ranking preserves every input story and returns finite scores", () => {
   assert.ok(ranked.every(item => Number.isFinite(item.score) && Number.isFinite(item.newsScore)));
 });
 
+test("widely covered topic scores more strongly than one-source routine news without unbounded source multiplication", () => {
+  const popular = [
+    article({ title: "Club confirms major manager departure after late-night talks", source: "Outlet A", link: "https://a.example.com/story" }),
+    article({ title: "Club confirms major manager departure after late-night talks", source: "Outlet B", link: "https://b.example.com/story" }),
+    article({ title: "Club confirms major manager departure after late-night talks", source: "Outlet C", link: "https://c.example.com/story" }),
+  ];
+  const routine = article({
+    title: "Local team prepares for routine training session",
+    source: "Single source",
+    link: "https://routine.example.com/story",
+  });
+  const ranked = rankArticles([...popular, routine]);
+  const popularScores = ranked.filter(item => item.title === popular[0].title);
+  const routineRanked = ranked.find(item => item.link === routine.link);
+  assert.ok(popularScores.every(item => item.uniqueSources >= 3));
+  assert.ok(popularScores.every(item => item.newsScore > routineRanked.newsScore));
+  assert.ok(popularScores.every(item => item.score < 400), "the echo signal should remain bounded");
+});
+
 test("WeekFocus includes full-coverage allArticles candidates and de-duplicates them", () => {
   const selectedStory = {
     title: "Elfsborgs första analys",
@@ -452,19 +471,16 @@ test("daily edition filters invalid article links before final edition validatio
   assert.ok(edition.includes("enrichEditorialImages(sectionsWithValidLinks)"));
 });
 
-test("sport editorial selection targets ten stories and prioritizes the four named football leagues when available", () => {
+test("football editorial selection follows current relevance rather than fixed league quotas", () => {
   const editor = fs.readFileSync(require.resolve("../lib/editorV2.ts"), "utf8");
-  assert.ok(editor.includes("Fotboll – Allsvenskan, Premier League, Serie A, La Liga och övrig fotboll"));
-  assert.ok(editor.includes("Övrig sport – balanserad bevakning av flera sporter"));
-  assert.ok(editor.includes("profile, 8)"));
-  assert.ok(editor.includes("profile, 2)"));
-  assert.ok(editor.includes("const stories: SelectedStory[] = ["));
-  assert.ok(editor.includes("...footballStories") && editor.includes("...otherStories") && editor.includes("...fallbackStories"));
+  assert.ok(editor.includes("de största och mest omtalade händelserna från de senaste 24 timmarna"));
+  assert.ok(editor.includes("footballArticles, profile, 6)"));
+  assert.ok(!editor.includes("function classifyFootballLeague"));
+  assert.ok(!editor.includes("Reserve a slot for each named league"));
   assert.ok(editor.includes("].slice(0, 10)"));
-  assert.ok(editor.includes('"allsvenskan",') && editor.includes('"premier-league",') && editor.includes('"serie-a",') && editor.includes('"la-liga",'));
   assert.ok(editor.includes("högst en tennisartikel"));
-  assert.ok(editor.includes("jämförbar kvalitet"));
 });
+
 
 test("sport homepage shows the actual story count and places the other-sport divider after football", () => {
   const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");

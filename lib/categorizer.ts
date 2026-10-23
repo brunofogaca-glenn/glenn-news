@@ -25,6 +25,14 @@ export function detectCategory(
     return "elfsborg";
   }
 
+  // ECONOMY signals precede lifestyle so financial stories from broad RSS
+  // feeds cannot leak into Culture, Food & Lifestyle due to words like "mat".
+  if (
+    /\b(ekonomi|börs(?:en|ras)?|inflation|ica banken|bolån|bostadsrätt|omxs30|nasdaq|dow jones|wall street|ränta|riksbanken|recession|konjunktur|aktier?|fonder?|bitcoin|ethereum|krypto|volvo|swedbank|handelsbanken|nordea|oljepris|elpris|gaspris|styrränta|arbetslöshet|lågkonjunktur|massvarsel|massuppsägning|rekordvinst|omsättning|finanskris|valuta|aktiekurs|börsvärde|marknadsvärde|prishöjning|prisökning|bostadspriser|elräkning|elpriser)\b/i.test(text)
+  ) {
+    return "ekonomi";
+  }
+
   // KULTUR / MAT / LIVSSTIL
 
   if (
@@ -60,7 +68,9 @@ export function detectCategory(
     text.includes("restaurang") ||
     text.includes("krog") ||
     text.includes("recept") ||
-    text.includes("mat") ||
+    /(?:^|[^\p{L}])mat(?:$|[^\p{L}])/u.test(text) ||
+    text.includes("matlagning") ||
+    text.includes("matkultur") ||
     text.includes("bakning") ||
     text.includes("vin") ||
     text.includes("öl")
@@ -138,39 +148,6 @@ export function detectCategory(
     text.includes("serie a")
   ) {
     return "fotboll";
-  }
-
-  // EKONOMI
-
-  if (
-    text.includes("börsen") ||
-    text.includes("inflation") ||
-    text.includes("ica banken") ||
-    text.includes("bolån") ||
-    text.includes("bostadsrätt") ||
-    text.includes("omxs30") ||
-    text.includes("nasdaq") ||
-    text.includes("dow jones") ||
-    text.includes("s&p 500") ||
-    text.includes("wall street") ||
-    text.includes("ränta") ||
-    text.includes("riksbanken") ||
-    text.includes("recession") ||
-    text.includes("konjunktur") ||
-    text.includes("aktie") ||
-    text.includes("fond") ||
-    text.includes("bitcoin") ||
-    text.includes("ethereum") ||
-    text.includes("krypto") ||
-    text.includes("volvo") ||
-    text.includes("swedbank") ||
-    text.includes("handelsbanken") ||
-    text.includes("nordea") ||
-    text.includes("oljepris") ||
-    text.includes("elpris") ||
-    text.includes("gaspris")
-  ) {
-    return "ekonomi";
   }
 
   // VÄRLDEN

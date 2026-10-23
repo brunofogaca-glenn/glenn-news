@@ -309,10 +309,15 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
             </div>
             <div className="text-xs text-slate-500 md:text-right">
               <div>
-                Veckans ligaval:{" "}
+                Veckoschema:{" "}
                 <span className="font-bold text-slate-700">
                   {data.selectedLeague.dayLabel}
                 </span>
+                {data.selectedLeague.isSeasonalFallback ? (
+                  <span className="ml-2 font-bold uppercase tracking-wide text-amber-700">
+                    Reservtabell
+                  </span>
+                ) : null}
               </div>
               <div className="mt-1">
                 Säsong {data.selectedLeague.season}

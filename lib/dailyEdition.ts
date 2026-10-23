@@ -1,4 +1,5 @@
 import { get, list, put } from "@vercel/blob";
+import { unstable_cache } from "next/cache";
 import { recordDiagnostic } from "./diagnosticLog";
 import {
   createEditorialSection,
@@ -592,18 +593,14 @@ export async function generateMorningEdition(
   return { ...edition, storage: "blob" };
 }
 
-export async function getSavedDailyEditions(limit = 7) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return [] as DailyEdition[];
-  }
-
-  try {
+const getSavedEditionDateKeys = unstable_cache(
+  async (limit: number) => {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) return [] as string[];
     const result = await list({
       prefix: EDITION_PREFIX,
       limit: Math.max(1, Math.min(limit * 2, 30)),
     });
-
-    const paths = result.blobs
+    return result.blobs
       .map(blob => blob.pathname)
       .map(pathname =>
         pathname.startsWith(EDITION_PREFIX)
@@ -615,7 +612,18 @@ export async function getSavedDailyEditions(limit = 7) {
       .sort()
       .reverse()
       .slice(0, limit);
+  },
+  ["glenn-news-saved-edition-date-keys-v1"],
+  { revalidate: 10 * 60, tags: ["glenn-news-editions"] }
+);
 
+export async function getSavedDailyEditions(limit = 7) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return [] as DailyEdition[];
+  }
+
+  try {
+    const paths = await getSavedEditionDateKeys(limit);
     const editions = await Promise.all(
       paths.map(dateKey => readBlobEdition(dateKey))
     );
@@ -628,7 +636,6 @@ export async function getSavedDailyEditions(limit = 7) {
     return [] as DailyEdition[];
   }
 }
-
 export async function createLiveDailyEdition(profile = EMPTY_PROFILE) {
   return buildDailyEdition(getTodayKey(), profile);
 }

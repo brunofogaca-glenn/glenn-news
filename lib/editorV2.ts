@@ -542,7 +542,7 @@ async function runEditorialAI(
       input: `
 Du är Glenns personliga morgonredaktör.
 
-Du ska redigera en morgontidning för EN person, Glenn.
+Du ska redigera en morgontidning för EN person, Glenn. För nyheter inom fotboll ska du identifiera de största snackisarna i materialet från de senaste 24 timmarna, inte fylla kvoter per liga.
 
 Glenn får redan pushnotiser under dagen. Därför ska Glenn News INTE försöka ge honom flest möjliga nyheter. Din uppgift är att:
 1. ge en kort, träffsäker lägesbild,
@@ -574,7 +574,7 @@ ${categoryKey === "sport" ? "- Balansera Övrig sport: välj normalt högst en t
 
 VIKTIGT:
 - Maskinell score är bara ett signalvärde. Gör själv den redaktionella bedömningen.
-- Undvik upprepningar om flera artiklar beskriver samma händelse.
+- Mät snackisvärde genom färskhet och hur många oberoende källor som rapporterar samma händelse; flera artiklar om en händelse ska öka dess relevans men inte skapa upprepade kort i urvalet.\n- Prioritera de viktigaste händelserna från hela fotbollen: klubbar, landslag, övergångar, tränare, stora matcher och ligor. Välj inte en liga bara för att den ska representeras.
 - Välj inte två texter som i praktiken säger samma sak.
 - Prioritera innehåll som ger perspektiv, analys, personlighet eller fördjupning.
 - Välj en vanlig nyhet framför en krönika om nyheten faktiskt är ovanligt viktig för Glenn.
@@ -736,24 +736,11 @@ function combineSportSummaries(
     .join(" ");
 }
 
-type SportLeagueGroup =
-  | "allsvenskan"
-  | "premier-league"
-  | "serie-a"
-  | "la-liga"
-  | "other-football";
-
-function classifyFootballLeague(article: Article): SportLeagueGroup {
-  const text = `${article.title} ${article.description ?? ""} ${article.source ?? ""}`
-    .toLocaleLowerCase("sv-SE");
-
-  if (/(allsvenskan|svenska cupen|svensk elitfotboll|superettan|ifk göteborg|ifk norrköping|djurgården|hammarby|malmö ff|bk häcken|if elfsborg|norrby)/i.test(text)) return "allsvenskan";
-  if (/(premier league|premiership|manchester united|manchester city|liverpool|arsenal|chelsea|tottenham|newcastle united|aston villa|west ham|everton|nottingham forest|brighton|fulham|crystal palace|wolves|brentford|burnley|sunderland)/i.test(text)) return "premier-league";
-  if (/(serie a|serie-a|italian football|italy|italien|juventus|inter milan|ac milan|napoli|roma|as roma|lazio|atalanta|fiorentina|bologna|torino|udinese|como 1907|parma calcio)/i.test(text)) return "serie-a";
-  if (/(la liga|laliga|spanish football|spain|spanien|real madrid|barcelona|atletico madrid|atlético madrid|girona|real sociedad|athletic bilbao|sevilla fc|real betis|villarreal|valencia cf)/i.test(text)) return "la-liga";
-  return "other-football";
-}
-
+/**
+ * Keep the football section driven by current editorial importance. League
+ * labels can help the AI understand context, but must not reserve slots for
+ * competitions that have little relevant news on a given day.
+ */
 function selectFootballCoverage(
   candidates: SelectedStory[],
   maxCount = 8
@@ -761,26 +748,14 @@ function selectFootballCoverage(
   const selected: SelectedStory[] = [];
   const used = new Set<string>();
 
-  function add(story: SelectedStory) {
+  for (const story of candidates) {
     const key = normalizeStoryUrl(story.link) || normalizeStoryTitle(story.title);
-    if (!key || used.has(key) || selected.length >= maxCount) return;
+    if (!key || used.has(key)) continue;
     used.add(key);
     selected.push({ ...story, sportGroup: "fotboll" as const });
+    if (selected.length >= maxCount) break;
   }
 
-  // Reserve a slot for each named league when recent, relevant coverage exists.
-  const groups: SportLeagueGroup[] = [
-    "allsvenskan",
-    "premier-league",
-    "serie-a",
-    "la-liga",
-  ];
-  for (const group of groups) {
-    const candidate = candidates.find(story => classifyFootballLeague(story) === group);
-    if (candidate) add(candidate);
-  }
-
-  for (const candidate of candidates) add(candidate);
   return selected;
 }
 
@@ -803,7 +778,7 @@ export async function createSportEditorialSection(
     ...rankedFootballStories,
   ];
   const [footballAI, otherAI] = await Promise.all([
-    runEditorialAI("fotboll", "Fotboll – Allsvenskan, Premier League, Serie A, La Liga och övrig fotboll", footballArticles, profile, 8),
+    runEditorialAI("fotboll", "Fotboll – de största och mest omtalade händelserna från de senaste 24 timmarna, oberoende av liga", footballArticles, profile, 6),
     runEditorialAI("sport", "Övrig sport – balanserad bevakning av flera sporter", otherSportArticles, profile, 2),
   ]);
   footballCandidatePool.push(...footballAI.stories);
@@ -812,7 +787,7 @@ export async function createSportEditorialSection(
   // Fill remaining places with the best AI-selected football stories.
   const footballStories = selectFootballCoverage(
     footballCandidatePool,
-    8
+    6
   ).map((story, index) => ({
     ...story,
     id: index,

@@ -119,6 +119,7 @@ export type SportLeagueTable = {
   title: string;
   season: string;
   dayLabel: string;
+  isSeasonalFallback?: boolean;
   rows: SportLeagueTableRow[];
   scorers: SportLeagueScorer[];
   tableError?: string;
@@ -411,25 +412,130 @@ type DailyTableSelection = {
   fotmobLeagueId: number;
   title: string;
   dayLabel: string;
+  isSeasonalFallback?: boolean;
+  tableGroup?: "norra" | "södra";
 };
 
-const DAILY_TABLE_SCHEDULE: Record<string, DailyTableSelection> = {
-  Monday: { dayLabel: "Måndag", leagueId: 113, fotmobLeagueId: 67, title: "Allsvenskan" },
-  Tuesday: { dayLabel: "Tisdag", leagueId: 114, fotmobLeagueId: 168, title: "Superettan" },
-  Wednesday: { dayLabel: "Onsdag", leagueId: 140, fotmobLeagueId: 87, title: "La Liga" },
-  Thursday: { dayLabel: "Torsdag", leagueId: 39, fotmobLeagueId: 47, title: "Premier League" },
-  Friday: { dayLabel: "Fredag", leagueId: 40, fotmobLeagueId: 48, title: "Championship" },
-  Saturday: { dayLabel: "Lördag", leagueId: 135, fotmobLeagueId: 55, title: "Serie A" },
-  Sunday: { dayLabel: "Söndag", leagueId: 2, fotmobLeagueId: 42, title: "Champions League" },
+type MonthDayWindow = readonly [number, number];
+
+type DailyTableSlot = {
+  dayLabel: string;
+  primary: Omit<DailyTableSelection, "dayLabel">;
+  fallback: Omit<DailyTableSelection, "dayLabel">;
+  primaryWindow: MonthDayWindow;
+  fallbackWindow: MonthDayWindow;
 };
 
-function dailyTableSelection(): DailyTableSelection {
+// These are intentionally broader than typical competition calendars. The
+// windows overlap at season boundaries; the primary league wins in the overlap,
+// while the alternate is selected outside the primary season window.
+// YYYY is deliberately omitted: this should not need yearly end-date edits.
+const TABLE_SEASON_WINDOWS = {
+  swedishLeagues: {
+    primaryWindow: [401, 1130],
+    fallbackWindow: [1101, 415],
+  },
+  bigEuropeanLeagues: {
+    primaryWindow: [801, 531],
+    fallbackWindow: [501, 831],
+  },
+  championsLeague: {
+    primaryWindow: [915, 131],
+    fallbackWindow: [201, 1015],
+  },
+} as const satisfies Record<string, { primaryWindow: MonthDayWindow; fallbackWindow: MonthDayWindow }>;
+
+const DAILY_TABLE_SCHEDULE: Record<string, DailyTableSlot> = {
+  Monday: {
+    dayLabel: "Måndag",
+    primary: { leagueId: 113, fotmobLeagueId: 67, title: "Allsvenskan" },
+    fallback: { leagueId: 61, fotmobLeagueId: 53, title: "Ligue 1", isSeasonalFallback: true },
+    ...TABLE_SEASON_WINDOWS.swedishLeagues,
+  },
+  Tuesday: {
+    dayLabel: "Tisdag",
+    primary: { leagueId: 114, fotmobLeagueId: 168, title: "Superettan" },
+    fallback: { leagueId: 88, fotmobLeagueId: 57, title: "Eredivisie", isSeasonalFallback: true },
+    ...TABLE_SEASON_WINDOWS.swedishLeagues,
+  },
+  Wednesday: {
+    dayLabel: "Onsdag",
+    primary: { leagueId: 140, fotmobLeagueId: 87, title: "La Liga" },
+    fallback: { leagueId: 1084, fotmobLeagueId: 169, title: "Ettan Norra", isSeasonalFallback: true, tableGroup: "norra" },
+    ...TABLE_SEASON_WINDOWS.bigEuropeanLeagues,
+  },
+  Thursday: {
+    dayLabel: "Torsdag",
+    primary: { leagueId: 39, fotmobLeagueId: 47, title: "Premier League" },
+    fallback: { leagueId: 103, fotmobLeagueId: 59, title: "Norska Eliteserien", isSeasonalFallback: true },
+    ...TABLE_SEASON_WINDOWS.bigEuropeanLeagues,
+  },
+  Friday: {
+    dayLabel: "Fredag",
+    primary: { leagueId: 40, fotmobLeagueId: 48, title: "Championship" },
+    fallback: { leagueId: 1085, fotmobLeagueId: 169, title: "Ettan Södra", isSeasonalFallback: true, tableGroup: "södra" },
+    ...TABLE_SEASON_WINDOWS.bigEuropeanLeagues,
+  },
+  Saturday: {
+    dayLabel: "Lördag",
+    primary: { leagueId: 135, fotmobLeagueId: 55, title: "Serie A" },
+    fallback: { leagueId: 1040, fotmobLeagueId: 9089, title: "Damallsvenskan", isSeasonalFallback: true },
+    ...TABLE_SEASON_WINDOWS.bigEuropeanLeagues,
+  },
+  Sunday: {
+    dayLabel: "Söndag",
+    primary: { leagueId: 2, fotmobLeagueId: 42, title: "Champions League" },
+    fallback: { leagueId: 128, fotmobLeagueId: 112, title: "Liga Profesional Argentina", isSeasonalFallback: true },
+    ...TABLE_SEASON_WINDOWS.championsLeague,
+  },
+};
+
+function stockholmDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: STOCKHOLM_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  return {
+    year: Number(parts.find(part => part.type === "year")?.value ?? "0"),
+    month: Number(parts.find(part => part.type === "month")?.value ?? "0"),
+    day: Number(parts.find(part => part.type === "day")?.value ?? "0"),
+  };
+}
+
+function isInMonthDayWindow(
+  date: { month: number; day: number },
+  window: MonthDayWindow
+) {
+  const value = date.month * 100 + date.day;
+  const [start, end] = window;
+  // A start greater than the end means the window crosses New Year's Eve.
+  return start <= end
+    ? value >= start && value <= end
+    : value >= start || value <= end;
+}
+
+function dailyTableSelection(date = new Date()): DailyTableSelection {
   const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone: STOCKHOLM_TIME_ZONE,
     weekday: "long",
-  }).format(new Date());
+  }).format(date);
+  const slot = DAILY_TABLE_SCHEDULE[weekday] ?? DAILY_TABLE_SCHEDULE.Monday;
+  const stockholmDate = stockholmDateParts(date);
+  const primaryActive = isInMonthDayWindow(stockholmDate, slot.primaryWindow);
+  const fallbackActive = isInMonthDayWindow(stockholmDate, slot.fallbackWindow);
 
-  return DAILY_TABLE_SCHEDULE[weekday] ?? DAILY_TABLE_SCHEDULE.Monday;
+  // Primary always wins in the deliberately overlapping transition window.
+  // Selection is determined only by the configured date schedule, never by
+  // whether a provider happens to return rows or considers a season finished.
+  const selected = primaryActive || !fallbackActive ? slot.primary : slot.fallback;
+
+  return {
+    ...selected,
+    dayLabel: slot.dayLabel,
+    isSeasonalFallback: Boolean(selected.isSeasonalFallback),
+  };
 }
 
 type FotMobStandingRow = {
@@ -445,19 +551,31 @@ type FotMobStandingRow = {
   pts?: number;
 };
 
+type FotMobTableGroup = {
+  name?: string;
+  title?: string;
+  label?: string;
+  shortName?: string;
+  data?: {
+    leagueId?: number;
+    name?: string;
+    title?: string;
+    leagueName?: string;
+    tableName?: string;
+    table?: {
+      name?: string;
+      title?: string;
+      all?: FotMobStandingRow[];
+    };
+  };
+};
+
 type FotMobLeaguePayload = {
   details?: {
     selectedSeason?: string;
     latestSeason?: string;
   };
-  table?: Array<{
-    data?: {
-      leagueId?: number;
-      table?: {
-        all?: FotMobStandingRow[];
-      };
-    };
-  }>;
+  table?: FotMobTableGroup[];
   stats?: {
     players?: Array<{
       header?: string;
@@ -474,9 +592,43 @@ type FotMobLeaguePayload = {
 };
 
 function normalizeFotMobTableRows(
-  groups: FotMobLeaguePayload["table"]
+  groups: FotMobLeaguePayload["table"],
+  tableGroup?: "norra" | "södra"
 ): SportLeagueTableRow[] {
-  const rows = groups?.flatMap(group => group.data?.table?.all ?? []) ?? [];
+  let selectedGroups = groups ?? [];
+
+  if (tableGroup && selectedGroups.length > 0) {
+    const groupText = (group: FotMobTableGroup) => [
+      group.name,
+      group.title,
+      group.label,
+      group.shortName,
+      group.data?.name,
+      group.data?.title,
+      group.data?.leagueName,
+      group.data?.tableName,
+      group.data?.table?.name,
+      group.data?.table?.title,
+    ].filter(Boolean).join(" ").toLocaleLowerCase("sv-SE").replace(/ö/g, "o");
+
+    const marker = tableGroup === "norra" ? /\bnorra\b/ : /\b(?:sodra|soedra)\b/;
+    const matches = selectedGroups.filter(group => marker.test(groupText(group)));
+
+    if (matches.length > 0) {
+      selectedGroups = matches;
+    } else if (selectedGroups.length >= 2) {
+      // Some FotMob payload variants expose two unlabelled table groups.
+      // FotMob renders Norra first and Södra second; select one rather than
+      // merging the divisions into a misleading 32-team table.
+      selectedGroups = [selectedGroups[tableGroup === "norra" ? 0 : 1]];
+    } else {
+      // Never quietly show a combined/incorrect table if the division cannot
+      // be identified in the provider payload.
+      selectedGroups = [];
+    }
+  }
+
+  const rows = selectedGroups.flatMap(group => group.data?.table?.all ?? []);
 
   return rows
     .filter(row => Boolean(row.name))
@@ -552,15 +704,13 @@ async function fetchSelectedLeagueTable(): Promise<SportLeagueTable | null> {
       },
     });
 
-    if (!response.ok) {
-      throw new Error("FotMob returned HTTP " + response.status);
-    }
+    if (!response.ok) throw new Error("FotMob returned HTTP " + response.status);
     if (!response.headers.get("content-type")?.includes("json")) {
       throw new Error("FotMob returned a non-JSON response");
     }
 
     const payload = (await response.json()) as FotMobLeaguePayload;
-    const rows = normalizeFotMobTableRows(payload.table);
+    const rows = normalizeFotMobTableRows(payload.table, selected.tableGroup);
     const scorers = normalizeFotMobScorers(payload.stats, rows);
     const season =
       payload.details?.selectedSeason ??
@@ -568,22 +718,25 @@ async function fetchSelectedLeagueTable(): Promise<SportLeagueTable | null> {
       fallbackSeason;
 
     if (rows.length === 0) {
-      console.warn("FotMob returned no standings for", selected.title, season);
+      console.warn("FotMob returned no standings for the scheduled table", selected.title, season);
     }
     if (scorers.length === 0) {
       console.warn("FotMob returned no top scorers for", selected.title, season);
     }
 
+    // Keep the title and league fixed by the weekday/date schedule even if the
+    // current season has ended or the data provider temporarily omits standings.
     return {
       leagueId: selected.leagueId,
       title: selected.title,
       season,
       dayLabel: selected.dayLabel,
+      isSeasonalFallback: selected.isSeasonalFallback,
       rows,
       scorers,
       tableError: rows.length
         ? undefined
-        : "FotMob returnerade ingen aktuell tabell för " + selected.title + " säsongen " + season + ".",
+        : "FotMob returnerade ingen tabell för det fasta tabellvalet " + selected.title + " (" + season + ").",
       scorersError: scorers.length
         ? undefined
         : "FotMob returnerade ingen aktuell skytteliga för " + selected.title + " säsongen " + season + ".",
@@ -595,14 +748,14 @@ async function fetchSelectedLeagueTable(): Promise<SportLeagueTable | null> {
       title: selected.title,
       season: fallbackSeason,
       dayLabel: selected.dayLabel,
+      isSeasonalFallback: selected.isSeasonalFallback,
       rows: [],
       scorers: [],
-      tableError: "Den aktuella tabellen för " + selected.title + " kunde inte hämtas från FotMob just nu.",
+      tableError: "Den schemalagda tabellen för " + selected.title + " kunde inte hämtas från FotMob just nu.",
       scorersError: "Skytteligan för " + selected.title + " kunde inte hämtas från FotMob just nu.",
     };
   }
 }
-
 
 function apiFootballErrorText(errors: unknown): string {
   if (!errors) return "";
