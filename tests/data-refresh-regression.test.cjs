@@ -110,6 +110,13 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(morning, /previousStatus\?\.status !== "retry"/);
 });
 
+test("lifestyle only treats mat as a complete word", () => {
+  const category = read("lib/categorizer.ts");
+  assert.match(category, /\[\^\\p\{L\}\]\)mat/);
+  assert.match(category, /matlagning/);
+  assert.match(category, /matkultur/);
+});
+
 test("economy category outranks lifestyle and Football Italia uses its secure feed", () => {
   const category = read("lib/categorizer.ts");
   assert.ok(category.indexOf("ECONOMY signals precede lifestyle") < category.indexOf("// KULTUR / MAT / LIVSSTIL"));
