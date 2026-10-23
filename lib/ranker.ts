@@ -448,8 +448,11 @@ function calculateRecencyScore(
       new Date(article.date).getTime()) /
     (1000 * 60 * 60);
 
+  if (!Number.isFinite(ageHours) || ageHours < 0) return ageHours < 0 ? 5 : 0;
+  if (ageHours > 72) return 0;
+
   return Math.round(
-    50 * Math.exp(-ageHours / 24)
+    50 * Math.exp(-ageHours / 18)
   );
 }
 
@@ -492,19 +495,19 @@ export function rankArticles(
       const uniqueSources =
         cluster?.uniqueSources ?? 1;
 
-      const editorialEchoScore =
-        Math.log2(
-          mentions + 1
-        ) *
-        uniqueSources *
-        25;
+      // Multi-source coverage is a strong signal that a story is being
+      // talked about, but it must plateau instead of overwhelming freshness.
+      const editorialEchoScore = Math.min(
+        100,
+        Math.log2(mentions + 1) * 22 + Math.max(0, uniqueSources - 1) * 24
+      );
 
-      const sourceDiversityScore =
-        uniqueSources * 15;
+      const sourceDiversityScore = Math.min(
+        45,
+        Math.max(0, uniqueSources - 1) * 12
+      );
 
-      const clusterScore =
-        editorialEchoScore +
-        sourceDiversityScore;
+      const clusterScore = editorialEchoScore + sourceDiversityScore;
 
       const fixedPreferenceScore = calculatePersonalScore(article);
       const behaviorProfileScore = calculateProfileAffinity(article, profile);
