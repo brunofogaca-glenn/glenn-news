@@ -110,6 +110,22 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(morning, /previousStatus\?\.status !== "retry"/);
 });
 
+test("economy category outranks lifestyle and Football Italia uses its secure feed", () => {
+  const category = read("lib/categorizer.ts");
+  assert.ok(category.indexOf("ECONOMY signals precede lifestyle") < category.indexOf("// KULTUR / MAT / LIVSSTIL"));
+  const rss = read("lib/rss.ts");
+  assert.match(rss, /https:\/\/football-italia\.net\/feed\//);
+});
+
+test("football editorial chooses a shorter top list without league quotas", () => {
+  const editor = read("lib/editorV2.ts");
+  assert.match(editor, /de största och mest omtalade händelserna från de senaste 24 timmarna/);
+  assert.match(editor, /profile, 6\)/);
+  assert.doesNotMatch(editor, /Reserve a slot for each named league/);
+  assert.doesNotMatch(editor, /function classifyFootballLeague/);
+  assert.doesNotMatch(editor, /const groups: SportLeagueGroup\[\]/);
+});
+
 test("sports data no longer triggers editorial article ingestion", () => {
   const sport = read("lib/sportDay.ts");
   assert.doesNotMatch(sport, /getCachedArticles|articlesCache/);
