@@ -155,13 +155,22 @@ test("quote feature is removed from the homepage", () => {
   assert.ok(!fs.existsSync(path.join(root, "lib/quotes.ts")));
 });
 
-test("seasonal league fallback date windows match the requested periods", () => {
+test("football league tables use fixed weekday mapping with buffered seasonal overlap windows", () => {
   const sport = read("lib/sportDay.ts");
-  assert.match(sport, /\["Allsvenskan", "Superettan"\][\s\S]*?isBetweenMonthDay\(stockholmDate, 11, 15, 4, 2\)/);
-  assert.match(sport, /regular\.title === "Champions League"[\s\S]*?isBetweenMonthDay\(stockholmDate, 2, 1, 10, 2\)/);
-  assert.match(sport, /"Premier League", "Championship", "La Liga", "Serie A"[\s\S]*?isBetweenMonthDay\(stockholmDate, 5, 20, 8, 16\)/);
-  assert.match(sport, /for \(const selected of selections\)[\s\S]*?rows\.length > 0/);
+  assert.match(sport, /swedishLeagues:\s*\{\s*primaryWindow: \[401, 1130\],\s*fallbackWindow: \[1101, 415\]/);
+  assert.match(sport, /bigEuropeanLeagues:\s*\{\s*primaryWindow: \[801, 531\],\s*fallbackWindow: \[501, 831\]/);
+  assert.match(sport, /championsLeague:\s*\{\s*primaryWindow: \[915, 131\],\s*fallbackWindow: \[201, 1015\]/);
+  assert.match(sport, /title: "Allsvenskan"[\s\S]*?title: "Ligue 1"/);
+  assert.match(sport, /title: "Superettan"[\s\S]*?title: "Eredivisie"/);
+  assert.match(sport, /title: "La Liga"[\s\S]*?title: "Ettan Norra"[\s\S]*?fotmobLeagueId: 169/);
+  assert.match(sport, /title: "Premier League"[\s\S]*?title: "Norska Eliteserien"[\s\S]*?fotmobLeagueId: 59/);
+  assert.match(sport, /title: "Championship"[\s\S]*?title: "Ettan Södra"[\s\S]*?fotmobLeagueId: 169/);
+  assert.match(sport, /title: "Serie A"[\s\S]*?title: "Damallsvenskan"[\s\S]*?fotmobLeagueId: 9089/);
+  assert.match(sport, /title: "Champions League"[\s\S]*?title: "Liga Profesional Argentina"[\s\S]*?fotmobLeagueId: 112/);
+  assert.match(sport, /primaryActive \|\| !fallbackActive \? slot\.primary : slot\.fallback/);
+  assert.match(sport, /Selection is determined only by the configured date schedule/);
 });
+
 
 test("league tables show season-scoped zones and explain provisional European places", () => {
   const zones = read("lib/leagueZones.ts");
@@ -179,16 +188,17 @@ test("league tables show season-scoped zones and explain provisional European pl
   assert.match(panel, /zoneConfig\.note/);
 });
 
-test("seasonal league table fallbacks are selected by Stockholm date and fetched in priority order", () => {
+test("the selected seasonal table does not change based on provider row availability", () => {
   const sport = read("lib/sportDay.ts");
-  assert.match(sport, /SEASONAL_TABLE_FALLBACKS/);
-  assert.match(sport, /nordicAutumn/);
-  assert.match(sport, /championsPause/);
-  assert.match(sport, /summerPause/);
-  assert.match(sport, /dailyTableSelections\(\)/);
-  assert.match(sport, /for \(const selected of selections\)/);
-  assert.match(sport, /if \(rows\.length > 0\)/);
+  const fetcher = sport.slice(sport.indexOf("async function fetchSelectedLeagueTable"), sport.indexOf("function apiFootballErrorText"));
+  assert.match(fetcher, /const selected = dailyTableSelection\(\)/);
+  assert.match(fetcher, /normalizeFotMobTableRows\(payload\.table, selected\.tableGroup\)/);
+  assert.doesNotMatch(fetcher, /for \(const selected of selections\)/);
+  assert.doesNotMatch(fetcher, /if \(rows\.length > 0\) \{[\s\S]*?return/);
+  assert.match(fetcher, /title: selected\.title/);
+  assert.match(fetcher, /isSeasonalFallback: selected\.isSeasonalFallback/);
 });
+
 
 test("saved edition list requests use the Next Data Cache", () => {
   const edition = read("lib/dailyEdition.ts");
