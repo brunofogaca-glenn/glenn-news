@@ -351,27 +351,23 @@ export function CultureSnapshotPanel({ data }: { data: CultureSnapshot }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="min-w-0">
           <div className="border-b border-slate-300 pb-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-pink-800">Kultur · på bio</div>
-            <h3 className="mt-1 font-serif text-xl font-black md:text-2xl">Veckans filmpremiärer</h3>
-            <p className="mt-1 text-xs text-slate-500">Alla svenska biopremiärer som hittats för de kommande sju dagarna.</p>
+            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-pink-800">Kultur · film</div>
+            <h3 className="mt-1 font-serif text-xl font-black md:text-2xl">Senaste filmrecensionerna</h3>
+            <p className="mt-1 text-xs text-slate-500">Nya filmrecensioner från Dagens Nyheter.</p>
             <div className="mt-2 text-xs text-slate-500">
-              <SourceLink title="Hela biokalendern" url={data.sourceUrl} />
+              <SourceLink title="DN:s RSS-flöde" url={data.filmReviewSourceUrl} />
             </div>
           </div>
 
-          {data.films.length ? (
-            <div className="mt-2 grid gap-x-5 lg:grid-cols-1 xl:grid-cols-2">
-              {data.films.map((film, index) => (
-                <a key={film.url + film.date + index} href={film.url} target="_blank" rel="noreferrer" className="group border-b border-slate-200 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{film.dateLabel ?? film.date}</div>
-                  <div className="mt-1 font-serif font-bold leading-snug group-hover:underline">{film.title}</div>
-                  {film.description ? <div className="mt-1 text-xs leading-5 text-slate-500">{film.description}</div> : null}
-                </a>
+          {data.filmReviews.length ? (
+            <div className="mt-1">
+              {data.filmReviews.slice(0, 6).map((review, index) => (
+                <SmallEntry key={review.url + index} item={review} meta="Filmrecension" />
               ))}
             </div>
           ) : (
             <p className="mt-3 font-serif text-sm text-slate-500">
-              Inga kommande premiärer hittades i de kommande sju dagarna. Öppna MovieZines kalender för den fullständiga listan.
+              Filmrecensionerna kunde inte hämtas just nu. Prova igen senare.
             </p>
           )}
         </div>
@@ -382,7 +378,7 @@ export function CultureSnapshotPanel({ data }: { data: CultureSnapshot }) {
             <h3 className="mt-1 font-serif text-xl font-black md:text-2xl">Senaste skivrecensionerna</h3>
             <p className="mt-1 text-xs text-slate-500">Nya albumrecensioner från Dagens Nyheter.</p>
             <div className="mt-2 text-xs text-slate-500">
-              <SourceLink title="DN:s RSS-flöde" url={data.reviewSourceUrl} />
+              <SourceLink title="DN:s RSS-flöde" url={data.albumReviewSourceUrl} />
             </div>
           </div>
 
@@ -402,7 +398,7 @@ export function CultureSnapshotPanel({ data }: { data: CultureSnapshot }) {
 
       <SourceFooter>
         <span>Hämtad {new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).format(new Date(data.updatedAt))}</span>
-        <span> · Källor: MovieZine och DN:s skivrecensioner</span>
+        <span> · Källor: DN:s film- och skivrecensioner</span>
       </SourceFooter>
     </section>
   );
