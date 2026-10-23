@@ -162,11 +162,11 @@ test("football league tables use fixed weekday mapping with buffered seasonal ov
   assert.match(sport, /championsLeague:\s*\{\s*primaryWindow: \[915, 131\],\s*fallbackWindow: \[201, 1015\]/);
   assert.match(sport, /title: "Allsvenskan"[\s\S]*?title: "Ligue 1"/);
   assert.match(sport, /title: "Superettan"[\s\S]*?title: "Eredivisie"/);
-  assert.match(sport, /title: "La Liga"[\s\S]*?title: "Ettan Norra"[\s\S]*?fotmobLeagueId: 169/);
-  assert.match(sport, /title: "Premier League"[\s\S]*?title: "Norska Eliteserien"[\s\S]*?fotmobLeagueId: 59/);
-  assert.match(sport, /title: "Championship"[\s\S]*?title: "Ettan Södra"[\s\S]*?fotmobLeagueId: 169/);
-  assert.match(sport, /title: "Serie A"[\s\S]*?title: "Damallsvenskan"[\s\S]*?fotmobLeagueId: 9089/);
-  assert.match(sport, /title: "Champions League"[\s\S]*?title: "Liga Profesional Argentina"[\s\S]*?fotmobLeagueId: 112/);
+  assert.match(sport, /title: "La Liga"[\s\S]*?fallback: \{ leagueId: 1084, fotmobLeagueId: 169, title: "Ettan Norra"/);
+  assert.match(sport, /title: "Premier League"[\s\S]*?fallback: \{ leagueId: 103, fotmobLeagueId: 59, title: "Norska Eliteserien"/);
+  assert.match(sport, /title: "Championship"[\s\S]*?fallback: \{ leagueId: 1085, fotmobLeagueId: 169, title: "Ettan Södra"/);
+  assert.match(sport, /title: "Serie A"[\s\S]*?fallback: \{ leagueId: 1040, fotmobLeagueId: 9089, title: "Damallsvenskan"/);
+  assert.match(sport, /title: "Champions League"[\s\S]*?fallback: \{ leagueId: 128, fotmobLeagueId: 112, title: "Liga Profesional Argentina"/);
   assert.match(sport, /primaryActive \|\| !fallbackActive \? slot\.primary : slot\.fallback/);
   assert.match(sport, /Selection is determined only by the configured date schedule/);
 });
