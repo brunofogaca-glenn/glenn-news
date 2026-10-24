@@ -117,11 +117,11 @@ test("lifestyle only treats mat as a complete word", () => {
   assert.match(category, /matkultur/);
 });
 
-test("economy category outranks lifestyle and Football Italia uses its secure feed", () => {
+test("economy category outranks lifestyle and Football Italia is not an RSS source", () => {
   const category = read("lib/categorizer.ts");
   assert.ok(category.indexOf("ECONOMY signals precede lifestyle") < category.indexOf("// KULTUR / MAT / LIVSSTIL"));
   const rss = read("lib/rss.ts");
-  assert.match(rss, /https:\/\/football-italia\.net\/feed\//);
+  assert.doesNotMatch(rss, /https:\/\/football-italia\.net\/feed\//);
 });
 
 test("football editorial chooses a shorter top list without league quotas", () => {
