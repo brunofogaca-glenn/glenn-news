@@ -196,7 +196,6 @@ export const FEEDS: FeedConfig[] = [
   { url: "https://www.bt.se/feeds/section/elfsborg/feed.xml", category: "elfsborg" },
   { url: "http://expressen.se/rss/fotboll", category: "fotboll" },
   { url: "http://www.aftonbladet.se/sportbladet/fotboll/rss.xml", category: "fotboll" },
-  { url: "https://football-italia.net/feed/", category: "fotboll" },
   { url: "https://feeds.expressen.se/dinapengar/", category: "ekonomi" },
   { url: "https://www.bt.se/feeds/section/boras/feed.xml", category: "boras" },
   { url: "https://www.bt.se/feeds/section/kronikor/feed.xml", category: "livsstil", articleType: "krönika" },
