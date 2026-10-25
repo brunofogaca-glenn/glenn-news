@@ -55,6 +55,34 @@ type WeeklyFocusDependencies = {
   generateEditorResponse: (input: string) => Promise<{ output_text: string }>;
 };
 
+const TIME_ZONE = "Europe/Stockholm";
+
+function stockholmDateKey(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find(part => part.type === "year")?.value ?? "2000";
+  const month = parts.find(part => part.type === "month")?.value ?? "01";
+  const day = parts.find(part => part.type === "day")?.value ?? "01";
+  return year + "-" + month + "-" + day;
+}
+
+function calendarWeekBounds(now = new Date()) {
+  const today = stockholmDateKey(now);
+  const [year, month, day] = today.split("-").map(Number);
+  const todayUtc = new Date(Date.UTC(year, month - 1, day));
+  const weekdayMondayFirst = (todayUtc.getUTCDay() + 6) % 7;
+  const start = new Date(todayUtc);
+  start.setUTCDate(start.getUTCDate() - weekdayMondayFirst);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  const key = (value: Date) =>
+    value.getUTCFullYear() + "-" +
+    String(value.getUTCMonth() + 1).padStart(2, "0") + "-" +
+    String(value.getUTCDate()).padStart(2, "0");
+  return { startKey: key(start), endKey: key(end) };
+}
+
 function profileForPrompt(profile: ReaderProfile) {
   return {
     totalClicks: profile.totalClicks,
@@ -296,11 +324,16 @@ export async function createWeeklyFocus(
   dependencyOverrides: Partial<WeeklyFocusDependencies> = {}
 ): Promise<WeeklyFocus> {
   const dependencies = { ...defaultWeeklyFocusDependencies, ...dependencyOverrides };
-  const weekStartDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [activity, savedWeeklyReadLinks] = await Promise.all([
-    dependencies.loadReaderActivity(weekStartDate.toISOString(), 250),
+  const { startKey: weekStartKey, endKey: weekEndKey } = calendarWeekBounds();
+  const weekStartDate = new Date(weekStartKey + "T00:00:00+01:00");
+  const [allActivity, savedWeeklyReadLinks] = await Promise.all([
+    dependencies.loadReaderActivity(weekStartDate.toISOString(), 500),
     dependencies.loadWeeklyReadLinks(),
   ]);
+  const activity = allActivity.filter(item => {
+    const dateKey = stockholmDateKey(new Date(item.timestamp));
+    return dateKey >= weekStartKey && dateKey <= weekEndKey;
+  });
   const readingHistory = buildReadingHistory(activity);
   const weeklyInterestProfile = buildWeeklyInterestProfile(readingHistory);
   const readLinks = new Set(
@@ -314,19 +347,20 @@ export async function createWeeklyFocus(
 
   const todayEdition = await dependencies.loadTodayEdition(profile);
   const savedEditions = await dependencies.loadSavedEditions(7);
-  const editions =
-    savedEditions.some(edition => edition.dateKey === todayEdition.dateKey)
-      ? savedEditions
-      : [todayEdition, ...savedEditions].slice(0, 7);
+  const editionsByDate = new Map<string, DailyEdition>();
+  for (const edition of savedEditions) {
+    if (edition.dateKey >= weekStartKey && edition.dateKey <= weekEndKey) {
+      editionsByDate.set(edition.dateKey, edition);
+    }
+  }
+  if (todayEdition.dateKey >= weekStartKey && todayEdition.dateKey <= weekEndKey) {
+    editionsByDate.set(todayEdition.dateKey, todayEdition);
+  }
+  const editions = [...editionsByDate.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
   const candidates = buildCandidates(editions, readLinks, profile);
-  const dates = editions.map(edition => edition.dateKey).sort();
-  const periodStart = dates[0]
-    ? new Date(dates[0] + "T05:00:00Z").toISOString()
-    : new Date().toISOString();
-  const periodEnd = dates.at(-1)
-    ? new Date(dates.at(-1) + "T20:00:00Z").toISOString()
-    : new Date().toISOString();
+  const periodStart = new Date(weekStartKey + "T00:00:00+01:00").toISOString();
+  const periodEnd = new Date(weekEndKey + "T23:59:59+01:00").toISOString();
 
   const sharedFields = {
     periodStart,
@@ -389,7 +423,7 @@ export async function createWeeklyFocus(
 
   const promptProfile = profileForPrompt(profile);
   const cacheFingerprint = dependencies.fingerprint({
-    cacheSchema: "weekfocus-v24",
+    cacheSchema: "weekfocus-calendar-week-v25",
     sharedFields,
     periodStart,
     periodEnd,
@@ -407,11 +441,11 @@ export async function createWeeklyFocus(
         "Du är Glenns personliga veckoredaktör på Glenn News.",
         "",
         "UPPDRAG:",
-        "Identifiera upp till tio ämnen som Glenn tydligast visat intresse för genom att öppna artiklar under de senaste sju dagarna. Välj exakt en ny, oläst artikel att läsa vidare om för varje ämne.",
+        "Identifiera upp till tio ämnen som Glenn tydligast visat intresse för genom att öppna artiklar under innevarande kalendervecka (måndag–söndag). Välj exakt en ny, oläst artikel att läsa vidare om för varje ämne.",
         "Detta är inte en vanlig topp tio över veckans nyheter. Varje val ska koppla ihop vad Glenn faktiskt läste med den bästa olästa fördjupningen från veckans sparade morgoneditioner.",
         "",
         "LÄSHISTORIK:",
-        "- READ-HISTORY innehåller faktiska klick från Glenn News under de senaste sju dygnen. ID motsvarar unika lästa artiklar och är bevis på intresse.",
+        "- READ-HISTORY innehåller faktiska klick från Glenn News under de innevarande kalendervecka (måndag–söndag). ID motsvarar unika lästa artiklar och är bevis på intresse.",
         "- Gruppera liknande rubriker till meningsfulla ämnen. Räkna hur många unika READ-HISTORY-ID:n som stödjer respektive ämne.",
         "- Sortera de tydligaste och vanligaste läsämnena först. Återkommande läsning väger mer än ett enstaka klick.",
         "- readIds måste innehålla verkliga ID:n ur READ-HISTORY; hitta inte på ID:n och använd helst inte samma lästa artikel i flera ämnen.",
@@ -419,7 +453,7 @@ export async function createWeeklyFocus(
         "",
         "VAL AV ARTIKEL:",
         "- Välj bara artiklar ur CANDIDATES. id måste motsvara en kandidat; hitta inte på rubriker, artiklar eller länkar.",
-        "- CANDIDATES har redan filtrerats så att artiklar som Glenn öppnat under de senaste sju dygnen inte finns med.",
+        "- CANDIDATES har redan filtrerats så att artiklar som Glenn öppnat under de innevarande kalendervecka (måndag–söndag) inte finns med.",
         "- Välj en text som tar ämnet vidare: analys, krönika, intervju, reportage, bakgrund eller granskning väger tyngre än en kort notis.",
         "- qualityScore signalerar fördjupning och redaktionellt läsvärde; prioritera höga värden när ämnet passar läshistoriken.",
         "- isNewswire markerar byråmaterial. Använd det när det tillför viktig information, men välj hellre en originell analys, intervju, krönika eller ett reportage om alternativen täcker ämnet lika bra.",
