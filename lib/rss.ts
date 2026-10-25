@@ -220,7 +220,6 @@ export const FEEDS: FeedConfig[] = [
   { url: "https://www.offside.org/feed/", category: "fotboll", articleType: "reportage" },
   { url: "https://www.dn.se/musik-rss", category: "livsstil" },
   { url: "https://feeds.expressen.se/sport/tennis/", category: "tennis" },
-  { url: "https://www.moviezine.se/feed", category: "livsstil" },
   { url: "https://www.transfermarkt.com/rss/news", category: "fotboll" },
   { url: "http://www.svt.se/sport/fotboll/rss.xml", category: "fotboll" },
   { url: "http://feeds.guardian.co.uk/theguardian/football/manchester-united/rss", category: "fotboll" },
