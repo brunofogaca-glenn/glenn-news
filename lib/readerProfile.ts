@@ -345,6 +345,27 @@ async function getEventProfile(): Promise<ReaderProfile> {
       }
     }
 
+    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+    for (const blob of batches.blobs) {
+      try {
+        const stored = await get(blob.pathname, { access: "private" });
+        if (!stored?.stream || stored.statusCode !== 200) continue;
+        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
+        for (const item of parsed.events ?? []) {
+          const stamp = Date.parse(item.timestamp);
+          if (!Number.isFinite(stamp) || stamp > Date.now() + 60000) continue;
+          const age = Math.max(0, (Date.now() - stamp) / 86400000);
+          const w = Math.max(0.15, Math.exp(-age / 45));
+          profile.category[item.category] = (profile.category[item.category] ?? 0) + w;
+          profile.articleType[item.articleType] = (profile.articleType[item.articleType] ?? 0) + w * 2;
+          profile.source[item.source] = (profile.source[item.source] ?? 0) + w * 0.5;
+          if (item.topic) profile.topic[item.topic] = (profile.topic[item.topic] ?? 0) + w * 1.5;
+          profile.totalClicks += 1;
+          const iso = new Date(stamp).toISOString();
+          if (!profile.lastUpdated || iso > profile.lastUpdated) profile.lastUpdated = iso;
+        }
+      } catch { /* Keep processing other batches. */ }
+    }
     return mergeProfiles(emptyProfile(), profile);
   } catch (error) {
     await recordDiagnostic({ level: "error", component: "readerProfile.read", message: "Kunde inte läsa läsarprofilens klickhistorik", error, context: { operation: "read-profile-events" } });
