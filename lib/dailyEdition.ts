@@ -663,7 +663,7 @@ const getSavedEditionDateKeys = unstable_cache(
       .reverse()
       .slice(0, limit);
   },
-  ["glenn-news-saved-edition-date-keys-v1"],
+  ["glenn-news-saved-edition-date-keys-v2"],
   { revalidate: 10 * 60, tags: ["glenn-news-editions"] }
 );
 
