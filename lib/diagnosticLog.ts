@@ -1,5 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
-import { get, list, put } from "@vercel/blob";
+import { createHash } from "node:crypto";
 
 export type DiagnosticLevel = "error" | "warning";
 export type DiagnosticLogEntry = {
@@ -8,9 +7,6 @@ export type DiagnosticLogEntry = {
   context: Record<string, string | number | boolean | null>; fingerprint: string;
 };
 
-const PREFIX = "glenn-news/diagnostics/";
-const MAX_FILES_PER_DAY = 250;
-const MAX_RETURNED_LOGS = 80;
 const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
 const recentFingerprints = new Map<string, number>();
 const SAFE_CONTEXT_KEYS = new Set([
@@ -54,26 +50,16 @@ function safeContext(input?: Record<string, string | number | boolean | null>) {
   return output;
 }
 
-function isLogEntry(value: unknown): value is DiagnosticLogEntry {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const item = value as Partial<DiagnosticLogEntry>;
-  return typeof item.id === "string" &&
-    typeof item.timestamp === "string" &&
-    Number.isFinite(Date.parse(item.timestamp)) &&
-    (item.level === "error" || item.level === "warning") &&
-    typeof item.component === "string" &&
-    typeof item.message === "string" &&
-    typeof item.fingerprint === "string" &&
-    Boolean(item.context) && typeof item.context === "object";
-}
-
-/** Persist separate incidents so concurrent failures cannot overwrite each other. */
+/**
+ * Diagnostics go to Vercel Runtime Logs instead of Blob. This avoids one
+ * persistent Blob write per incident. Deduplication is best-effort per warm
+ * server instance, and messages/context are redacted before being logged.
+ */
 export async function recordDiagnostic(input: {
   level: DiagnosticLevel; component: string; message: string;
   error?: unknown;
   context?: Record<string, string | number | boolean | null>;
 }) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return false;
   const message = redactText(input.message, 800);
   const detailRaw = input.error instanceof Error ? input.error.message :
     input.error === undefined ? "" : String(input.error);
@@ -95,66 +81,29 @@ export async function recordDiagnostic(input: {
     if (oldest) recentFingerprints.delete(oldest);
   }
 
-  const timestamp = new Date(now).toISOString();
-  const entry: DiagnosticLogEntry = {
-    id: randomUUID(), timestamp, level: input.level, component, message,
-    ...(detail ? { detail } : {}), ...(stack ? { stack } : {}),
-    context, fingerprint,
+  const payload = {
+    timestamp: new Date(now).toISOString(),
+    level: input.level,
+    component,
+    message,
+    ...(detail ? { detail } : {}),
+    ...(stack ? { stack } : {}),
+    context,
   };
-  const path = PREFIX + timestamp.slice(0, 10) + "/" +
-    String(now).padStart(13, "0") + "-" + entry.id + ".json";
-
-  try {
-    await put(path, JSON.stringify(entry), {
-      access: "private", addRandomSuffix: false, contentType: "application/json",
-    });
-    return true;
-  } catch (error) {
-    console.error("Kunde inte spara diagnostiklogg:",
-      redactText(error instanceof Error ? error.message : String(error), 500));
-    return false;
-  }
+  const serialized = JSON.stringify(payload);
+  if (input.level === "error") console.error("[Glenn News diagnostic]", serialized);
+  else console.warn("[Glenn News diagnostic]", serialized);
+  return true;
 }
 
-export async function getDiagnosticEvents(days = 1): Promise<{
+/** Persistent diagnostic history is disabled to keep Blob operations within budget. */
+export async function getDiagnosticEvents(_days = 1): Promise<{
   available: boolean; entries: DiagnosticLogEntry[]; truncated: boolean; message?: string;
 }> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return {
-      available: false, entries: [], truncated: false,
-      message: "Beständig loggning är inte tillgänglig eftersom Blob-lagringen saknar konfiguration.",
-    };
-  }
-
-  const safeDays = days === 7 ? 7 : 1;
-  const since = Date.now() - safeDays * 24 * 60 * 60 * 1000;
-  const dates = Array.from({ length: safeDays + 1 }, (_, index) =>
-    new Date(Date.now() - index * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-  const listings = await Promise.all(dates.map(date =>
-    list({ prefix: PREFIX + date + "/", limit: MAX_FILES_PER_DAY })));
-  const blobs = listings.flatMap(result => result.blobs)
-    .sort((a, b) => b.pathname.localeCompare(a.pathname));
-  const truncated = blobs.length > MAX_RETURNED_LOGS;
-  const candidates = blobs.slice(0, MAX_RETURNED_LOGS);
-
-  const loaded = await Promise.all(candidates.map(async blob => {
-    try {
-      const result = await get(blob.pathname, { access: "private" });
-      if (!result?.stream || result.statusCode !== 200) return null;
-      const text = await new Response(result.stream).text();
-      if (text.length > 15_000) return null;
-      const parsed: unknown = JSON.parse(text);
-      if (!isLogEntry(parsed) || Date.parse(parsed.timestamp) < since) return null;
-      return parsed;
-    } catch {
-      return null;
-    }
-  }));
-
   return {
-    available: true,
-    entries: loaded.filter((entry): entry is DiagnosticLogEntry => entry !== null)
-      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)),
-    truncated,
+    available: false,
+    entries: [],
+    truncated: false,
+    message: "Beständig felloggning är avstängd för att minska Blob-operationer. Se Vercel Runtime Logs för diagnostik.",
   };
 }
