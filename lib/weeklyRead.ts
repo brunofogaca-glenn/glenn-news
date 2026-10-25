@@ -21,7 +21,10 @@ export async function addWeeklyReadLink(link: string) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return false;
   try {
     await put(READ_PATH, JSON.stringify(next), {
-      access: "private", addRandomSuffix: false, contentType: "application/json"
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json",
     });
     return true;
   } catch (error) {
