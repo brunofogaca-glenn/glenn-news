@@ -3,6 +3,9 @@ import { get, put } from "@vercel/blob";
 
 const CACHE_PATH = "glenn-news/week-focus/cache/latest.json";
 const MAX_MEMORY_ENTRIES = 3;
+// A typical weekend Week Focus reading session is about 15 minutes; keep the
+// edition reusable for an hour without serving an unchanged cache forever.
+const WEEK_FOCUS_CACHE_TTL_MS = 60 * 60 * 1000;
 
 type CacheEnvelope = {
   version: 1;
@@ -11,7 +14,7 @@ type CacheEnvelope = {
   value: unknown;
 };
 
-const memoryCache = new Map<string, unknown>();
+const memoryCache = new Map<string, { expiresAt: number; value: unknown }>();
 const inFlight = new Map<string, Promise<unknown>>();
 
 function stableSerialize(value: unknown): string {
@@ -40,9 +43,9 @@ export function createWeeklyFocusFingerprint(input: unknown): string {
   return createHash("sha256").update(stableSerialize(input)).digest("hex");
 }
 
-function remember(fingerprint: string, value: unknown) {
+function remember(fingerprint: string, value: unknown, cachedAt = Date.now()) {
   memoryCache.delete(fingerprint);
-  memoryCache.set(fingerprint, value);
+  memoryCache.set(fingerprint, { expiresAt: cachedAt + WEEK_FOCUS_CACHE_TTL_MS, value });
   while (memoryCache.size > MAX_MEMORY_ENTRIES) {
     const firstKey = memoryCache.keys().next().value as string | undefined;
     if (!firstKey) break;
@@ -60,10 +63,18 @@ async function readPersistentCache<T>(
     const result = await get(CACHE_PATH, { access: "private" });
     if (!result?.stream || result.statusCode !== 200) return null;
     const parsed = JSON.parse(await new Response(result.stream).text()) as Partial<CacheEnvelope>;
-    if (parsed.version !== 1 || parsed.fingerprint !== fingerprint || !isValid(parsed.value)) {
+    const cachedAt = typeof parsed.cachedAt === "string" ? Date.parse(parsed.cachedAt) : Number.NaN;
+    if (
+      parsed.version !== 1 ||
+      parsed.fingerprint !== fingerprint ||
+      !Number.isFinite(cachedAt) ||
+      Date.now() - cachedAt >= WEEK_FOCUS_CACHE_TTL_MS ||
+      Date.now() < cachedAt ||
+      !isValid(parsed.value)
+    ) {
       return null;
     }
-    remember(fingerprint, parsed.value);
+    remember(fingerprint, parsed.value, cachedAt);
     return parsed.value;
   } catch {
     return null;
@@ -102,8 +113,11 @@ export async function getOrCreateWeeklyFocus<T>(
   create: () => Promise<T>,
   isValid: (value: unknown) => value is T
 ): Promise<T> {
-  const memoryValue = memoryCache.get(fingerprint);
-  if (isValid(memoryValue)) return memoryValue;
+  const cached = memoryCache.get(fingerprint);
+  if (cached && cached.expiresAt > Date.now() && isValid(cached.value)) {
+    return cached.value;
+  }
+  if (cached) memoryCache.delete(fingerprint);
 
   const existingPromise = inFlight.get(fingerprint);
   if (existingPromise) return existingPromise as Promise<T>;
