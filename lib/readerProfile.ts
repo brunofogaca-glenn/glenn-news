@@ -51,6 +51,7 @@ export type ReaderActivity = ReaderEvent & {
 const PROFILE_PATH = "glenn-news/profile/default.json";
 const EVENT_PREFIX = "glenn-news/profile/events/";
 const SEMANTIC_EVENT_PREFIX = "glenn-news/profile/semantic-events/";
+const BATCH_EVENT_PREFIX = "glenn-news/profile/batches/";
 const MAX_PROFILE_BYTES = 32_000;
 const MAX_EVENTS = 1000;
 
@@ -216,6 +217,21 @@ function decode(value: string) {
 
 function encode(value: string) {
   return Buffer.from(value, "utf8").toString("base64url");
+}
+
+export type BatchedReaderEvent = ReaderEvent & { eventId: string; timestamp: string; classification?: SemanticReaderClassification | null };
+
+export async function recordReaderBatch(batchId: string, events: BatchedReaderEvent[]): Promise<boolean> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN || !/^[0-9]{13}-[a-f0-9]{32}$/i.test(batchId) || events.length < 1 || events.length > 50) return false;
+  try {
+    await put(BATCH_EVENT_PREFIX + batchId + ".json", JSON.stringify({ version: 1, events }), {
+      access: "private", addRandomSuffix: false, contentType: "application/json",
+    });
+    return true;
+  } catch (error) {
+    console.error("Kunde inte spara läshistorikens batch:", error);
+    return false;
+  }
 }
 
 async function getLegacyProfile(): Promise<ReaderProfile> {
