@@ -9,7 +9,7 @@ function isText(value: unknown, max: number): value is string {
 }
 
 function isArticleUrl(value: unknown): value is string {
-  if (!isText(value, 2048) || /\\s/.test(value)) return false;
+  if (!isText(value, 2048) || /\s/.test(value)) return false;
   try {
     const url = new URL(value);
     return (url.protocol === "https:" || url.protocol === "http:") && Boolean(url.hostname);
