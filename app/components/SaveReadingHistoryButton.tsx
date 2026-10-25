@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { readReaderQueue, READER_QUEUE_EVENT, READER_QUEUE_KEY, type ReaderQueueState } from "./readerQueue";
 
 function makeBatchId() {
@@ -8,6 +9,7 @@ function makeBatchId() {
 }
 
 export function SaveReadingHistoryButton() {
+  const pathname = usePathname();
   const [count, setCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -59,8 +61,10 @@ export function SaveReadingHistoryButton() {
     }
   }
 
+  if (pathname !== "/") return null;
+
   return (
-    <section className="mt-10 border-2 border-slate-950 bg-white/70 p-5 md:p-6" aria-label="Läshistorik">
+    <section className="mx-auto mt-10 max-w-7xl px-4 md:px-8 border-2 border-slate-950 bg-white/70 p-5 md:p-6" aria-label="Läshistorik">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">Din läshistorik</div>
