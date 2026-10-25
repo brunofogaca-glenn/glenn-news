@@ -75,7 +75,7 @@ function stockholmOffsetForDate(dateKey: string) {
     hour: "2-digit",
   }).formatToParts(probe);
   const label = parts.find(part => part.type === "timeZoneName")?.value ?? "GMT+1";
-  const match = label.match(/^GMT([+-])(\\d{1,2})(?::?(\\d{2}))?$/);
+  const match = label.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/);
   if (!match) return "+01:00";
   return match[1] + String(match[2]).padStart(2, "0") + ":" +
     String(match[3] ?? "00").padStart(2, "0");
