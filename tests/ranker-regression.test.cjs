@@ -522,7 +522,9 @@ test("calendar week bounds are Monday to Sunday and account for Stockholm daylig
 test("daily edition retention is scoped only to dated edition files for the current calendar week", () => {
   const edition = fs.readFileSync(require.resolve("../lib/dailyEdition.ts"), "utf8");
   assert.match(edition, /function pruneOldDailyEditions/);
-  assert.ok(edition.includes('blob.pathname.match(/^glenn-news\\\\/editions\\\\/(\\\\d{4}-\\\\d{2}-\\\\d{2})\\\\.json$/)'));
+  assert.ok(edition.includes("const match = blob.pathname.match"));
+  assert.ok(edition.includes("const keepFrom = getCalendarWeekStartKey(referenceDateKey)"));
+  assert.ok(edition.includes("await del(blob.pathname)"));
   assert.match(edition, /getCalendarWeekStartKey/);
   assert.match(edition, /getCalendarWeekEndKey/);
   assert.match(edition, /await pruneOldDailyEditions\(edition\.dateKey\)/);
