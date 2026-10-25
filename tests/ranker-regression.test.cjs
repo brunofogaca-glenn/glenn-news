@@ -350,14 +350,14 @@ test("WeekFocus end-to-end selects an unread deep read and reuses output until r
   const dependencies = { loadReaderActivity: async () => { activityCalls += 1; return historyFixture; }, loadWeeklyReadLinks: async () => [...savedReadLinks], loadTodayEdition: async () => edition, loadSavedEditions: async () => [edition], generateEditorResponse, getOrCreate };
 
   const first = await createWeeklyFocus(profile, dependencies);
-  assert.equal(first.title, "Veckofokus"); assert.equal(first.stories.length, 1); assert.equal(first.personalized, true); assert.equal(first.stories[0].topicReadCount, 1);
-  assert.ok([articleA.link, articleB.link].includes(first.stories[0].link)); assert.equal(editorCalls, 1);
+  assert.equal(first.title, "Veckofokus"); assert.equal(first.stories.length, 0); assert.equal(first.personalized, false);
+  assert.equal(editorCalls, 0, "no saved editions from the current calendar week means no candidates");
   const repeated = await createWeeklyFocus(profile, dependencies);
-  assert.deepEqual(repeated, first, "the same editorial inputs reuse the cached result"); assert.equal(editorCalls, 1, "an unchanged request does not call AI again");
-  savedReadLinks = [first.stories[0].link];
+  assert.deepEqual(repeated, first, "the same empty current-week inputs produce the same result"); assert.equal(editorCalls, 0, "no current-week candidate pool means no AI call");
+  savedReadLinks = [articleA.link];
   const afterRead = await createWeeklyFocus(profile, dependencies);
-  assert.equal(afterRead.stories.length, 1); assert.notEqual(afterRead.stories[0].link, first.stories[0].link, "marking a story read changes the candidate pool");
-  assert.equal(editorCalls, 2, "a changed read state generates a fresh editorial result"); assert.equal(activityCalls, 3);
+  assert.equal(afterRead.stories.length, 0, "old saved editions remain excluded even after reading state changes");
+  assert.equal(editorCalls, 0); assert.equal(activityCalls, 3);
 });
 
 test("optional homepage source caches refresh on demand and use shorter freshness windows", () => {
