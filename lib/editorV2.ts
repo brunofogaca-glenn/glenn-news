@@ -736,7 +736,7 @@ export async function createSportEditorialSection(
     ...rankedFootballStories,
   ];
   const [footballAI, otherAI] = await Promise.all([
-    runEditorialAI("fotboll", "Fotboll – de största och mest omtalade händelserna från de senaste 24 timmarna, oberoende av liga", footballArticles, profile, 6),
+    runEditorialAI("fotboll", "Fotboll – de största och mest omtalade händelserna från de senaste 24 timmarna, oberoende av liga", footballArticles, profile, 8),
     runEditorialAI("sport", "Övrig sport – balanserad bevakning av flera sporter", otherSportArticles, profile, 2),
   ]);
   footballCandidatePool.push(...footballAI.stories);
@@ -744,7 +744,7 @@ export async function createSportEditorialSection(
   // Use the same relevance-first editorial choice for football; do not reserve slots for leagues.
   const footballStories = selectFootballCoverage(
     footballAI.stories.length ? footballAI.stories : footballCandidatePool,
-    6
+    8
   ).map((story, index) => ({
     ...story,
     id: index,
