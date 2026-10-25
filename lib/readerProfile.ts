@@ -491,11 +491,11 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
 }
 
 
-// Blob-backed profile data changes infrequently relative to page renders.
-// Cache briefly per warm server instance and coalesce concurrent rebuilds so
-// parallel components do not each list the same event prefixes. A short TTL
-// keeps click-based personalization fresh without reading Blob on every render.
-const READER_PROFILE_CACHE_TTL_MS = 30_000;
+// Glenn typically reads for about 30 minutes per morning session. Keep the
+// merged profile cached for that whole session to avoid repeatedly listing the
+// same Blob event prefixes during article browsing. Click events are still
+// recorded independently; this cache is per warm server instance.
+const READER_PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
 let readerProfileCache: { expiresAt: number; value: ReaderProfile } | null = null;
 let readerProfileInFlight: Promise<ReaderProfile> | null = null;
 
