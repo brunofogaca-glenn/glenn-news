@@ -501,7 +501,7 @@ test("calendar week bounds are Monday to Sunday and account for Stockholm daylig
   assert.match(weekFocusSource, /function calendarWeekBounds/);
   assert.match(weekFocusSource, /weekdayMondayFirst/);
   assert.match(weekFocusSource, /weekfocus-calendar-week-v25/);
-  assert.match(weekFocusSource, /edition\\.dateKey >= weekStartKey && edition\\.dateKey <= weekEndKey/);
+  assert.match(weekFocusSource, /edition\.dateKey >= weekStartKey && edition\.dateKey <= weekEndKey/);
   assert.match(weekFocusSource, /dateKey >= weekStartKey && dateKey <= weekEndKey/);
 
   const helperStart = weekFocusSource.indexOf("function stockholmOffsetForDate");
