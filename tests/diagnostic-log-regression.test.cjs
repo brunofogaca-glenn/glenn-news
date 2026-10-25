@@ -21,16 +21,32 @@ test("health page includes a copyable diagnostic log panel", () => {
   assert.ok(route.includes('endsWith(".vercel.app")'));
 });
 
-test("diagnostic log storage is private, bounded and redacts common secrets", () => {
+test("diagnostics use redacted, deduplicated runtime logs without Blob writes", () => {
   const logger = read("lib/diagnosticLog.ts");
 
-  assert.ok(logger.includes('access: "private"'));
-  assert.ok(logger.includes("BLOB_READ_WRITE_TOKEN"));
+  assert.ok(logger.includes("Vercel Runtime Logs"));
   assert.ok(logger.includes("Bearer\\s+"));
   assert.ok(logger.includes("REDACTED"));
-  assert.ok(logger.includes("MAX_RETURNED_LOGS = 80"));
   assert.ok(logger.includes("SAFE_CONTEXT_KEYS"));
   assert.ok(logger.includes("DEDUPE_WINDOW_MS"));
+  assert.ok(!logger.includes('@vercel/blob'));
+  assert.ok(!logger.includes("await put("));
+  assert.ok(!logger.includes("await list("));
+});
+
+test("Week Focus persists one static edition per Stockholm date", () => {
+  const cache = read("lib/weekFocusCache.ts");
+  const focus = read("lib/weekFocus.ts");
+
+  assert.ok(cache.includes('CACHE_PREFIX = "glenn-news/week-focus/cache/"'));
+  assert.ok(cache.includes('timeZone: "Europe/Stockholm"'));
+  assert.ok(cache.includes("const dateKey = stockholmDateKey()"));
+  assert.ok(cache.includes("readPersistentCache(dateKey, isValid)"));
+  assert.ok(cache.includes("writePersistentCache(dateKey, fingerprint, value)"));
+  assert.ok(cache.includes("inFlight.get(dateKey)"));
+  assert.ok(!cache.includes("WEEK_FOCUS_CACHE_TTL_MS"));
+  assert.ok(focus.includes("collectWeeklyCandidates(editions, readLinks)"));
+  assert.ok(focus.includes("getSavedDailyEditions(7)"));
 });
 
 test("critical production error paths record diagnostics", () => {
