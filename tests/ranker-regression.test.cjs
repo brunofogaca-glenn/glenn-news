@@ -496,20 +496,22 @@ test("editorial feed no longer includes Moviezine", () => {
   assert.doesNotMatch(editor, /moviezine/i);
 });
 
-test("calendar week bounds follow Monday through Sunday in Stockholm", () => {
+test("calendar week bounds are Monday to Sunday and account for Stockholm daylight saving time", () => {
   const weekFocusSource = fs.readFileSync(require.resolve("../lib/weekFocus.ts"), "utf8");
   assert.match(weekFocusSource, /function calendarWeekBounds/);
   assert.match(weekFocusSource, /weekdayMondayFirst/);
   assert.match(weekFocusSource, /weekfocus-calendar-week-v25/);
-  assert.match(weekFocusSource, /edition\.dateKey >= weekStartKey && edition\.dateKey <= weekEndKey/);
+  assert.match(weekFocusSource, /edition\\.dateKey >= weekStartKey && edition\\.dateKey <= weekEndKey/);
   assert.match(weekFocusSource, /dateKey >= weekStartKey && dateKey <= weekEndKey/);
 
-  // Exercise the exact date arithmetic in the production helper, using UTC date keys.
-  const helper = weekFocusSource.slice(
-    weekFocusSource.indexOf("function calendarWeekBounds"),
-    weekFocusSource.indexOf("function profileForPrompt")
-  );
-  assert.ok(helper.includes("function stockholmDateKey"));
+  const helperStart = weekFocusSource.indexOf("function stockholmOffsetForDate");
+  const helperEnd = weekFocusSource.indexOf("function calendarWeekBounds");
+  const helper = weekFocusSource.slice(helperStart, helperEnd);
+  assert.ok(helper.includes("timeZone: TIME_ZONE"));
+  assert.ok(helper.includes("shortOffset"));
+  assert.ok(helper.includes("+01:00"));
+  assert.ok(helper.includes("String(match[2]).padStart(2, "));
+
   const mondayStart = new Date(Date.UTC(2026, 9, 19));
   assert.equal((mondayStart.getUTCDay() + 6) % 7, 0);
   const sundayEnd = new Date(mondayStart);
