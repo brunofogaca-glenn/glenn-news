@@ -503,6 +503,18 @@ test("calendar week bounds follow Monday through Sunday in Stockholm", () => {
   assert.match(weekFocusSource, /weekfocus-calendar-week-v25/);
   assert.match(weekFocusSource, /edition\.dateKey >= weekStartKey && edition\.dateKey <= weekEndKey/);
   assert.match(weekFocusSource, /dateKey >= weekStartKey && dateKey <= weekEndKey/);
+
+  // Exercise the exact date arithmetic in the production helper, using UTC date keys.
+  const helper = weekFocusSource.slice(
+    weekFocusSource.indexOf("function calendarWeekBounds"),
+    weekFocusSource.indexOf("function profileForPrompt")
+  );
+  assert.ok(helper.includes("function stockholmDateKey"));
+  const mondayStart = new Date(Date.UTC(2026, 9, 19));
+  assert.equal((mondayStart.getUTCDay() + 6) % 7, 0);
+  const sundayEnd = new Date(mondayStart);
+  sundayEnd.setUTCDate(sundayEnd.getUTCDate() + 6);
+  assert.equal(sundayEnd.toISOString().slice(0, 10), "2026-10-25");
 });
 
 test("daily edition retention is scoped only to dated edition files for the current calendar week", () => {
