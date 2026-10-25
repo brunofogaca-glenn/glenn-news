@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MobileNav } from "./components/MobileNav";
+import { SaveReadingHistoryButton } from "./components/SaveReadingHistoryButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <div className="pb-24 md:pb-0">{children}</div>
+        <div className="pb-24 md:pb-0">{children}<SaveReadingHistoryButton /></div>
         <MobileNav />
       </body>
     </html>

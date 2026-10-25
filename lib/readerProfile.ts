@@ -51,6 +51,7 @@ export type ReaderActivity = ReaderEvent & {
 const PROFILE_PATH = "glenn-news/profile/default.json";
 const EVENT_PREFIX = "glenn-news/profile/events/";
 const SEMANTIC_EVENT_PREFIX = "glenn-news/profile/semantic-events/";
+const BATCH_EVENT_PREFIX = "glenn-news/profile/batches/";
 const MAX_PROFILE_BYTES = 32_000;
 const MAX_EVENTS = 1000;
 
@@ -218,6 +219,21 @@ function encode(value: string) {
   return Buffer.from(value, "utf8").toString("base64url");
 }
 
+export type BatchedReaderEvent = ReaderEvent & { eventId: string; timestamp: string; classification?: SemanticReaderClassification | null };
+
+export async function recordReaderBatch(batchId: string, events: BatchedReaderEvent[]): Promise<boolean> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN || !/^[0-9]{13}-[a-f0-9]{32}$/i.test(batchId) || events.length < 1 || events.length > 50) return false;
+  try {
+    await put(BATCH_EVENT_PREFIX + batchId + ".json", JSON.stringify({ version: 1, events }), {
+      access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json",
+    });
+    return true;
+  } catch (error) {
+    console.error("Kunde inte spara läshistorikens batch:", error);
+    return false;
+  }
+}
+
 async function getLegacyProfile(): Promise<ReaderProfile> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return emptyProfile();
@@ -329,6 +345,27 @@ async function getEventProfile(): Promise<ReaderProfile> {
       }
     }
 
+    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+    for (const blob of batches.blobs) {
+      try {
+        const stored = await get(blob.pathname, { access: "private" });
+        if (!stored?.stream || stored.statusCode !== 200) continue;
+        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
+        for (const item of parsed.events ?? []) {
+          const stamp = Date.parse(item.timestamp);
+          if (!Number.isFinite(stamp) || stamp > Date.now() + 60000) continue;
+          const age = Math.max(0, (Date.now() - stamp) / 86400000);
+          const w = Math.max(0.15, Math.exp(-age / 45));
+          profile.category[item.category] = (profile.category[item.category] ?? 0) + w;
+          profile.articleType[item.articleType] = (profile.articleType[item.articleType] ?? 0) + w * 2;
+          profile.source[item.source] = (profile.source[item.source] ?? 0) + w * 0.5;
+          if (item.topic) profile.topic[item.topic] = (profile.topic[item.topic] ?? 0) + w * 1.5;
+          profile.totalClicks += 1;
+          const iso = new Date(stamp).toISOString();
+          if (!profile.lastUpdated || iso > profile.lastUpdated) profile.lastUpdated = iso;
+        }
+      } catch { /* Keep processing other batches. */ }
+    }
     return mergeProfiles(emptyProfile(), profile);
   } catch (error) {
     await recordDiagnostic({ level: "error", component: "readerProfile.read", message: "Kunde inte läsa läsarprofilens klickhistorik", error, context: { operation: "read-profile-events" } });
@@ -483,6 +520,31 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
       profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
     }
 
+    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+    for (const blob of batches.blobs) {
+      try {
+        const stored = await get(blob.pathname, { access: "private" });
+        if (!stored?.stream || stored.statusCode !== 200) continue;
+        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
+        for (const item of parsed.events ?? []) {
+          const data = item.classification;
+          const stamp = Date.parse(item.timestamp);
+          if (!data || !Number.isFinite(stamp) || stamp > now + 60000) continue;
+          const age = Math.max(0, (now - stamp) / 86400000);
+          const recency = Math.max(0.15, Math.exp(-age / 45));
+          const confidence = Number.isFinite(data.confidence) ? Math.max(0, Math.min(1, data.confidence)) : 0.5;
+          const weight = recency * (0.4 + confidence * 0.6);
+          addSemanticWeight(profile, "semanticCategory", data.broadCategory, weight * 0.5);
+          addSemanticWeight(profile, "semanticArticleType", data.articleType, weight * 0.7);
+          addSemanticWeight(profile, "semanticTopic", data.mainTopic, weight * 1.4);
+          addSemanticWeight(profile, "eventKey", data.eventKey, weight * 0.35);
+          for (const tag of data.tags ?? []) addSemanticWeight(profile, "semanticTag", tag, weight * 0.7);
+          for (const entity of data.entities ?? []) addSemanticWeight(profile, "entity", entity.name, weight * 1.2);
+          for (const place of [data.geography?.country, data.geography?.region, data.geography?.city]) addSemanticWeight(profile, "geography", place, weight * 0.3);
+          profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
+        }
+      } catch { /* Keep processing other batches. */ }
+    }
     return mergeProfiles(emptyProfile(), profile);
   } catch (error) {
     console.warn("Kunde inte läsa semantisk läsarprofil:", error);
@@ -647,7 +709,29 @@ export async function getRecentReaderActivity(
       }
     }
 
-    return cleaned;
+    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+    const batchItems: ReaderActivity[] = [];
+    for (const blob of batches.blobs) {
+      try {
+        const stored = await get(blob.pathname, { access: "private" });
+        if (!stored?.stream || stored.statusCode !== 200) continue;
+        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
+        for (const item of parsed.events ?? []) {
+          batchItems.push({
+            timestamp: item.timestamp,
+            category: item.category,
+            articleType: item.articleType,
+            source: item.source,
+            topic: item.topic,
+            title: item.title || item.topic || "Läst artikel",
+            link: item.link,
+          });
+        }
+      } catch { /* Ignore malformed batches. */ }
+    }
+    return [...cleaned, ...batchItems]
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, Math.max(1, Math.min(limit, 50)));
   } catch (error) {
     console.error(
       "Kunde inte läsa reader activity:",
@@ -744,7 +828,31 @@ export async function getReaderActivitySince(
       activity.push(...resolved);
     }
 
-    return activity;
+    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+    for (const blob of batches.blobs) {
+      try {
+        const stored = await get(blob.pathname, { access: "private" });
+        if (!stored?.stream || stored.statusCode !== 200) continue;
+        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
+        for (const item of parsed.events ?? []) {
+          const timestamp = Date.parse(item.timestamp);
+          if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > Date.now()) continue;
+          activity.push({
+            timestamp: new Date(timestamp).toISOString(),
+            category: item.category,
+            articleType: item.articleType,
+            source: item.source,
+            topic: item.topic,
+            title: item.title || item.topic || "Läst artikel",
+            link: item.link,
+          });
+        }
+      } catch { /* Ignore malformed batches and keep legacy activity. */ }
+    }
+
+    return activity
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, Math.max(1, Math.min(limit, 300)));
   } catch (error) {
     console.error("Kunde inte läsa veckans läshistorik:", error);
     return [];
