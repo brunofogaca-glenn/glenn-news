@@ -487,3 +487,29 @@ test("sport homepage shows the actual story count and places the other-sport div
   assert.match(home, /section\.stories\.length.*fotboll först, övrig sport vid tillgång/);
   assert.match(home, /section\.key === "sport" && index === Math\.min\(8, section\.stories\.length\)/);
 });
+
+
+test("editorial feed no longer includes Moviezine", () => {
+  const rss = fs.readFileSync(require.resolve("../lib/rss.ts"), "utf8");
+  const editor = fs.readFileSync(require.resolve("../lib/editorV2.ts"), "utf8");
+  assert.doesNotMatch(rss, /moviezine/i);
+  assert.doesNotMatch(editor, /moviezine/i);
+});
+
+test("calendar week bounds follow Monday through Sunday in Stockholm", () => {
+  const weekFocusSource = fs.readFileSync(require.resolve("../lib/weekFocus.ts"), "utf8");
+  assert.match(weekFocusSource, /function calendarWeekBounds/);
+  assert.match(weekFocusSource, /weekdayMondayFirst/);
+  assert.match(weekFocusSource, /weekfocus-calendar-week-v25/);
+  assert.match(weekFocusSource, /edition\.dateKey >= weekStartKey && edition\.dateKey <= weekEndKey/);
+  assert.match(weekFocusSource, /dateKey >= weekStartKey && dateKey <= weekEndKey/);
+});
+
+test("daily edition retention is scoped only to dated edition files for the current calendar week", () => {
+  const edition = fs.readFileSync(require.resolve("../lib/dailyEdition.ts"), "utf8");
+  assert.match(edition, /function pruneOldDailyEditions/);
+  assert.match(edition, /glenn-news\\/editions\\/\(\\d\{4\}-\\d\{2\}-\\d\{2\}\)\\.json/);
+  assert.match(edition, /getCalendarWeekStartKey/);
+  assert.match(edition, /getCalendarWeekEndKey/);
+  assert.match(edition, /await pruneOldDailyEditions\(edition\.dateKey\)/);
+});
