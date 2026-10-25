@@ -350,7 +350,7 @@ test("WeekFocus end-to-end selects an unread deep read and reuses output until r
   const dependencies = { loadReaderActivity: async () => { activityCalls += 1; return historyFixture; }, loadWeeklyReadLinks: async () => [...savedReadLinks], loadTodayEdition: async () => edition, loadSavedEditions: async () => [edition], generateEditorResponse, getOrCreate };
 
   const first = await createWeeklyFocus(profile, dependencies);
-  assert.equal(first.title, "Veckofokus"); assert.equal(first.stories.length, 1); assert.equal(first.personalized, false); assert.equal(first.stories[0].topicReadCount, 0);
+  assert.equal(first.title, "Veckofokus"); assert.equal(first.stories.length, 1); assert.equal(first.personalized, true); assert.equal(first.stories[0].topicReadCount, 1);
   assert.ok([articleA.link, articleB.link].includes(first.stories[0].link)); assert.equal(editorCalls, 1);
   const repeated = await createWeeklyFocus(profile, dependencies);
   assert.deepEqual(repeated, first, "the same editorial inputs reuse the cached result"); assert.equal(editorCalls, 1, "an unchanged request does not call AI again");
