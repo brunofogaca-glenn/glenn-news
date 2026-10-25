@@ -1,4 +1,4 @@
-import { get, list, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 import { unstable_cache } from "next/cache";
 import { recordDiagnostic } from "./diagnosticLog";
 import {
@@ -440,7 +440,7 @@ async function pruneOldDailyEditions(referenceDateKey = getTodayKey()) {
         if (!match) continue;
         const dateKey = match[1];
         if (dateKey < keepFrom || dateKey > keepThrough) {
-          await (await import("@vercel/blob")).del(blob.pathname);
+          await del(blob.pathname);
         }
       }
       cursor = page.hasMore ? page.cursor : undefined;
