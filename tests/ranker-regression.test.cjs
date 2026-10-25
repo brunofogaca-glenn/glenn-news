@@ -510,7 +510,7 @@ test("calendar week bounds are Monday to Sunday and account for Stockholm daylig
   assert.ok(helper.includes("timeZone: TIME_ZONE"));
   assert.ok(helper.includes("shortOffset"));
   assert.ok(helper.includes("+01:00"));
-  assert.ok(helper.includes("String(match[2]).padStart(2, "));
+  assert.ok(helper.includes('String(match[2]).padStart(2, "0")'));
 
   const mondayStart = new Date(Date.UTC(2026, 9, 19));
   assert.equal((mondayStart.getUTCDay() + 6) % 7, 0);
@@ -522,7 +522,7 @@ test("calendar week bounds are Monday to Sunday and account for Stockholm daylig
 test("daily edition retention is scoped only to dated edition files for the current calendar week", () => {
   const edition = fs.readFileSync(require.resolve("../lib/dailyEdition.ts"), "utf8");
   assert.match(edition, /function pruneOldDailyEditions/);
-  assert.match(edition, /glenn-news\\/editions\\/\(\\d\{4\}-\\d\{2\}-\\d\{2\}\)\\.json/);
+  assert.ok(edition.includes('blob.pathname.match(/^glenn-news\\\\/editions\\\\/(\\\\d{4}-\\\\d{2}-\\\\d{2})\\\\.json$/)'));
   assert.match(edition, /getCalendarWeekStartKey/);
   assert.match(edition, /getCalendarWeekEndKey/);
   assert.match(edition, /await pruneOldDailyEditions\(edition\.dateKey\)/);
