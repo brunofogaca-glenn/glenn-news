@@ -127,7 +127,7 @@ test("economy category outranks lifestyle and Football Italia is not an RSS sour
 test("football editorial chooses a shorter top list without league quotas", () => {
   const editor = read("lib/editorV2.ts");
   assert.match(editor, /de största och mest omtalade händelserna från de senaste 24 timmarna/);
-  assert.match(editor, /profile, 6\)/);
+  assert.match(editor, /profile, 8\)/);
   assert.doesNotMatch(editor, /Reserve a slot for each named league/);
   assert.doesNotMatch(editor, /function classifyFootballLeague/);
   assert.doesNotMatch(editor, /const groups: SportLeagueGroup\[\]/);
@@ -203,7 +203,7 @@ test("the selected seasonal table does not change based on provider row availabi
 test("saved edition list requests use the Next Data Cache", () => {
   const edition = read("lib/dailyEdition.ts");
   assert.match(edition, /unstable_cache/);
-  assert.match(edition, /glenn-news-saved-edition-date-keys-v1/);
+  assert.match(edition, /glenn-news-saved-edition-date-keys-v2/);
   assert.match(edition, /revalidate: 10 \* 60/);
 });
 

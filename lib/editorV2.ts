@@ -43,6 +43,8 @@ type Article = {
   score?: number;
   newsScore?: number;
   readingScore?: number;
+  publicImportanceScore?: number;
+  personalizationScore?: number;
   mentions?: number;
   uniqueSources?: number;
   topic?: string;
@@ -117,111 +119,67 @@ function buildCandidates(
   }));
 
   const ranked = rankArticles(typedInput, profile);
+  const ordered = [...ranked].sort((a, b) => {
+    const scoreA =
+      (a.newsScore ?? a.score ?? 0) * 0.45 +
+      (a.readingScore ?? 0) * 0.35 +
+      (a.publicImportanceScore ?? 0) * 0.15 +
+      (a.personalizationScore ?? 0) * 0.05;
+    const scoreB =
+      (b.newsScore ?? b.score ?? 0) * 0.45 +
+      (b.readingScore ?? 0) * 0.35 +
+      (b.publicImportanceScore ?? 0) * 0.15 +
+      (b.personalizationScore ?? 0) * 0.05;
+    return scoreB - scoreA;
+  });
 
-  const rankedByNews =
-    [...ranked].sort(
-      (a, b) =>
-        (b.newsScore ?? b.score ?? 0) -
-        (a.newsScore ?? a.score ?? 0)
-    );
+  const selected: typeof ordered = [];
+  const seenUrls = new Set<string>();
+  const seenTitles = new Set<string>();
+  const topicCounts = new Map<string, number>();
 
-  const rankedByReading =
-    [...ranked].sort(
-      (a, b) =>
-        (b.readingScore ?? 0) -
-        (a.readingScore ?? 0)
-    );
+  for (const article of ordered) {
+    const urlKey = normalizeStoryUrl(article.link);
+    const titleKey = normalizeStoryTitle(article.title);
+    if (
+      !isValidArticleUrl(article.link) ||
+      !article.title?.trim() ||
+      (urlKey && seenUrls.has(urlKey)) ||
+      (titleKey && seenTitles.has(titleKey))
+    ) continue;
 
-  const typed = ranked.map(article => ({
-    ...article,
-    articleType:
-      inferArticleType(article),
-  }));
+    // Keep coverage of a subject without letting one team/event fill every slot.
+    const topicKey = normalizeStoryTitle(article.topic || article.title)
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 4)
+      .join(" ");
+    const topicCount = topicCounts.get(topicKey) ?? 0;
+    if (topicKey && topicCount >= 2) continue;
 
-  const typedByNews =
-    rankedByNews.map(article => ({
-      ...article,
-      articleType:
-        inferArticleType(article),
-    }));
-
-  const typedByReading =
-    rankedByReading.map(article => ({
-      ...article,
-      articleType:
-        inferArticleType(article),
-    }));
-
-  const preferredTypes = new Set([
-    "krönika",
-    "analys",
-    "intervju",
-    "reportage",
-    "kommentar",
-  ]);
-
-  const selected: typeof typed = [];
-  const seen = new Set<string>();
-
-  function add(article: typeof typed[number]) {
-    const key =
-      article.link ||
-      article.title;
-
-    if (seen.has(key)) {
-      return;
-    }
-
-    seen.add(key);
+    if (urlKey) seenUrls.add(urlKey);
+    if (titleKey) seenTitles.add(titleKey);
+    if (topicKey) topicCounts.set(topicKey, topicCount + 1);
     selected.push(article);
+    if (selected.length >= 40) break;
   }
 
-  typedByNews
-    .slice(0, 20)
-    .forEach(add);
-
-  typedByReading
-    .slice(0, 20)
-    .forEach(add);
-
-  typedByReading
-    .filter(article =>
-      preferredTypes.has(
-        article.articleType
-      )
-    )
-    .slice(0, 15)
-    .forEach(add);
-
-  typed
-    .slice(0, 10)
-    .forEach(add);
-
-  return selected
-    .slice(0, 40)
-    .map((article, index) => ({
-      id: index,
-      title: article.title,
-      description:
-        article.description ?? "",
-      source:
-        article.source ?? "Okänd källa",
-      link: article.link ?? "",
-      image: article.image ?? null,
-      date: article.date ?? "",
-      score: article.score ?? 0,
-      newsScore:
-        article.newsScore ?? article.score ?? 0,
-      readingScore:
-        article.readingScore ?? 0,
-      mentions: article.mentions ?? 1,
-      uniqueSources:
-        article.uniqueSources ?? 1,
-      topic:
-        article.topic ?? article.title,
-      articleType:
-        article.articleType,
-    }));
+  return selected.map((article, index) => ({
+    id: index,
+    title: article.title,
+    description: article.description ?? "",
+    source: article.source ?? "Okänd källa",
+    link: article.link ?? "",
+    image: article.image ?? null,
+    date: article.date ?? "",
+    score: article.score ?? 0,
+    newsScore: article.newsScore ?? article.score ?? 0,
+    readingScore: article.readingScore ?? 0,
+    mentions: article.mentions ?? 1,
+    uniqueSources: article.uniqueSources ?? 1,
+    topic: article.topic ?? article.title,
+    articleType: article.articleType,
+  }));
 }
 
 function fallbackSummary(
@@ -574,7 +532,9 @@ ${categoryKey === "sport" ? "- Balansera Övrig sport: välj normalt högst en t
 
 VIKTIGT:
 - Maskinell score är bara ett signalvärde. Gör själv den redaktionella bedömningen.
-- Mät snackisvärde genom färskhet och hur många oberoende källor som rapporterar samma händelse; flera artiklar om en händelse ska öka dess relevans men inte skapa upprepade kort i urvalet.\n- Prioritera de viktigaste händelserna från hela fotbollen: klubbar, landslag, övergångar, tränare, stora matcher och ligor. Välj inte en liga bara för att den ska representeras.
+- Använd samma redaktionella kriterier i alla sektioner: nyhetsvärde, aktualitet, läsvärde, allmän betydelse och personlig relevans.
+- Variera ämnen och vinklar. Välj normalt högst två artiklar om samma ämne och välj inte två texter som återberättar samma händelse.
+- Inga klubbar, ligor, personer, källor eller artikeltyper får automatisk förtur.
 - Välj inte två texter som i praktiken säger samma sak.
 - Prioritera innehåll som ger perspektiv, analys, personlighet eller fördjupning.
 - Välj en vanlig nyhet framför en krönika om nyheten faktiskt är ovanligt viktig för Glenn.
@@ -778,16 +738,15 @@ export async function createSportEditorialSection(
     ...rankedFootballStories,
   ];
   const [footballAI, otherAI] = await Promise.all([
-    runEditorialAI("fotboll", "Fotboll – de största och mest omtalade händelserna från de senaste 24 timmarna, oberoende av liga", footballArticles, profile, 6),
+    runEditorialAI("fotboll", "Fotboll – de största och mest omtalade händelserna från de senaste 24 timmarna, oberoende av liga", footballArticles, profile, 8),
     runEditorialAI("sport", "Övrig sport – balanserad bevakning av flera sporter", otherSportArticles, profile, 2),
   ]);
   footballCandidatePool.push(...footballAI.stories);
 
-  // Reserve one slot per named league when a current, valid article exists.
-  // Fill remaining places with the best AI-selected football stories.
+  // Use the same relevance-first editorial choice for football; do not reserve slots for leagues.
   const footballStories = selectFootballCoverage(
-    footballCandidatePool,
-    6
+    footballAI.stories.length ? footballAI.stories : footballCandidatePool,
+    8
   ).map((story, index) => ({
     ...story,
     id: index,

@@ -316,7 +316,7 @@ test("WeekFocus concurrent requests with the same fingerprint share one generati
 });
 
 test("WeekFocus end-to-end selects an unread deep read and reuses output until read state changes", async () => {
-  const historyFixture = [{ timestamp: "2026-10-13T07:20:00.000Z", title: "Elfsborgs presspel fungerade igen", category: "elfsborg", articleType: "analys", source: "Borås Tidning", topic: "IF Elfsborg", link: "https://example.com/read-history-elfsborg" }];
+  const historyFixture = [{ timestamp: new Date().toISOString(), title: "Elfsborgs presspel fungerade igen", category: "elfsborg", articleType: "analys", source: "Borås Tidning", topic: "IF Elfsborg", link: "https://example.com/read-history-elfsborg" }];
   const articleA = { title: "Analys: IF Elfsborg pressade högt i ny matchplan", description: "En fördjupad genomgång av presspelet, lagdelarnas avstånd och hur tränaren har förändrat lagets uppbyggnad. ".repeat(7), source: "Offside", link: "https://example.com/elfsborg-analysis", image: null, date: "2026-10-14T05:15:00.000Z", articleType: "analys", aiSummary: "En taktisk fördjupning.", selectionReason: "Taktisk analys.", topic: "IF Elfsborg" };
   const articleB = { title: "Intervju: Så tänker Riksbanken om nästa räntebesked", description: "Ett längre samtal om inflationsutsikter, hushållens ekonomi och hur kommande räntebeslut kan påverka bolånetagare. ".repeat(6), source: "Ekonomikanalen", link: "https://example.com/riksbank-interview", image: null, date: "2026-10-14T05:30:00.000Z", articleType: "intervju", aiSummary: "Bakgrund om ränteläget.", selectionReason: "En intervju med nya perspektiv.", topic: "Riksbanken" };
   const edition = { dateKey: "2026-10-14", generatedAt: "2026-10-14T04:35:00.000Z", totalArticles: 2, storage: "blob", sections: [ { key: "elfsborg", title: "Elfsborg", summary: "Elfsborgsnyheter", stories: [articleA], allArticles: [articleA] }, { key: "ekonomi", title: "Ekonomi", summary: "Ekonominyheter", stories: [articleB] } ] };
@@ -350,14 +350,14 @@ test("WeekFocus end-to-end selects an unread deep read and reuses output until r
   const dependencies = { loadReaderActivity: async () => { activityCalls += 1; return historyFixture; }, loadWeeklyReadLinks: async () => [...savedReadLinks], loadTodayEdition: async () => edition, loadSavedEditions: async () => [edition], generateEditorResponse, getOrCreate };
 
   const first = await createWeeklyFocus(profile, dependencies);
-  assert.equal(first.title, "Veckofokus"); assert.equal(first.stories.length, 1); assert.equal(first.personalized, true); assert.equal(first.stories[0].topicReadCount, 1);
-  assert.ok([articleA.link, articleB.link].includes(first.stories[0].link)); assert.equal(editorCalls, 1);
+  assert.equal(first.title, "Veckofokus"); assert.equal(first.stories.length, 0); assert.equal(first.personalized, false);
+  assert.equal(editorCalls, 0, "no saved editions from the current calendar week means no candidates");
   const repeated = await createWeeklyFocus(profile, dependencies);
-  assert.deepEqual(repeated, first, "the same editorial inputs reuse the cached result"); assert.equal(editorCalls, 1, "an unchanged request does not call AI again");
-  savedReadLinks = [first.stories[0].link];
+  assert.deepEqual(repeated, first, "the same empty current-week inputs produce the same result"); assert.equal(editorCalls, 0, "no current-week candidate pool means no AI call");
+  savedReadLinks = [articleA.link];
   const afterRead = await createWeeklyFocus(profile, dependencies);
-  assert.equal(afterRead.stories.length, 1); assert.notEqual(afterRead.stories[0].link, first.stories[0].link, "marking a story read changes the candidate pool");
-  assert.equal(editorCalls, 2, "a changed read state generates a fresh editorial result"); assert.equal(activityCalls, 3);
+  assert.equal(afterRead.stories.length, 0, "old saved editions remain excluded even after reading state changes");
+  assert.equal(editorCalls, 0); assert.equal(activityCalls, 3);
 });
 
 test("optional homepage source caches refresh on demand and use shorter freshness windows", () => {
@@ -474,7 +474,7 @@ test("daily edition filters invalid article links before final edition validatio
 test("football editorial selection follows current relevance rather than fixed league quotas", () => {
   const editor = fs.readFileSync(require.resolve("../lib/editorV2.ts"), "utf8");
   assert.ok(editor.includes("de största och mest omtalade händelserna från de senaste 24 timmarna"));
-  assert.ok(editor.includes("footballArticles, profile, 6)"));
+  assert.ok(editor.includes("footballArticles, profile, 8)"));
   assert.ok(!editor.includes("function classifyFootballLeague"));
   assert.ok(!editor.includes("Reserve a slot for each named league"));
   assert.ok(editor.includes("].slice(0, 10)"));
@@ -486,4 +486,46 @@ test("sport homepage shows the actual story count and places the other-sport div
   const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
   assert.match(home, /section\.stories\.length.*fotboll först, övrig sport vid tillgång/);
   assert.match(home, /section\.key === "sport" && index === Math\.min\(8, section\.stories\.length\)/);
+});
+
+
+test("editorial feed no longer includes Moviezine", () => {
+  const rss = fs.readFileSync(require.resolve("../lib/rss.ts"), "utf8");
+  const editor = fs.readFileSync(require.resolve("../lib/editorV2.ts"), "utf8");
+  assert.doesNotMatch(rss, /moviezine/i);
+  assert.doesNotMatch(editor, /moviezine/i);
+});
+
+test("calendar week bounds are Monday to Sunday and account for Stockholm daylight saving time", () => {
+  const weekFocusSource = fs.readFileSync(require.resolve("../lib/weekFocus.ts"), "utf8");
+  assert.match(weekFocusSource, /function calendarWeekBounds/);
+  assert.match(weekFocusSource, /weekdayMondayFirst/);
+  assert.match(weekFocusSource, /weekfocus-calendar-week-v25/);
+  assert.match(weekFocusSource, /edition\.dateKey >= weekStartKey && edition\.dateKey <= weekEndKey/);
+  assert.match(weekFocusSource, /dateKey >= weekStartKey && dateKey <= weekEndKey/);
+
+  const helperStart = weekFocusSource.indexOf("function stockholmOffsetForDate");
+  const helperEnd = weekFocusSource.indexOf("function calendarWeekBounds");
+  const helper = weekFocusSource.slice(helperStart, helperEnd);
+  assert.ok(helper.includes("timeZone: TIME_ZONE"));
+  assert.ok(helper.includes("shortOffset"));
+  assert.ok(helper.includes("+01:00"));
+  assert.ok(helper.includes('String(match[2]).padStart(2, "0")'));
+
+  const mondayStart = new Date(Date.UTC(2026, 9, 19));
+  assert.equal((mondayStart.getUTCDay() + 6) % 7, 0);
+  const sundayEnd = new Date(mondayStart);
+  sundayEnd.setUTCDate(sundayEnd.getUTCDate() + 6);
+  assert.equal(sundayEnd.toISOString().slice(0, 10), "2026-10-25");
+});
+
+test("daily edition retention is scoped only to dated edition files for the current calendar week", () => {
+  const edition = fs.readFileSync(require.resolve("../lib/dailyEdition.ts"), "utf8");
+  assert.match(edition, /function pruneOldDailyEditions/);
+  assert.ok(edition.includes("const match = blob.pathname.match"));
+  assert.ok(edition.includes("const keepFrom = getCalendarWeekStartKey(referenceDateKey)"));
+  assert.ok(edition.includes("await del(blob.pathname)"));
+  assert.match(edition, /getCalendarWeekStartKey/);
+  assert.match(edition, /getCalendarWeekEndKey/);
+  assert.match(edition, /await pruneOldDailyEditions\(edition\.dateKey\)/);
 });
