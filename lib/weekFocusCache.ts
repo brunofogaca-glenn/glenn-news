@@ -1,20 +1,30 @@
 import { createHash } from "node:crypto";
 import { get, put } from "@vercel/blob";
 
-const CACHE_PATH = "glenn-news/week-focus/cache/latest.json";
+const CACHE_PREFIX = "glenn-news/week-focus/cache/";
+function stockholmDateKey(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find(part => part.type === "year")?.value ?? "2000";
+  const month = parts.find(part => part.type === "month")?.value ?? "01";
+  const day = parts.find(part => part.type === "day")?.value ?? "01";
+  return year + "-" + month + "-" + day;
+}
+function cachePath(dateKey: string) {
+  return CACHE_PREFIX + dateKey + ".json";
+}
 const MAX_MEMORY_ENTRIES = 3;
-// A typical weekend Week Focus reading session is about 15 minutes; keep the
-// edition reusable for an hour without serving an unchanged cache forever.
-const WEEK_FOCUS_CACHE_TTL_MS = 60 * 60 * 1000;
-
 type CacheEnvelope = {
-  version: 1;
+  version: 2;
+  dateKey: string;
   fingerprint: string;
   cachedAt: string;
   value: unknown;
 };
 
-const memoryCache = new Map<string, { expiresAt: number; value: unknown }>();
+// Keyed by Stockholm calendar date: the first generated edition stays fixed all day.
+const memoryCache = new Map<string, { value: unknown }>();
 const inFlight = new Map<string, Promise<unknown>>();
 
 function stableSerialize(value: unknown): string {
@@ -43,9 +53,9 @@ export function createWeeklyFocusFingerprint(input: unknown): string {
   return createHash("sha256").update(stableSerialize(input)).digest("hex");
 }
 
-function remember(fingerprint: string, value: unknown, cachedAt = Date.now()) {
-  memoryCache.delete(fingerprint);
-  memoryCache.set(fingerprint, { expiresAt: cachedAt + WEEK_FOCUS_CACHE_TTL_MS, value });
+function remember(dateKey: string, value: unknown) {
+  memoryCache.delete(dateKey);
+  memoryCache.set(dateKey, { value });
   while (memoryCache.size > MAX_MEMORY_ENTRIES) {
     const firstKey = memoryCache.keys().next().value as string | undefined;
     if (!firstKey) break;
@@ -54,44 +64,45 @@ function remember(fingerprint: string, value: unknown, cachedAt = Date.now()) {
 }
 
 async function readPersistentCache<T>(
-  fingerprint: string,
+  dateKey: string,
   isValid: (value: unknown) => value is T
 ): Promise<T | null> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
 
   try {
-    const result = await get(CACHE_PATH, { access: "private" });
+    const result = await get(cachePath(dateKey), { access: "private" });
     if (!result?.stream || result.statusCode !== 200) return null;
     const parsed = JSON.parse(await new Response(result.stream).text()) as Partial<CacheEnvelope>;
     const cachedAt = typeof parsed.cachedAt === "string" ? Date.parse(parsed.cachedAt) : Number.NaN;
     if (
-      parsed.version !== 1 ||
-      parsed.fingerprint !== fingerprint ||
+      parsed.version !== 2 ||
+      parsed.dateKey !== dateKey ||
       !Number.isFinite(cachedAt) ||
-      Date.now() - cachedAt >= WEEK_FOCUS_CACHE_TTL_MS ||
       Date.now() < cachedAt ||
+      stockholmDateKey(new Date(cachedAt)) !== dateKey ||
       !isValid(parsed.value)
     ) {
       return null;
     }
-    remember(fingerprint, parsed.value, cachedAt);
+    remember(dateKey, parsed.value);
     return parsed.value;
   } catch {
     return null;
   }
 }
 
-async function writePersistentCache(fingerprint: string, value: unknown) {
+async function writePersistentCache(dateKey: string, fingerprint: string, value: unknown) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return;
 
   const envelope: CacheEnvelope = {
-    version: 1,
+    version: 2,
+    dateKey,
     fingerprint,
     cachedAt: new Date().toISOString(),
     value,
   };
   try {
-    await put(CACHE_PATH, JSON.stringify(envelope), {
+    await put(cachePath(dateKey), JSON.stringify(envelope), {
       access: "private",
       addRandomSuffix: false,
       allowOverwrite: true,
@@ -104,40 +115,39 @@ async function writePersistentCache(fingerprint: string, value: unknown) {
 }
 
 /**
- * Cache successful and fallback editions by their editorial input fingerprint.
- * Same-instance simultaneous requests share one generation promise; persistent
- * Blob storage reuses the result across serverless instances.
+ * Generate one Week Focus edition per Stockholm calendar day. The first request
+ * persists a snapshot; later requests reuse it even if reading activity or the
+ * profile changes during the day. Same-instance requests coalesce.
  */
 export async function getOrCreateWeeklyFocus<T>(
   fingerprint: string,
   create: () => Promise<T>,
   isValid: (value: unknown) => value is T
 ): Promise<T> {
-  const cached = memoryCache.get(fingerprint);
-  if (cached && cached.expiresAt > Date.now() && isValid(cached.value)) {
-    return cached.value;
-  }
-  if (cached) memoryCache.delete(fingerprint);
+  const dateKey = stockholmDateKey();
+  const cached = memoryCache.get(dateKey);
+  if (cached && isValid(cached.value)) return cached.value;
+  if (cached) memoryCache.delete(dateKey);
 
-  const existingPromise = inFlight.get(fingerprint);
+  const existingPromise = inFlight.get(dateKey);
   if (existingPromise) return existingPromise as Promise<T>;
 
   const task = (async () => {
-    const persistedValue = await readPersistentCache(fingerprint, isValid);
+    const persistedValue = await readPersistentCache(dateKey, isValid);
     if (persistedValue !== null) return persistedValue;
 
     const value = await create();
     if (isValid(value)) {
-      remember(fingerprint, value);
-      await writePersistentCache(fingerprint, value);
+      remember(dateKey, value);
+      await writePersistentCache(dateKey, fingerprint, value);
     }
     return value;
   })();
 
-  inFlight.set(fingerprint, task);
+  inFlight.set(dateKey, task);
   try {
     return await task;
   } finally {
-    if (inFlight.get(fingerprint) === task) inFlight.delete(fingerprint);
+    if (inFlight.get(dateKey) === task) inFlight.delete(dateKey);
   }
 }
