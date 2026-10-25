@@ -520,6 +520,31 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
       profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
     }
 
+    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+    for (const blob of batches.blobs) {
+      try {
+        const stored = await get(blob.pathname, { access: "private" });
+        if (!stored?.stream || stored.statusCode !== 200) continue;
+        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
+        for (const item of parsed.events ?? []) {
+          const data = item.classification;
+          const stamp = Date.parse(item.timestamp);
+          if (!data || !Number.isFinite(stamp) || stamp > now + 60000) continue;
+          const age = Math.max(0, (now - stamp) / 86400000);
+          const recency = Math.max(0.15, Math.exp(-age / 45));
+          const confidence = Number.isFinite(data.confidence) ? Math.max(0, Math.min(1, data.confidence)) : 0.5;
+          const weight = recency * (0.4 + confidence * 0.6);
+          addSemanticWeight(profile, "semanticCategory", data.broadCategory, weight * 0.5);
+          addSemanticWeight(profile, "semanticArticleType", data.articleType, weight * 0.7);
+          addSemanticWeight(profile, "semanticTopic", data.mainTopic, weight * 1.4);
+          addSemanticWeight(profile, "eventKey", data.eventKey, weight * 0.35);
+          for (const tag of data.tags ?? []) addSemanticWeight(profile, "semanticTag", tag, weight * 0.7);
+          for (const entity of data.entities ?? []) addSemanticWeight(profile, "entity", entity.name, weight * 1.2);
+          for (const place of [data.geography?.country, data.geography?.region, data.geography?.city]) addSemanticWeight(profile, "geography", place, weight * 0.3);
+          profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
+        }
+      } catch { /* Keep processing other batches. */ }
+    }
     return mergeProfiles(emptyProfile(), profile);
   } catch (error) {
     console.warn("Kunde inte läsa semantisk läsarprofil:", error);
