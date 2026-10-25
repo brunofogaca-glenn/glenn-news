@@ -31,6 +31,19 @@ const EMPTY_PROFILE: ReaderProfile = {
   lastUpdated: null,
 };
 
+function getCalendarWeekStartKey(dateKey = getTodayKey()) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+  return date.toISOString().slice(0, 10);
+}
+
+function getCalendarWeekEndKey(dateKey = getTodayKey()) {
+  const start = new Date(getCalendarWeekStartKey(dateKey) + "T12:00:00Z");
+  start.setUTCDate(start.getUTCDate() + 6);
+  return start.toISOString().slice(0, 10);
+}
+
 function getTodayKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: TIME_ZONE,
@@ -397,12 +410,44 @@ async function saveBlobEdition(edition: DailyEdition) {
         contentType: "application/json",
       }
     );
+    await pruneOldDailyEditions(edition.dateKey);
 
     return true;
   } catch (error) {
     await recordDiagnostic({ level: "error", component: "dailyEdition.save", message: "Kunde inte spara morgonedition", error, context: { operation: "save-edition" } });
     console.error("Kunde inte spara edition:", edition.dateKey, error);
     return false;
+  }
+}
+
+
+/** Keep only the current Monday-Sunday edition files in Blob storage. */
+async function pruneOldDailyEditions(referenceDateKey = getTodayKey()) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  const keepFrom = getCalendarWeekStartKey(referenceDateKey);
+  const keepThrough = getCalendarWeekEndKey(referenceDateKey);
+  let cursor: string | undefined;
+
+  try {
+    do {
+      const page = await list({
+        prefix: EDITION_PREFIX,
+        limit: 1000,
+        ...(cursor ? { cursor } : {}),
+      } as Parameters<typeof list>[0]);
+      for (const blob of page.blobs) {
+        const match = blob.pathname.match(/^glenn-news\/editions\/(\d{4}-\d{2}-\d{2})\.json$/);
+        if (!match) continue;
+        const dateKey = match[1];
+        if (dateKey < keepFrom || dateKey > keepThrough) {
+          await (await import("@vercel/blob")).del(blob.pathname);
+        }
+      }
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+  } catch (error) {
+    // Pruning is maintenance only; never fail the act of publishing today's edition.
+    console.warn("Kunde inte rensa gamla morgoneditioner:", error);
   }
 }
 
@@ -609,6 +654,11 @@ const getSavedEditionDateKeys = unstable_cache(
       )
       .map(path => path.replace(/\.json$/, ""))
       .filter(isValidDateKey)
+      .filter(dateKey => {
+        const today = getTodayKey();
+        return dateKey >= getCalendarWeekStartKey(today) &&
+          dateKey <= getCalendarWeekEndKey(today);
+      })
       .sort()
       .reverse()
       .slice(0, limit);
@@ -623,7 +673,7 @@ export async function getSavedDailyEditions(limit = 7) {
   }
 
   try {
-    const paths = await getSavedEditionDateKeys(limit);
+    const paths = await getSavedEditionDateKeys(Math.min(limit, 7));
     const editions = await Promise.all(
       paths.map(dateKey => readBlobEdition(dateKey))
     );
