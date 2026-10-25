@@ -434,7 +434,7 @@ async function pruneOldDailyEditions(referenceDateKey = getTodayKey()) {
         prefix: EDITION_PREFIX,
         limit: 1000,
         ...(cursor ? { cursor } : {}),
-      } as Parameters<typeof list>[0]);
+      });
       for (const blob of page.blobs) {
         const match = blob.pathname.match(/^glenn-news\/editions\/(\d{4}-\d{2}-\d{2})\.json$/);
         if (!match) continue;
