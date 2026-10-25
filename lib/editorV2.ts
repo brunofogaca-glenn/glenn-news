@@ -43,6 +43,8 @@ type Article = {
   score?: number;
   newsScore?: number;
   readingScore?: number;
+  publicImportanceScore?: number;
+  personalizationScore?: number;
   mentions?: number;
   uniqueSources?: number;
   topic?: string;
