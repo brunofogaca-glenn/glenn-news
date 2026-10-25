@@ -709,7 +709,29 @@ export async function getRecentReaderActivity(
       }
     }
 
-    return cleaned;
+    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+    const batchItems: ReaderActivity[] = [];
+    for (const blob of batches.blobs) {
+      try {
+        const stored = await get(blob.pathname, { access: "private" });
+        if (!stored?.stream || stored.statusCode !== 200) continue;
+        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
+        for (const item of parsed.events ?? []) {
+          batchItems.push({
+            timestamp: item.timestamp,
+            category: item.category,
+            articleType: item.articleType,
+            source: item.source,
+            topic: item.topic,
+            title: item.title || item.topic || "Läst artikel",
+            link: item.link,
+          });
+        }
+      } catch { /* Ignore malformed batches. */ }
+    }
+    return [...cleaned, ...batchItems]
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, Math.max(1, Math.min(limit, 50)));
   } catch (error) {
     console.error(
       "Kunde inte läsa reader activity:",
@@ -806,7 +828,31 @@ export async function getReaderActivitySince(
       activity.push(...resolved);
     }
 
-    return activity;
+    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+    for (const blob of batches.blobs) {
+      try {
+        const stored = await get(blob.pathname, { access: "private" });
+        if (!stored?.stream || stored.statusCode !== 200) continue;
+        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
+        for (const item of parsed.events ?? []) {
+          const timestamp = Date.parse(item.timestamp);
+          if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > Date.now()) continue;
+          activity.push({
+            timestamp: new Date(timestamp).toISOString(),
+            category: item.category,
+            articleType: item.articleType,
+            source: item.source,
+            topic: item.topic,
+            title: item.title || item.topic || "Läst artikel",
+            link: item.link,
+          });
+        }
+      } catch { /* Ignore malformed batches and keep legacy activity. */ }
+    }
+
+    return activity
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, Math.max(1, Math.min(limit, 300)));
   } catch (error) {
     console.error("Kunde inte läsa veckans läshistorik:", error);
     return [];
