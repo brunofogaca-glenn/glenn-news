@@ -225,7 +225,7 @@ export async function recordReaderBatch(batchId: string, events: BatchedReaderEv
   if (!process.env.BLOB_READ_WRITE_TOKEN || !/^[0-9]{13}-[a-f0-9]{32}$/i.test(batchId) || events.length < 1 || events.length > 50) return false;
   try {
     await put(BATCH_EVENT_PREFIX + batchId + ".json", JSON.stringify({ version: 1, events }), {
-      access: "private", addRandomSuffix: false, contentType: "application/json",
+      access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json",
     });
     return true;
   } catch (error) {
