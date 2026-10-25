@@ -46,7 +46,7 @@ test("Week Focus persists one static edition per Stockholm date", () => {
   assert.ok(cache.includes("inFlight.get(dateKey)"));
   assert.ok(!cache.includes("WEEK_FOCUS_CACHE_TTL_MS"));
   assert.ok(focus.includes("collectWeeklyCandidates(editions, readLinks)"));
-  assert.ok(focus.includes("getSavedDailyEditions(7)"));
+  assert.ok(focus.includes("dependencies.loadSavedEditions(7)"));
 });
 
 test("critical production error paths record diagnostics", () => {
