@@ -491,14 +491,43 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
 }
 
 
-export async function getReaderProfile(): Promise<ReaderProfile> {
-  const [legacy, events, semanticEvents] = await Promise.all([
-    getLegacyProfile(),
-    getEventProfile(),
-    getSemanticEventProfile(),
-  ]);
+// Blob-backed profile data changes infrequently relative to page renders.
+// Cache briefly per warm server instance and coalesce concurrent rebuilds so
+// parallel components do not each list the same event prefixes. A short TTL
+// keeps click-based personalization fresh without reading Blob on every render.
+const READER_PROFILE_CACHE_TTL_MS = 30_000;
+let readerProfileCache: { expiresAt: number; value: ReaderProfile } | null = null;
+let readerProfileInFlight: Promise<ReaderProfile> | null = null;
 
-  return mergeProfiles(mergeProfiles(legacy, events), semanticEvents);
+export async function getReaderProfile(): Promise<ReaderProfile> {
+  const now = Date.now();
+  if (readerProfileCache && readerProfileCache.expiresAt > now) {
+    return structuredClone(readerProfileCache.value);
+  }
+
+  if (readerProfileInFlight) {
+    return structuredClone(await readerProfileInFlight);
+  }
+
+  readerProfileInFlight = (async () => {
+    const [legacy, events, semanticEvents] = await Promise.all([
+      getLegacyProfile(),
+      getEventProfile(),
+      getSemanticEventProfile(),
+    ]);
+    return mergeProfiles(mergeProfiles(legacy, events), semanticEvents);
+  })();
+
+  try {
+    const profile = await readerProfileInFlight;
+    readerProfileCache = {
+      expiresAt: Date.now() + READER_PROFILE_CACHE_TTL_MS,
+      value: profile,
+    };
+    return structuredClone(profile);
+  } finally {
+    readerProfileInFlight = null;
+  }
 }
 
 export function updateReaderProfile(
