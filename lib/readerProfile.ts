@@ -738,6 +738,7 @@ export async function saveReaderProfile(
       {
         access: "private",
         addRandomSuffix: false,
+        allowOverwrite: true,
         contentType: "application/json",
       }
     );
