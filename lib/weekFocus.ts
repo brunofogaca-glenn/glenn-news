@@ -67,6 +67,20 @@ function stockholmDateKey(date = new Date()): string {
   return year + "-" + month + "-" + day;
 }
 
+function stockholmOffsetForDate(dateKey: string) {
+  const probe = new Date(dateKey + "T12:00:00Z");
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE,
+    timeZoneName: "shortOffset",
+    hour: "2-digit",
+  }).formatToParts(probe);
+  const label = parts.find(part => part.type === "timeZoneName")?.value ?? "GMT+1";
+  const match = label.match(/^GMT([+-])(\\d{1,2})(?::?(\\d{2}))?$/);
+  if (!match) return "+01:00";
+  return match[1] + String(match[2]).padStart(2, "0") + ":" +
+    String(match[3] ?? "00").padStart(2, "0");
+}
+
 function calendarWeekBounds(now = new Date()) {
   const today = stockholmDateKey(now);
   const [year, month, day] = today.split("-").map(Number);
@@ -325,7 +339,7 @@ export async function createWeeklyFocus(
 ): Promise<WeeklyFocus> {
   const dependencies = { ...defaultWeeklyFocusDependencies, ...dependencyOverrides };
   const { startKey: weekStartKey, endKey: weekEndKey } = calendarWeekBounds();
-  const weekStartDate = new Date(weekStartKey + "T00:00:00+01:00");
+  const weekStartDate = new Date(weekStartKey + "T00:00:00" + stockholmOffsetForDate(weekStartKey));
   const [allActivity, savedWeeklyReadLinks] = await Promise.all([
     dependencies.loadReaderActivity(weekStartDate.toISOString(), 500),
     dependencies.loadWeeklyReadLinks(),
@@ -359,8 +373,8 @@ export async function createWeeklyFocus(
   const editions = [...editionsByDate.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
   const candidates = buildCandidates(editions, readLinks, profile);
-  const periodStart = new Date(weekStartKey + "T00:00:00+01:00").toISOString();
-  const periodEnd = new Date(weekEndKey + "T23:59:59+01:00").toISOString();
+  const periodStart = new Date(weekStartKey + "T00:00:00" + stockholmOffsetForDate(weekStartKey)).toISOString();
+  const periodEnd = new Date(weekEndKey + "T23:59:59" + stockholmOffsetForDate(weekEndKey)).toISOString();
 
   const sharedFields = {
     periodStart,
