@@ -439,7 +439,7 @@ test("recent profile activity reads the ledger before loading legacy event paylo
   assert.ok(recentActivity.indexOf("readReaderHistoryLedger()") < recentActivity.indexOf("list({"));
   assert.match(recentActivity, /oldestBatchTimestamp/);
   assert.match(recentActivity, /timestamp < oldestBatchTimestamp/);
-  assert.match(recentActivity, /legacyCandidates\\.map\\(async item/);
+  assert.ok(recentActivity.includes("legacyCandidates.map(async item => {"));
 });
 
 test("unused create-next-app decorative SVGs stay removed", () => {
