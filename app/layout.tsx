@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MobileNav } from "./components/MobileNav";
 import { SaveReadingHistoryButton } from "./components/SaveReadingHistoryButton";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <div className="pb-24 md:pb-0">{children}<SaveReadingHistoryButton /></div>
         <MobileNav />
+        <SpeedInsights />
       </body>
     </html>
   );
