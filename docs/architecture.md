@@ -44,7 +44,7 @@ This is the quick map for making a targeted change without needing to rediscover
 | HTTP/API entry points | `app/api/**/route.ts` |
 | Reusable UI and browser interaction | `app/components/` |
 | RSS and publisher-page ingestion | `lib/rss.ts`, `lib/webSources.ts`, `lib/categorizer.ts` |
-| Article types, normalization, classification | `lib/articleType.ts`, `lib/articleUrl.ts`, `lib/articleClassification.ts` |
+| Article types, normalization, classification | `lib/articleType.ts`, `lib/articleUrl.ts`, `lib/categorizer.ts` |
 | Editorial ranking and generation | `lib/ranker.ts`, `lib/editor.ts`, `lib/editorV2.ts`, `lib/dailyEdition.ts` |
 | Personalization and history | `lib/readerProfile.ts`, `lib/weeklyRead.ts`, `lib/weekFocus*.ts` |
 | Supplemental snapshots and fallbacks | `lib/dailySnapshots.ts`, `lib/supplementalCache.ts`, source-specific `*Cache.ts` modules |
@@ -58,6 +58,13 @@ This is the quick map for making a targeted change without needing to rediscover
 - **Change a feed, parser, snapshot, cache, or schedule:** consult [data-refresh-inventory.md](data-refresh-inventory.md), then update that document if the operational behavior changes.
 - **Change reader-history processing:** inspect the batch API, `lib/readerProfile.ts`, the nightly route, and the relevant test together.
 - **Change an authenticated job:** inspect both the route and its GitHub workflow. Preserve repository/workflow scoping and OIDC audience checks; don't broaden authorization for convenience.
+
+## Build and deployment efficiency
+
+- `vercel.json` uses `scripts/vercel-ignore-build.mjs` to skip Vercel builds only when the full change set consists of Markdown files in `docs/` or the root documentation files. Code, assets, configuration, tests, scripts, workflows, and lockfiles keep the normal build.
+- The ignore script uses Vercel's previous-successful-deployment SHA and current commit SHA. If either SHA or the diff is unavailable, it fails closed by allowing the build.
+- GitHub Actions still runs the regression tests and production build for pull requests, including documentation changes, so source-of-truth docs remain checked.
+- Recent profile activity reads the consolidated ledger first. Legacy per-click payloads are fetched only when their timestamps could change the visible newest activity list.
 
 ## Validation and deployment
 
