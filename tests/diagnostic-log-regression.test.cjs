@@ -54,6 +54,22 @@ test("Week Focus uses one cached edition for Saturday and Sunday", () => {
   assert.ok(page.includes('<SaveReadingHistoryButton mode="weekfocus" />'));
 });
 
+test("reader history is consolidated and clicked articles are not individually classified", () => {
+  const profile = read("lib/readerProfile.ts");
+  const processor = profile.slice(
+    profile.indexOf("export async function processPendingReaderBatches"),
+    profile.indexOf("async function getLegacyProfile")
+  );
+
+  assert.ok(profile.includes('READER_HISTORY_LEDGER_PATH = "glenn-news/profile/reader-history-ledger.json"'));
+  assert.ok(profile.includes("writeReaderHistoryLedger(nextLedger)"));
+  assert.ok(profile.includes("getEventProfile(storedHistory)"));
+  assert.ok(profile.includes("getSemanticEventProfile(storedHistory)"));
+  assert.doesNotMatch(processor, /classifyClickedArticle/);
+  assert.doesNotMatch(processor, /put\(blob\.pathname/);
+  assert.ok(profile.includes("const ledger = await readReaderHistoryLedger()"));
+});
+
 test("critical production error paths record diagnostics", () => {
   for (const file of [
     "lib/feedHealth.ts",
