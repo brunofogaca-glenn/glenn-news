@@ -1,6 +1,7 @@
 import { get, list, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { recordDiagnostic } from "./diagnosticLog";
+import { classifyClickedArticle } from "./articleClassification";
 
 export type ReaderProfile = {
   category: Record<string, number>;
@@ -52,6 +53,7 @@ const PROFILE_PATH = "glenn-news/profile/default.json";
 const EVENT_PREFIX = "glenn-news/profile/events/";
 const SEMANTIC_EVENT_PREFIX = "glenn-news/profile/semantic-events/";
 const BATCH_EVENT_PREFIX = "glenn-news/profile/batches/";
+const PROFILE_SNAPSHOT_PATH = "glenn-news/profile/reader-profile-snapshot.json";
 const MAX_PROFILE_BYTES = 32_000;
 const MAX_EVENTS = 1000;
 
@@ -232,6 +234,152 @@ export async function recordReaderBatch(batchId: string, events: BatchedReaderEv
     console.error("Kunde inte spara läshistorikens batch:", error);
     return false;
   }
+}
+
+export type ReaderBatchProcessingResult = {
+  storageAvailable: boolean;
+  scannedBatches: number;
+  updatedBatches: number;
+  classifiedEvents: number;
+  classificationFailures: number;
+  pendingEvents: number;
+  weeklyReadLinks: string[];
+};
+
+/**
+ * Classify unprocessed reading-batch events during the nightly maintenance
+ * window. A batch is rewritten once after its events have been classified;
+ * there are no AI calls or per-article Blob writes during the reading session.
+ */
+export async function processPendingReaderBatches(
+  maxClassifications = 100
+): Promise<ReaderBatchProcessingResult> {
+  const emptyResult: ReaderBatchProcessingResult = {
+    storageAvailable: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    scannedBatches: 0,
+    updatedBatches: 0,
+    classifiedEvents: 0,
+    classificationFailures: 0,
+    pendingEvents: 0,
+    weeklyReadLinks: [],
+  };
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return emptyResult;
+
+  const now = Date.now();
+  const recentCutoff = now - 7 * 24 * 60 * 60 * 1000;
+  const snapshot = await readReaderProfileSnapshotEnvelope();
+  const snapshotAt = snapshot ? Date.parse(snapshot.generatedAt) : 0;
+  const index = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+  const candidates = index.blobs.filter(blob => {
+    const uploadedAt = Date.parse(String(blob.uploadedAt ?? ""));
+    const file = blob.pathname.slice(BATCH_EVENT_PREFIX.length).split(".")[0];
+    const createdAt = Number(file.slice(0, 13));
+    const isRecentBatch = Number.isFinite(createdAt) && createdAt >= recentCutoff;
+    const uploadedSinceSnapshot = !snapshot || !Number.isFinite(snapshotAt) ||
+      !Number.isFinite(uploadedAt) || uploadedAt >= snapshotAt;
+    return isRecentBatch || uploadedSinceSnapshot;
+  }).sort((a, b) => a.pathname.localeCompare(b.pathname));
+
+  const weeklyReadLinks = new Set<string>();
+  let scannedBatches = 0;
+  let updatedBatches = 0;
+  let classifiedEvents = 0;
+  let classificationFailures = 0;
+  let remainingCapacity = Math.max(1, Math.min(maxClassifications, 500));
+  let pendingEvents = 0;
+
+  for (const blob of candidates) {
+    const stored = await get(blob.pathname, { access: "private" });
+    if (!stored?.stream || stored.statusCode !== 200) continue;
+
+    let parsed: { version?: number; events?: BatchedReaderEvent[] };
+    try {
+      parsed = JSON.parse(await new Response(stored.stream).text()) as { version?: number; events?: BatchedReaderEvent[] };
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(parsed.events)) continue;
+    scannedBatches += 1;
+    let changed = false;
+    const events = parsed.events;
+
+    for (const event of events) {
+      const timestamp = Date.parse(event.timestamp);
+      if (event.category === "weekfocus" && event.link &&
+          Number.isFinite(timestamp) && timestamp >= recentCutoff &&
+          /^https?:\/\//i.test(event.link)) {
+        weeklyReadLinks.add(event.link);
+      }
+    }
+
+    const pending = events
+      .map((event, index) => ({ event, index }))
+      .filter(({ event }) => !Object.prototype.hasOwnProperty.call(event, "classification"));
+
+    for (let offset = 0; offset < pending.length && remainingCapacity > 0; offset += 5) {
+      const group = pending.slice(offset, offset + Math.min(5, remainingCapacity));
+      const results = await Promise.all(group.map(async item => {
+        try {
+          const classification = await classifyClickedArticle({
+            link: item.event.link ?? "",
+            title: item.event.title ?? item.event.topic ?? "Läst artikel",
+            summary: item.event.summary,
+            category: item.event.category,
+            articleType: item.event.articleType,
+            source: item.event.source,
+            topic: item.event.topic,
+          });
+          return {
+            index: item.index,
+            classification: classification ? {
+              broadCategory: classification.broadCategory,
+              mainTopic: classification.mainTopic,
+              tags: classification.tags,
+              entities: classification.entities,
+              geography: classification.geography,
+              articleType: classification.articleType,
+              eventKey: classification.eventKey,
+              confidence: classification.confidence,
+            } satisfies SemanticReaderClassification : null,
+          };
+        } catch {
+          return { index: item.index, classification: null };
+        }
+      }));
+
+      for (const result of results) {
+        events[result.index].classification = result.classification;
+        classifiedEvents += 1;
+        if (!result.classification) classificationFailures += 1;
+      }
+      remainingCapacity -= results.length;
+      changed = changed || results.length > 0;
+    }
+
+    pendingEvents += events.filter(event =>
+      !Object.prototype.hasOwnProperty.call(event, "classification")
+    ).length;
+
+    if (changed) {
+      await put(blob.pathname, JSON.stringify({ version: parsed.version ?? 1, events }), {
+        access: "private",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: "application/json",
+      });
+      updatedBatches += 1;
+    }
+  }
+
+  return {
+    storageAvailable: true,
+    scannedBatches,
+    updatedBatches,
+    classifiedEvents,
+    classificationFailures,
+    pendingEvents,
+    weeklyReadLinks: [...weeklyReadLinks],
+  };
 }
 
 async function getLegacyProfile(): Promise<ReaderProfile> {
@@ -553,10 +701,58 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
 }
 
 
-// Glenn typically reads for about 30 minutes per morning session. Keep the
-// merged profile cached for that whole session to avoid repeatedly listing the
-// same Blob event prefixes during article browsing. Click events are still
-// recorded independently; this cache is per warm server instance.
+type ReaderProfileSnapshotEnvelope = {
+  version: 1;
+  generatedAt: string;
+  profile: ReaderProfile;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isReaderProfileValue(value: unknown): value is ReaderProfile {
+  if (!isRecord(value)) return false;
+  const isMap = (candidate: unknown) =>
+    typeof candidate === "object" && candidate !== null && !Array.isArray(candidate);
+  return isMap(value.category) &&
+    isMap(value.articleType) &&
+    isMap(value.source) &&
+    isMap(value.topic) &&
+    typeof value.totalClicks === "number" &&
+    (value.lastUpdated === null || typeof value.lastUpdated === "string");
+}
+
+async function readReaderProfileSnapshotEnvelope(): Promise<ReaderProfileSnapshotEnvelope | null> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  try {
+    const result = await get(PROFILE_SNAPSHOT_PATH, { access: "private" });
+    if (!result?.stream || result.statusCode !== 200) return null;
+    const text = await new Response(result.stream).text();
+    if (text.length > 100_000) return null;
+    const value = JSON.parse(text) as Partial<ReaderProfileSnapshotEnvelope>;
+    if (value.version !== 1 || typeof value.generatedAt !== "string" ||
+        !Number.isFinite(Date.parse(value.generatedAt)) || !isReaderProfileValue(value.profile)) {
+      return null;
+    }
+    return value as ReaderProfileSnapshotEnvelope;
+  } catch {
+    return null;
+  }
+}
+
+async function buildReaderProfileFromStoredEvents(): Promise<ReaderProfile> {
+  const [legacy, events, semanticEvents] = await Promise.all([
+    getLegacyProfile(),
+    getEventProfile(),
+    getSemanticEventProfile(),
+  ]);
+  return mergeProfiles(mergeProfiles(legacy, events), semanticEvents);
+}
+
+// Daytime requests read one compact profile instead of repeatedly listing
+// historical events and downloading every stored batch. The one-time fallback
+// keeps a fresh deployment usable before its first nightly snapshot is made.
 const READER_PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
 let readerProfileCache: { expiresAt: number; value: ReaderProfile } | null = null;
 let readerProfileInFlight: Promise<ReaderProfile> | null = null;
@@ -566,18 +762,13 @@ export async function getReaderProfile(): Promise<ReaderProfile> {
   if (readerProfileCache && readerProfileCache.expiresAt > now) {
     return structuredClone(readerProfileCache.value);
   }
-
   if (readerProfileInFlight) {
     return structuredClone(await readerProfileInFlight);
   }
 
   readerProfileInFlight = (async () => {
-    const [legacy, events, semanticEvents] = await Promise.all([
-      getLegacyProfile(),
-      getEventProfile(),
-      getSemanticEventProfile(),
-    ]);
-    return mergeProfiles(mergeProfiles(legacy, events), semanticEvents);
+    const snapshot = await readReaderProfileSnapshotEnvelope();
+    return snapshot?.profile ?? buildReaderProfileFromStoredEvents();
   })();
 
   try {
@@ -590,6 +781,30 @@ export async function getReaderProfile(): Promise<ReaderProfile> {
   } finally {
     readerProfileInFlight = null;
   }
+}
+
+/** Rebuild and save the reader profile as part of nightly maintenance. */
+export async function rebuildAndSaveReaderProfileSnapshot() {
+  const profile = await buildReaderProfileFromStoredEvents();
+  const generatedAt = new Date().toISOString();
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return { saved: false, generatedAt, profile };
+  }
+  await put(PROFILE_SNAPSHOT_PATH, JSON.stringify({
+    version: 1,
+    generatedAt,
+    profile,
+  }), {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: "application/json",
+  });
+  readerProfileCache = {
+    expiresAt: Date.now() + READER_PROFILE_CACHE_TTL_MS,
+    value: profile,
+  };
+  return { saved: true, generatedAt, profile };
 }
 
 export function updateReaderProfile(
