@@ -4,7 +4,8 @@ The goal is to deliver correct changes with the **smallest relevant investigatio
 
 ## Fast path for every task
 
-1. Read the relevant section of [docs/architecture.md](docs/architecture.md). For user-facing pages, components, navigation, buttons or visible states, also consult [docs/ui-feature-guide.md](docs/ui-feature-guide.md). Read [docs/data-refresh-inventory.md](docs/data-refresh-inventory.md) when touching feeds, snapshots, caches or schedules.
+1. **Always start with [docs/product-requirements.md](docs/product-requirements.md).** Identify the relevant requirement IDs and read their status and known discrepancies before touching code. It is the canonical product-level starting point for every task, not an optional reference.
+2. Read the relevant section of [docs/architecture.md](docs/architecture.md). For user-facing pages, components, navigation, buttons or visible states, also consult [docs/ui-feature-guide.md](docs/ui-feature-guide.md). Read [docs/data-refresh-inventory.md](docs/data-refresh-inventory.md) when touching feeds, snapshots, caches or schedules.
 2. Use the architecture map to find the owning route/module and its closest regression test. Inspect those files first. Do not recursively inventory the entire repo unless the task is explicitly architectural.
 3. Search for an existing helper before inventing another one. Make one complete, tightly scoped patch rather than a sequence of speculative micro-fixes.
 4. For local code validation, run `npm run build` once; it combines regression suites with `next build`. In CI, GitHub Actions runs regression tests and Vercel owns Next.js compilation, so do not add another duplicate production build to the workflow. Run `npm run lint` when TypeScript/React/source files change. Do not repeat successful checks without a new failure or a relevant new edit.
@@ -20,7 +21,9 @@ The goal is to deliver correct changes with the **smallest relevant investigatio
 - Week Focus is available on Saturday and Sunday and uses one weekend edition keyed to Saturday's Stockholm date. Preserve precomputation, caching, and request coalescing.
 - Reader-profile snapshots and the consolidated history ledger are written by background maintenance. The authenticated `manual=1` reader-history route must remain behind GitHub Actions OIDC authorization.
 - Treat `.github/run-reader-history-migration` as a one-time migration trigger. Do not touch that path casually.
+- Update [docs/product-requirements.md](docs/product-requirements.md) whenever a product requirement, requirement status, important invariant, or known discrepancy changes. Keep its requirement IDs and implementation/test references accurate.
 - Update documentation when a change alters a data flow, storage contract, refresh window, or other cross-module invariant. Update [docs/ui-feature-guide.md](docs/ui-feature-guide.md) when visible pages, panels, navigation, button behavior, reader interactions, or loading/error/empty states change.
+- If product intent, detailed documentation and code disagree, do not silently treat them as equivalent. Record the discrepancy in the product requirements document and resolve it deliberately when in scope.
 
 ## Comments and structure
 
