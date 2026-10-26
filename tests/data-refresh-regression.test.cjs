@@ -11,7 +11,7 @@ test("supplemental refresh and manual editorial recovery use scoped GitHub OIDC"
   assert.ok(!config.crons.some((cron) => cron.path === "/api/cron/refresh-data"));
 
   const workflow = read(".github/workflows/refresh-supplemental-data.yml");
-  assert.match(workflow, /cron: "43 2 \* \* \*"/);
+  assert.match(workflow, /cron: "43 0 \* \* \*"/);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
   assert.match(workflow, /audience=\$OIDC_AUDIENCE/);
@@ -95,7 +95,7 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.ok(config.crons.every((cron) => cron.path === "/api/cron/refresh-news"));
 
   const boras = read(".github/workflows/refresh-boras-events.yml");
-  assert.match(boras, /cron: "13 2 \* \* \*"/);
+  assert.match(boras, /cron: "13 0 \* \* \*"/);
   const fotbollskanalen = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
   assert.match(fotbollskanalen, /cron: "17 3 \* \* \*"/);
   const supplemental = read(".github/workflows/refresh-supplemental-data.yml");
