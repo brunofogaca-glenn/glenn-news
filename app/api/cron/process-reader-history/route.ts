@@ -17,7 +17,10 @@ export async function GET(request: Request) {
   }
 
   const clock = getStockholmClock();
-  if (clock.hour < 1 || clock.hour >= 6) {
+  // A manually dispatched, OIDC-authenticated job may perform the initial
+  // ledger migration outside the normal nightly window.
+  const manualRun = new URL(request.url).searchParams.get("manual") === "1";
+  if (!manualRun && (clock.hour < 1 || clock.hour >= 6)) {
     return NextResponse.json({
       ok: true,
       skipped: true,

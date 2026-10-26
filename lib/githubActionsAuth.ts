@@ -52,7 +52,7 @@ export async function authorizeGitHubActionsRefresh(
       (
         payload.event_name === "schedule" ||
         payload.event_name === "workflow_dispatch" ||
-        ((workflow === "borasEvents" || workflow === "fotbollskanalenArticles") && payload.event_name === "push")
+        ((workflow === "borasEvents" || workflow === "fotbollskanalenArticles" || workflow === "readerHistory") && payload.event_name === "push")
       ) &&
       payload.workflow_ref === ALLOWED_WORKFLOWS[workflow]
     );

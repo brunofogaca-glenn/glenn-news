@@ -1,6 +1,10 @@
 name: Process reader history nightly
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/run-reader-history-migration"
   schedule:
     # Run after overnight source refreshes and well before the 06:30 edition.
     - cron: "15 2 * * *"
@@ -15,17 +19,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check nightly maintenance window
+      - name: Check nightly window or explicit one-time migration trigger
         id: nightly_window
         shell: bash
         run: |
-          hour="$(TZ=Europe/Stockholm date +%H)"
-          hour_num=$((10#$hour))
-          if (( hour_num >= 1 && hour_num < 6 )); then
-            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          allowed=false
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            allowed=true
+          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            changed_trigger="$(jq -r '((.head_commit.added // []) + (.head_commit.modified // [])) | any(. == ".github/run-reader-history-migration")' "$GITHUB_EVENT_PATH")"
+            [[ "$changed_trigger" == "true" ]] && allowed=true
           else
-            echo "allowed=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping reader-history processing outside 01:00-05:59 Europe/Stockholm."
+            hour="$(TZ=Europe/Stockholm date +%H)"
+            hour_num=$((10#$hour))
+            if (( hour_num >= 1 && hour_num < 6 )); then
+              allowed=true
+            fi
+          fi
+
+          echo "allowed=$allowed" >> "$GITHUB_OUTPUT"
+          if [[ "$allowed" != "true" ]]; then
+            echo "::notice::Skipping reader-history processing outside the nightly window or without an explicit migration trigger."
           fi
 
       - name: Process reading batches and cache profile before the morning edition
@@ -53,8 +67,13 @@ jobs:
             "$ACTIONS_ID_TOKEN_REQUEST_URL")"
           oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
 
+          request_url="$REFRESH_URL"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$GITHUB_EVENT_NAME" == "push" ]]; then
+            request_url="${REFRESH_URL}?manual=1"
+          fi
+
           curl --fail-with-body --silent --show-error --max-time 270 \
             --header "Authorization: Bearer $oidc_token" \
             --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
             --header "Accept: application/json" \
-            "$REFRESH_URL"
+            "$request_url"
