@@ -47,7 +47,7 @@ Primary file: `app/page.tsx`. Editorial generation and validation: `lib/dailyEdi
 - Shows the Glenn News masthead, the current Stockholm-local date, name days, and a historical event when available.
 - Displays the edition's generation time and article count. The small read counter starts from the profile total and increments locally as articles are opened.
 - The Flödesstatus link is visually highlighted and shows the number of source errors when the saved feed-health result reports errors.
-- The **Uppdatera källor** control is available during the allowed pre-06:00 maintenance window only. It refreshes the underlying supplemental panels (and the allowed editorial cache work for that window) and refreshes the server-rendered page. It deliberately does **not** regenerate or rewrite today's saved morning edition.
+- The **Uppdatera källor** control is available during the pre-06:00 maintenance window only. In the current implementation it refreshes the underlying supplemental panels and refreshes the server-rendered page; because this window is before 06:00, it does **not** fetch editorial RSS/article sources or run editorial feed-health checks. It deliberately does **not** regenerate or rewrite today's saved morning edition. Use the separate edition-retry action for that recovery path.
 - Weather appears only when forecast data is available. The panel shows today and tomorrow for Borås, with conditions, high/low temperature, precipitation probability and amount, and wind.
 
 ### Morning edition and recovery states
