@@ -24,7 +24,7 @@ The homepage, direct feed-health page, and manual refresh action are also gated 
 | `lib/dailySnapshots.ts` — local | Borås.com events and Borås Stad meetings | 2 hours | Total upstream failure throws so last good snapshot can be reused |
 | `lib/dailySnapshots.ts` — national | Riksdag agenda and news | 1 hour | Total upstream failure throws so last good snapshot can be reused |
 | `lib/dailySnapshots.ts` — world | Market indicators, central-bank rates and World Bank GDP | 3 hours | Total upstream failure throws so last good snapshot can be reused |
-| `lib/dailySnapshots.ts` — culture | MovieZine release calendar | 4 hours | Fetch failure throws so last good snapshot can be reused |
+| `lib/dailySnapshots.ts` — culture | DN film and album review RSS feeds | 4 hours | Fetch failure throws so last good snapshot can be reused |
 | `lib/weather.ts` | Borås forecast (Open-Meteo) | 1 hour | Fetch failure throws so last good snapshot can be reused |
 | `lib/dailyHeader.ts` | Name day and historical event (Tammergård API/Wikimedia) | 7 days per date key | If both upstreams fail, use last good snapshot |
 
