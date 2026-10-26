@@ -4,6 +4,7 @@ Glenn News is a personal Swedish news reader built with Next.js App Router, Type
 
 ## Start here
 
+- **[UI and feature guide](docs/ui-feature-guide.md)** — every user-facing page, panel, interaction, empty/error state and owning component.
 - **[Architecture map](docs/architecture.md)** — where features live, how data moves, and which performance constraints to preserve.
 - **[Data refresh inventory](docs/data-refresh-inventory.md)** — source-specific refresh windows, cache lifetimes, fallback behavior, and operational jobs.
 - **[Agent and contributor rules](AGENTS.md)** — how to make changes with minimal investigation, tests, and deployments.

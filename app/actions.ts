@@ -77,8 +77,8 @@ export async function refreshNews() {
  */
 export async function retryMorningEdition() {
   const clock = getStockholmClock();
-  if (clock.hour !== 6 || clock.minute >= 40) {
-    throw new Error("Återförsök av morgonutgåvan tillåts bara mellan 06.00 och 06.39 svensk tid.");
+  if (clock.hour !== 6) {
+    throw new Error("Återförsök av morgonutgåvan tillåts bara mellan 06.00 och 06.59 svensk tid.");
   }
   if (!canRefreshEditorialSourcesNow()) {
     throw new Error("Morgonutgåvan kan inte återskapas före 06.00 svensk tid.");
