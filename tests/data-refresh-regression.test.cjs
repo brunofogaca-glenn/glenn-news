@@ -387,3 +387,30 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
   assert.ok(feedHealth.includes("getBrowserScrapedFotbollskanalenArticles"));
   assert.ok(feedHealth.includes("article.sourcePages.includes(source.url)"));
 });
+
+
+test("culture source inventory matches active DN review feeds", () => {
+  const inventory = read("docs/data-refresh-inventory.md");
+  assert.match(inventory, /\| `lib\/dailySnapshots\.ts` — culture \| DN film and album review RSS feeds \| 4 hours \|/);
+  assert.doesNotMatch(inventory, /MovieZine/i);
+});
+
+test("retired helpers and individual-click classification path stay removed", () => {
+  const retiredFiles = [
+    "lib/ai.ts",
+    "lib/morningBrief.ts",
+    "lib/editor.ts",
+    "lib/topStories.ts",
+    "lib/editionMeta.ts",
+    "app/api/events/route.ts",
+    "lib/articleClassification.ts",
+  ];
+  for (const file of retiredFiles) {
+    assert.equal(fs.existsSync(path.join(root, file)), false, file + " should remain removed");
+  }
+
+  const readerProfile = read("lib/readerProfile.ts");
+  assert.doesNotMatch(readerProfile, /export async function recordReaderEvent/);
+  assert.doesNotMatch(readerProfile, /export async function recordSemanticReaderEvent/);
+  assert.ok(fs.existsSync(path.join(root, "app/api/events/batch/route.ts")));
+});

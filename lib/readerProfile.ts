@@ -12,7 +12,6 @@
  */
 
 import { get, list, put } from "@vercel/blob";
-import { randomUUID } from "node:crypto";
 import { recordDiagnostic } from "./diagnosticLog";
 
 export type ReaderProfile = {
@@ -228,10 +227,6 @@ function mergeProfiles(
 
 function decode(value: string) {
   return Buffer.from(value, "base64url").toString("utf8");
-}
-
-function encode(value: string) {
-  return Buffer.from(value, "utf8").toString("base64url");
 }
 
 export type BatchedReaderEvent = ReaderEvent & { eventId: string; timestamp: string; classification?: SemanticReaderClassification | null };
@@ -608,64 +603,6 @@ async function getEventProfile(historyEvents: ReaderHistoryLedgerEvent[]): Promi
  * the Blob listing itself. This avoids downloading every event body every time
  * the reader profile is rebuilt.
  */
-export async function recordSemanticReaderEvent(
-  eventId: string,
-  classification: SemanticReaderClassification
-): Promise<boolean> {
-  if (
-    !process.env.BLOB_READ_WRITE_TOKEN ||
-    !/^\d{13}-[a-f0-9]{32}$/i.test(eventId)
-  ) {
-    return false;
-  }
-
-  const geography = classification.geography ?? {
-    country: null,
-    region: null,
-    city: null,
-  };
-  const compact = {
-    c: classification.broadCategory.trim().toLowerCase().slice(0, 18),
-    t: classification.mainTopic.trim().toLocaleLowerCase("sv-SE").slice(0, 48),
-    g: classification.tags.slice(0, 4)
-      .map(value => value.trim().toLocaleLowerCase("sv-SE").slice(0, 42))
-      .filter(Boolean),
-    e: classification.entities.slice(0, 3).map(item => [
-      item.name.trim().toLocaleLowerCase("sv-SE").slice(0, 42),
-      item.kind.trim().toLowerCase().slice(0, 12),
-    ]),
-    p: [geography.country, geography.region, geography.city]
-      .filter((value): value is string => Boolean(value))
-      .map(value => value.trim().toLocaleLowerCase("sv-SE").slice(0, 32)),
-    a: classification.articleType.trim().toLocaleLowerCase("sv-SE").slice(0, 20),
-    v: classification.eventKey.trim().toLocaleLowerCase("sv-SE").slice(0, 55),
-    q: Number.isFinite(classification.confidence)
-      ? Math.max(0, Math.min(1, classification.confidence))
-      : 0.5,
-  };
-  const encoded = encode(JSON.stringify(compact));
-  if (encoded.length > 1_600) {
-    console.warn("Semantic reader index entry exceeded the safe pathname budget.");
-    return false;
-  }
-
-  try {
-    await put(
-      SEMANTIC_EVENT_PREFIX + eventId + "." + encoded + ".json",
-      JSON.stringify({ version: 1 }),
-      {
-        access: "private",
-        addRandomSuffix: false,
-        contentType: "application/json",
-      }
-    );
-    return true;
-  } catch (error) {
-    console.warn("Kunde inte spara semantisk läsarhändelse:", error);
-    return false;
-  }
-}
-
 function addSemanticWeight(
   profile: ReaderProfile,
   key: "semanticCategory" | "semanticArticleType" | "semanticTopic" | "semanticTag" | "entity" | "geography" | "eventKey",
@@ -886,40 +823,6 @@ export async function rebuildAndSaveReaderProfileSnapshot(historyEvents?: Reader
   return { saved: true, generatedAt, profile };
 }
 
-export function updateReaderProfile(
-  profile: ReaderProfile,
-  event: ReaderEvent
-): ReaderProfile {
-  const next = structuredClone(profile);
-
-  next.category[event.category] =
-    (next.category[event.category] ?? 0) + 1;
-
-  next.articleType[event.articleType] =
-    (next.articleType[event.articleType] ?? 0) + 2;
-
-  next.source[event.source] =
-    (next.source[event.source] ?? 0) + 0.5;
-
-  if (event.topic) {
-    const topic = event.topic.trim().slice(0, 80);
-
-    if (topic) {
-      next.topic[topic] =
-        (next.topic[topic] ?? 0) + 1.5;
-    }
-  }
-
-  next.totalClicks += 1;
-  next.lastUpdated =
-    new Date().toISOString();
-
-  return mergeProfiles(
-    emptyProfile(),
-    next
-  );
-}
-
 export async function getRecentReaderActivity(
   limit = 20
 ): Promise<ReaderActivity[]> {
@@ -1133,98 +1036,5 @@ export async function getReaderActivitySince(
   } catch (error) {
     console.error("Kunde inte läsa veckans läshistorik:", error);
     return [];
-  }
-}
-
-// Kept for backwards compatibility with existing callers.
-// New events are append-only and do not overwrite the profile.
-export async function saveReaderProfile(
-  profile: ReaderProfile
-) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return false;
-  }
-
-  try {
-    await put(
-      PROFILE_PATH,
-      JSON.stringify(profile),
-      {
-        access: "private",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        contentType: "application/json",
-      }
-    );
-
-    return true;
-  } catch (error) {
-    console.error(
-      "Kunde inte spara reader profile:",
-      error
-    );
-
-    return false;
-  }
-}
-
-export async function recordReaderEvent(
-  event: ReaderEvent,
-  eventId?: string
-) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return false;
-  }
-
-  const now = Date.now();
-  const match = eventId?.match(/^(\d{13})-([a-f0-9]{32})$/i);
-  const requestedTimestamp = match ? Number(match[1]) : Number.NaN;
-  const canUseStableId =
-    Boolean(match) &&
-    Number.isFinite(requestedTimestamp) &&
-    requestedTimestamp <= now + 60_000 &&
-    requestedTimestamp >= now - 10 * 60_000;
-
-  // Keep the same Blob pathname for a quick retry of the same click. If the
-  // supplied ID is absent or stale, fall back to a fresh server-generated ID.
-  const timestamp = canUseStableId ? requestedTimestamp : now;
-  const id = canUseStableId
-    ? match![2].toLowerCase()
-    : randomUUID().replaceAll("-", "");
-
-  const pathname = [
-    EVENT_PREFIX +
-      timestamp +
-      "-" +
-      id,
-    encode(event.category),
-    encode(event.articleType),
-    encode(event.source),
-    encode(event.topic ?? ""),
-    "json",
-  ].join(".");
-
-  try {
-    await put(
-      pathname,
-      JSON.stringify({
-        title: event.title?.trim().slice(0, 300) ?? "",
-        link: event.link ?? "",
-        summary: event.summary?.trim().slice(0, 1_500) ?? "",
-      }),
-      {
-      access: "private",
-      addRandomSuffix: false,
-      contentType: "application/json",
-    });
-
-    return true;
-  } catch (error) {
-    console.error(
-      "Kunde inte spara reader event:",
-      error
-    );
-
-    return false;
   }
 }
