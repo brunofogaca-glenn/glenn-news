@@ -1,3 +1,12 @@
+/**
+ * Source adapters and parsers for supplemental homepage snapshots.
+ *
+ * Keep the public cache-aware getters stable for page callers and preserve last-good
+ * fallback behavior. The source refresh inventory (windows and cache lifetimes) lives
+ * in docs/data-refresh-inventory.md. If this file is ever split, extract whole source
+ * areas behind the same exported getters rather than moving live fetches into pages.
+ */
+
 import { unstable_cache } from "next/cache";
 import { withLastGoodSnapshot } from "./supplementalCache";
 import { getBrowserScrapedBorasEvents } from "./borasEventStore";
@@ -388,6 +397,7 @@ function dedupeEntries(entries: SnapshotLink[]) {
   });
 }
 
+// Borås events and meetings, including the municipality fallback.
 async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
   const [browserEventsResult, borasHtml, calendarHtml] = await Promise.allSettled([
     getBrowserScrapedBorasEvents(),
@@ -651,6 +661,7 @@ function parseRiksdagNews(html: string) {
   return dedupeEntries(entries);
 }
 
+// National panel: parliamentary agenda and national news.
 async function getNationalSnapshotInternal(): Promise<NationalSnapshot> {
   const [agendaHtml, newsResult] = await Promise.allSettled([
     fetchHtml(RIKSDAG_AGENDA_URL),
@@ -754,6 +765,7 @@ async function getAlbumReviews(): Promise<SnapshotLink[]> {
   return getReviews(DN_ALBUM_REVIEWS_RSS_URL, "DN:s RSS-flöde för skivrecensioner", "skivrecension");
 }
 
+// Culture panel: film and album review feeds.
 async function getCultureSnapshotInternal(): Promise<CultureSnapshot> {
   const [filmResult, albumResult] = await Promise.allSettled([
     getFilmReviews(),
@@ -1001,6 +1013,7 @@ async function getWorldGdp(): Promise<WorldGdp[]> {
   });
 }
 
+// World panel: markets, central-bank rates, and GDP indicators.
 async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
   const settled = await Promise.allSettled([
     getWorldMarkets(),

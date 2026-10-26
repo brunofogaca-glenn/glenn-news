@@ -1,3 +1,11 @@
+/**
+ * Editorial article ingestion from RSS and publisher web pages.
+ *
+ * Normalization and conservative deduplication happen here before downstream ranking.
+ * Do not use this module as a supplemental-panel data source, and keep fetch eligibility
+ * (after 06:00 Europe/Stockholm) in sync with docs/data-refresh-inventory.md.
+ */
+
 import Parser from "rss-parser";
 import { detectCategory } from "./categorizer";
 import { getWebArticles } from "./webSources";

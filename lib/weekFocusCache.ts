@@ -1,3 +1,12 @@
+/**
+ * Cache boundary for the weekend Week Focus edition.
+ *
+ * Saturday and Sunday share the same Europe/Stockholm Saturday date key. The memory
+ * cache avoids same-instance reads, the persistent cache avoids repeat generation
+ * across instances, and the in-flight map coalesces concurrent requests. Keep the
+ * fingerprint and envelope validation when changing the cache contract.
+ */
+
 import { createHash } from "node:crypto";
 import { get, put } from "@vercel/blob";
 
