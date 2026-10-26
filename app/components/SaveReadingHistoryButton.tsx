@@ -45,7 +45,7 @@ export function SaveReadingHistoryButton() {
         cache: "no-store",
         credentials: "same-origin",
       });
-      const result = await response.json().catch(() => null) as { ok?: boolean; saved?: number } | null;
+      const result = await response.json().catch(() => null) as { ok?: boolean; saved?: number; queuedForNightlyProcessing?: boolean } | null;
       if (!response.ok || result?.ok !== true) throw new Error("Sparandet misslyckades.");
       const current = readReaderQueue();
       const savedIds = new Set(selected.map(item => item.eventId));
@@ -53,7 +53,7 @@ export function SaveReadingHistoryButton() {
       const next: ReaderQueueState = { events: remaining };
       sessionStorage.setItem(READER_QUEUE_KEY, JSON.stringify(next));
       setCount(remaining.length);
-      setMessage(`Sparade ${selected.length} artiklar.${remaining.length ? " Spara igen för resten." : ""}`);
+      setMessage(`Sparade ${selected.length} artiklar. De bearbetas nattetid.${remaining.length ? " Spara igen för resten." : ""}`);
     } catch {
       setMessage("Kunde inte spara just nu. Artiklarna ligger kvar i kön – försök igen.");
     } finally {
@@ -70,7 +70,7 @@ export function SaveReadingHistoryButton() {
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">Din läshistorik</div>
           <h2 className="mt-1 font-serif text-2xl font-black">Spara morgonens läsning</h2>
           <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">
-            Artiklarna samlas i webbläsaren och skickas tillsammans när du är klar. Upp till 50 artiklar sparas per omgång.
+            Artiklarna skickas tillsammans i en enda batch. AI-klassificering, Veckofokus-lässtatus och uppdatering av läsprofil körs nattetid före morgonutgåvan. Upp till 50 artiklar sparas per omgång.
           </p>
           {message && <p role="status" className="mt-2 text-sm font-semibold text-slate-700">{message}</p>}
         </div>
