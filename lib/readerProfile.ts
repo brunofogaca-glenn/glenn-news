@@ -830,38 +830,34 @@ export async function getRecentReaderActivity(
     return [];
   }
 
-  // Prefer the consolidated ledger. Most current reads arrive through batches, so
-  // there is no reason to download old per-click event payloads when the ledger
-  // already contains enough recent entries to fill this view.
   const safeLimit = Math.max(1, Math.min(Number.isFinite(limit) ? Math.floor(limit) : 20, 50));
+  const ledger = await readReaderHistoryLedger();
+  const now = Date.now();
+  const batchItems: ReaderActivity[] = (ledger?.events ?? [])
+    .flatMap(item => {
+      const timestamp = Date.parse(item.timestamp);
+      if (!Number.isFinite(timestamp) || timestamp > now + 60_000) return [];
+      return [{
+        timestamp: new Date(timestamp).toISOString(),
+        category: item.category,
+        articleType: item.articleType,
+        source: item.source,
+        topic: item.topic,
+        title: item.title || item.topic || "Läst artikel",
+        link: item.link,
+      }];
+    })
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, safeLimit);
+
+  // If the ledger already fills the page, legacy entries older than its last
+  // visible timestamp cannot change the result. Keep only possible newer matches.
+  const oldestBatchTimestamp = batchItems.length >= safeLimit
+    ? Date.parse(batchItems[batchItems.length - 1].timestamp)
+    : null;
+  let legacyItems: ReaderActivity[] = [];
 
   try {
-    const ledger = await readReaderHistoryLedger();
-    const now = Date.now();
-    const batchItems: ReaderActivity[] = (ledger?.events ?? [])
-      .flatMap(item => {
-        const timestamp = Date.parse(item.timestamp);
-        if (!Number.isFinite(timestamp) || timestamp > now + 60_000) return [];
-        return [{
-          timestamp: new Date(timestamp).toISOString(),
-          category: item.category,
-          articleType: item.articleType,
-          source: item.source,
-          topic: item.topic,
-          title: item.title || item.topic || "Läst artikel",
-          link: item.link,
-        }];
-      })
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-      .slice(0, safeLimit);
-
-    // If we have a full page from the ledger, legacy items older than its oldest
-    // entry cannot affect the final top-N. We still list old event paths to preserve
-    // newer legacy reads, but only download payloads that can make the result.
-    const oldestBatchTimestamp = batchItems.length >= safeLimit
-      ? Date.parse(batchItems[batchItems.length - 1].timestamp)
-      : null;
-
     const result = await list({
       prefix: EVENT_PREFIX,
       limit: MAX_EVENTS,
@@ -879,11 +875,11 @@ export async function getRecentReaderActivity(
         return { blob, parts, timestamp };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null)
-      .sort((a, b) => b.blob.pathname.localeCompare(a.blob.pathname))
+      .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, safeLimit);
 
     const decode = (value: string) => Buffer.from(value, "base64url").toString("utf8");
-    const legacyItems = await Promise.all(
+    legacyItems = await Promise.all(
       legacyCandidates.map(async item => {
         let title = "";
         let link = "";
@@ -914,14 +910,14 @@ export async function getRecentReaderActivity(
         } satisfies ReaderActivity;
       })
     );
-
-    return [...legacyItems, ...batchItems]
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-      .slice(0, safeLimit);
   } catch (error) {
-    console.error("Kunde inte läsa reader activity:", error);
-    return [];
+    // A legacy-list failure must not hide valid reading activity already in the ledger.
+    console.warn("Kunde inte läsa äldre läshistorik; tillgänglig batchhistorik används:", error);
   }
+
+  return [...legacyItems, ...batchItems]
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, safeLimit);
 }
 
 export async function getReaderActivitySince(
@@ -937,6 +933,36 @@ export async function getReaderActivitySince(
     return [];
   }
 
+  const safeLimit = Math.max(1, Math.min(Number.isFinite(limit) ? Math.floor(limit) : 250, 300));
+  const now = Date.now();
+
+  // Read consolidated history first. It contains today's batched reads without
+  // requiring one Blob download per article.
+  const ledger = await readReaderHistoryLedger();
+  const batchItems: ReaderActivity[] = (ledger?.events ?? [])
+    .flatMap(item => {
+      const timestamp = Date.parse(item.timestamp);
+      if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > now) return [];
+      return [{
+        timestamp: new Date(timestamp).toISOString(),
+        category: item.category,
+        articleType: item.articleType,
+        source: item.source,
+        topic: item.topic,
+        title: item.title || item.topic || "Läst artikel",
+        link: item.link,
+      }];
+    })
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, safeLimit);
+
+  // When the ledger has enough in-range events, older legacy events cannot
+  // make the visible top-N. Avoid downloading those historical payloads.
+  const oldestBatchTimestamp = batchItems.length >= safeLimit
+    ? Date.parse(batchItems[batchItems.length - 1].timestamp)
+    : null;
+  let legacyItems: ReaderActivity[] = [];
+
   try {
     const result = await list({
       prefix: EVENT_PREFIX,
@@ -945,33 +971,23 @@ export async function getReaderActivitySince(
 
     const candidates = result.blobs
       .map(blob => {
-        const parts = blob.pathname
-          .slice(EVENT_PREFIX.length)
-          .split(".");
-        if (parts.length !== 6 || parts[5] !== "json") {
-          return null;
-        }
+        const parts = blob.pathname.slice(EVENT_PREFIX.length).split(".");
+        if (parts.length !== 6 || parts[5] !== "json") return null;
 
         const timestamp = Number.parseInt(parts[0].split("-")[0], 10);
-        if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > Date.now()) {
-          return null;
-        }
+        if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > now) return null;
+        if (oldestBatchTimestamp !== null && timestamp < oldestBatchTimestamp) return null;
 
         return { blob, parts, timestamp };
       })
-      .filter(
-        (item): item is NonNullable<typeof item> => item !== null
-      )
+      .filter((item): item is NonNullable<typeof item> => item !== null)
       .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, Math.max(1, Math.min(limit, 300)));
+      .slice(0, safeLimit);
 
-    const decodeValue = (value: string) =>
-      Buffer.from(value, "base64url").toString("utf8");
+    const decode = (value: string) => Buffer.from(value, "base64url").toString("utf8");
 
-    const activity: ReaderActivity[] = [];
-
-    // Read a small batch at a time to avoid overwhelming Blob when a busy week
-    // contains many clicks. All history is read centrally, across devices.
+    // Bound concurrent downloads: on older installations this prefix may contain
+    // many legacy per-click blobs, while the weekend page needs only a capped view.
     for (let offset = 0; offset < candidates.length; offset += 20) {
       const batch = candidates.slice(offset, offset + 20);
       const resolved = await Promise.all(batch.map(async item => {
@@ -979,15 +995,12 @@ export async function getReaderActivitySince(
         let link = "";
 
         try {
-          const stored = await get(item.blob.pathname, {
-            access: "private",
-          });
-
+          const stored = await get(item.blob.pathname, { access: "private" });
           if (stored?.stream && stored.statusCode === 200) {
-            const payload = JSON.parse(
-              await new Response(stored.stream).text()
-            ) as { title?: string; link?: string };
-
+            const payload = JSON.parse(await new Response(stored.stream).text()) as {
+              title?: string;
+              link?: string;
+            };
             title = payload.title?.trim() ?? "";
             link = payload.link ?? "";
           }
@@ -995,41 +1008,25 @@ export async function getReaderActivitySince(
           // The event path still preserves category, type, source and topic.
         }
 
-        const topic = decodeValue(item.parts[4]);
+        const topic = decode(item.parts[4]);
         return {
           timestamp: new Date(item.timestamp).toISOString(),
-          category: decodeValue(item.parts[1]),
-          articleType: decodeValue(item.parts[2]),
-          source: decodeValue(item.parts[3]),
+          category: decode(item.parts[1]),
+          articleType: decode(item.parts[2]),
+          source: decode(item.parts[3]),
           topic: topic || undefined,
           title: title || topic || "Läst artikel",
           link: link || undefined,
         } satisfies ReaderActivity;
       }));
-
-      activity.push(...resolved);
+      legacyItems.push(...resolved);
     }
-
-    const ledger = await readReaderHistoryLedger();
-    for (const item of ledger?.events ?? []) {
-      const timestamp = Date.parse(item.timestamp);
-      if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > Date.now()) continue;
-      activity.push({
-        timestamp: new Date(timestamp).toISOString(),
-        category: item.category,
-        articleType: item.articleType,
-        source: item.source,
-        topic: item.topic,
-        title: item.title || item.topic || "Läst artikel",
-        link: item.link,
-      });
-    }
-
-    return activity
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-      .slice(0, Math.max(1, Math.min(limit, 300)));
   } catch (error) {
-    console.error("Kunde inte läsa veckans läshistorik:", error);
-    return [];
+    // Week Focus can still use valid ledger reads if legacy storage is unavailable.
+    console.warn("Kunde inte läsa äldre veckohistorik; tillgänglig batchhistorik används:", error);
   }
+
+  return [...legacyItems, ...batchItems]
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, safeLimit);
 }

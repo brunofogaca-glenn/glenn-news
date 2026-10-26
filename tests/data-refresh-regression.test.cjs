@@ -476,3 +476,23 @@ test("the home page does not keep the unused category configuration", () => {
   const homepage = read("app/page.tsx");
   assert.doesNotMatch(homepage, /CATEGORY_CONFIG/);
 });
+
+test("reader activity uses ledger history first and keeps it when legacy listing fails", () => {
+  const profile = read("lib/readerProfile.ts");
+
+  for (const name of ["getRecentReaderActivity", "getReaderActivitySince"]) {
+    const start = profile.indexOf(`export async function ${name}(`);
+    const next = profile.indexOf("\n\nexport async function ", start + 1);
+    const fn = profile.slice(start, next < 0 ? undefined : next);
+    assert.ok(start >= 0);
+    assert.ok(fn.indexOf("readReaderHistoryLedger()") < fn.indexOf("list({"));
+    assert.match(fn, /oldestBatchTimestamp/);
+    assert.match(fn, /timestamp < oldestBatchTimestamp/);
+    assert.match(fn, /tillgänglig batchhistorik används/);
+    assert.match(fn, /return \[\.\.\.legacyItems, \.\.\.batchItems\]/);
+  }
+
+  const weekly = profile.slice(profile.indexOf("export async function getReaderActivitySince("));
+  assert.match(weekly, /for \(let offset = 0; offset < candidates\.length; offset \+= 20\)/);
+  assert.match(weekly, /Math\.min\(Number\.isFinite\(limit\) \? Math\.floor\(limit\) : 250, 300\)/);
+});
