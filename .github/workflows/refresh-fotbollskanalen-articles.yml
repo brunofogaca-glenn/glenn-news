@@ -1,19 +1,9 @@
 name: Refresh Fotbollskanalen articles
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/refresh-fotbollskanalen-articles.yml"
-      - "scripts/scrape-fotbollskanalen-articles.mjs"
-      - "app/api/cron/ingest-fotbollskanalen-articles/route.ts"
-      - "lib/fotbollskanalenArticleStore.ts"
-      - "lib/webSources.ts"
-      - "lib/feedHealth.ts"
-      - "lib/githubActionsAuth.ts"
   schedule:
-    # Once daily, before the 06:30 Stockholm morning edition in CET and CEST.
-    - cron: "17 3 * * *"
+    # Run early enough to tolerate GitHub Actions queue delays.
+    - cron: "17 1 * * *"
   workflow_dispatch:
 
 permissions:
@@ -25,30 +15,50 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Check nightly maintenance window
+        id: nightly_window
+        shell: bash
+        run: |
+          hour="$(TZ=Europe/Stockholm date +%H)"
+          hour_num=$((10#$hour))
+          if (( hour_num < 6 )); then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping data refresh after 06:00 Europe/Stockholm."
+          fi
+
       - name: Check out repository
+        if: steps.nightly_window.outputs.allowed == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: steps.nightly_window.outputs.allowed == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Cache Playwright Chromium
+        if: steps.nightly_window.outputs.allowed == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ubuntu-playwright-1.56.0-chromium
 
       - name: Install Playwright
+        if: steps.nightly_window.outputs.allowed == 'true'
         run: npm install --no-save --package-lock=false playwright@1.56.0
 
       - name: Install browser
+        if: steps.nightly_window.outputs.allowed == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Read Fotbollskanalen through a real browser
+        if: steps.nightly_window.outputs.allowed == 'true'
         run: node scripts/scrape-fotbollskanalen-articles.mjs
 
       - name: Upload validated articles to Glenn News
+        if: steps.nightly_window.outputs.allowed == 'true'
         env:
           INGEST_URL: https://glenn-news.vercel.app/api/cron/ingest-fotbollskanalen-articles
           OIDC_AUDIENCE: https://glenn-news.vercel.app

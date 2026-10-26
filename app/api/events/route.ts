@@ -1,4 +1,5 @@
 import { after, NextResponse } from "next/server";
+import { getStockholmClock } from "@/lib/updateSchedule";
 import { recordReaderEvent, recordSemanticReaderEvent } from "@/lib/readerProfile";
 import { classifyClickedArticle } from "@/lib/articleClassification";
 
@@ -51,6 +52,14 @@ function isValidEventId(value: unknown): value is string {
 }
 
 export async function POST(request: Request) {
+  const clock = getStockholmClock();
+  if (clock.hour >= 6) {
+    return NextResponse.json({
+      ok: false,
+      error: "Individual click writes are closed after 06:00; queue clicks for the nightly batch.",
+    }, { status: 409 });
+  }
+
   try {
     const contentLength = Number(request.headers.get("content-length") ?? "0");
     if (Number.isFinite(contentLength) && contentLength > 8_192) {
