@@ -830,101 +830,96 @@ export async function getRecentReaderActivity(
     return [];
   }
 
+  // Prefer the consolidated ledger. Most current reads arrive through batches, so
+  // there is no reason to download old per-click event payloads when the ledger
+  // already contains enough recent entries to fill this view.
+  const safeLimit = Math.max(1, Math.min(Number.isFinite(limit) ? Math.floor(limit) : 20, 50));
+
   try {
+    const ledger = await readReaderHistoryLedger();
+    const now = Date.now();
+    const batchItems: ReaderActivity[] = (ledger?.events ?? [])
+      .flatMap(item => {
+        const timestamp = Date.parse(item.timestamp);
+        if (!Number.isFinite(timestamp) || timestamp > now + 60_000) return [];
+        return [{
+          timestamp: new Date(timestamp).toISOString(),
+          category: item.category,
+          articleType: item.articleType,
+          source: item.source,
+          topic: item.topic,
+          title: item.title || item.topic || "Läst artikel",
+          link: item.link,
+        }];
+      })
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, safeLimit);
+
+    // If we have a full page from the ledger, legacy items older than its oldest
+    // entry cannot affect the final top-N. We still list old event paths to preserve
+    // newer legacy reads, but only download payloads that can make the result.
+    const oldestBatchTimestamp = batchItems.length >= safeLimit
+      ? Date.parse(batchItems[batchItems.length - 1].timestamp)
+      : null;
+
     const result = await list({
       prefix: EVENT_PREFIX,
       limit: MAX_EVENTS,
     });
 
-    const recentBlobs = result.blobs
-      .sort((a, b) => b.pathname.localeCompare(a.pathname))
-      .slice(0, Math.max(1, Math.min(limit, 50)));
+    const legacyCandidates = result.blobs
+      .map(blob => {
+        const parts = blob.pathname.slice(EVENT_PREFIX.length).split(".");
+        if (parts.length !== 6 || parts[5] !== "json") return null;
 
-    const activity = await Promise.all(
-      recentBlobs.map(async blob => {
-        const parts = blob.pathname
-          .slice(EVENT_PREFIX.length)
-          .split(".");
+        const timestamp = Number.parseInt(parts[0].split("-")[0], 10);
+        if (!Number.isFinite(timestamp) || timestamp > now + 60_000) return null;
+        if (oldestBatchTimestamp !== null && timestamp < oldestBatchTimestamp) return null;
 
-        if (parts.length !== 6 || parts[5] !== "json") {
-          return null;
-        }
+        return { blob, parts, timestamp };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort((a, b) => b.blob.pathname.localeCompare(a.blob.pathname))
+      .slice(0, safeLimit);
 
-        const timestamp = Number.parseInt(
-          parts[0].split("-")[0],
-          10
-        );
-
-        if (!Number.isFinite(timestamp)) {
-          return null;
-        }
-
-        const decode = (value: string) =>
-          Buffer.from(value, "base64url").toString("utf8");
-
+    const decode = (value: string) => Buffer.from(value, "base64url").toString("utf8");
+    const legacyItems = await Promise.all(
+      legacyCandidates.map(async item => {
         let title = "";
         let link = "";
 
         try {
-          const stored = await get(blob.pathname, {
-            access: "private",
-          });
-
-          if (stored?.stream) {
-            const payload = JSON.parse(
-              await new Response(stored.stream).text()
-            ) as {
+          const stored = await get(item.blob.pathname, { access: "private" });
+          if (stored?.stream && stored.statusCode === 200) {
+            const payload = JSON.parse(await new Response(stored.stream).text()) as {
               title?: string;
               link?: string;
             };
-
             title = payload.title?.trim() ?? "";
             link = payload.link ?? "";
           }
         } catch {
-          // Older events may only contain metadata in the pathname.
+          // Legacy event pathnames still preserve category, type, source and topic.
         }
 
-        const topic = decode(parts[4]);
-
+        const topic = decode(item.parts[4]);
         return {
-          timestamp: new Date(timestamp).toISOString(),
-          category: decode(parts[1]),
-          articleType: decode(parts[2]),
-          source: decode(parts[3]),
+          timestamp: new Date(item.timestamp).toISOString(),
+          category: decode(item.parts[1]),
+          articleType: decode(item.parts[2]),
+          source: decode(item.parts[3]),
           topic: topic || undefined,
           title: title || topic || "Läst artikel",
           link: link || undefined,
-        };
+        } satisfies ReaderActivity;
       })
     );
 
-    const cleaned: ReaderActivity[] = [];
-    for (const item of activity) {
-      if (item !== null) {
-        cleaned.push(item);
-      }
-    }
-
-    const ledger = await readReaderHistoryLedger();
-    const batchItems: ReaderActivity[] = (ledger?.events ?? []).map(item => ({
-      timestamp: item.timestamp,
-      category: item.category,
-      articleType: item.articleType,
-      source: item.source,
-      topic: item.topic,
-      title: item.title || item.topic || "Läst artikel",
-      link: item.link,
-    }));
-    return [...cleaned, ...batchItems]
+    return [...legacyItems, ...batchItems]
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-      .slice(0, Math.max(1, Math.min(limit, 50)));
+      .slice(0, safeLimit);
   } catch (error) {
-    console.error(
-      "Kunde inte läsa reader activity:",
-      error
-    );
-
+    console.error("Kunde inte läsa reader activity:", error);
     return [];
   }
 }

@@ -414,3 +414,42 @@ test("retired helpers and individual-click classification path stay removed", ()
   assert.doesNotMatch(readerProfile, /export async function recordSemanticReaderEvent/);
   assert.ok(fs.existsSync(path.join(root, "app/api/events/batch/route.ts")));
 });
+
+test("Vercel build is skipped only for Markdown documentation-only changes", async () => {
+  const { shouldIgnoreVercelBuild } = await import("../scripts/vercel-ignore-build.mjs");
+
+  assert.equal(shouldIgnoreVercelBuild(["README.md", "docs/architecture.md"]), true);
+  assert.equal(shouldIgnoreVercelBuild(["AGENTS.md", "docs/data-refresh-inventory.md"]), true);
+  assert.equal(shouldIgnoreVercelBuild(["lib/readerProfile.ts", "README.md"]), false);
+  assert.equal(shouldIgnoreVercelBuild(["vercel.json"]), false);
+  assert.equal(shouldIgnoreVercelBuild([".github/run-reader-history-migration"]), false);
+  assert.equal(shouldIgnoreVercelBuild([]), false);
+
+  const config = JSON.parse(read("vercel.json"));
+  assert.equal(config.ignoreCommand, "node scripts/vercel-ignore-build.mjs");
+});
+
+test("recent profile activity reads the ledger before loading legacy event payloads", () => {
+  const profile = read("lib/readerProfile.ts");
+  const start = profile.indexOf("export async function getRecentReaderActivity(");
+  const end = profile.indexOf("export async function getReaderActivitySince(", start);
+  const recentActivity = profile.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.ok(recentActivity.indexOf("readReaderHistoryLedger()") < recentActivity.indexOf("list({"));
+  assert.match(recentActivity, /oldestBatchTimestamp/);
+  assert.match(recentActivity, /timestamp < oldestBatchTimestamp/);
+  assert.ok(recentActivity.includes("legacyCandidates.map(async item => {"));
+});
+
+test("unused create-next-app decorative SVGs stay removed", () => {
+  for (const asset of [
+    "public/file.svg",
+    "public/globe.svg",
+    "public/next.svg",
+    "public/vercel.svg",
+    "public/window.svg",
+  ]) {
+    assert.equal(fs.existsSync(path.join(root, asset)), false, asset + " should remain deleted");
+  }
+});

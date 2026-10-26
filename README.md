@@ -35,7 +35,7 @@ npm run build
 npm run lint
 ```
 
-`npm run build` already runs the ranking regression tests, refresh/diagnostic regression tests, and the Next.js production build. Do not run those same tests separately and then repeat the full build unless a failing test is being investigated.
+`npm run build` already runs the ranking regression tests, refresh/diagnostic regression tests, and the Next.js production build. Do not run those same tests separately and then repeat the full build unless a failing test is being investigated. Vercel skips deployment builds for Markdown-only documentation changes; GitHub Actions still validates those changes.
 
 ## Operational notes
 
