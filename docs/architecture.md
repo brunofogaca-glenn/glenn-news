@@ -6,7 +6,7 @@ This is the quick map for making a targeted change without needing to rediscover
 
 ### Morning homepage
 
-1. Scheduled article refresh calls `app/api/cron/refresh-articles/route.ts`; RSS and publisher-page adapters live in `lib/rss.ts` and `lib/webSources.ts`.
+1. Vercel Hobby crons call `app/api/cron/refresh-news/route.ts` in the Stockholm 06:00–06:59 hour. It refreshes RSS/feed health and persists the daily edition; `app/api/cron/refresh-articles/route.ts` is manual recovery only. RSS and publisher-page adapters live in `lib/rss.ts` and `lib/webSources.ts`.
 2. Editorial selection, validation, duplicate prevention, and dated publication live in `lib/dailyEdition.ts` and the `lib/editor` / `lib/ranker` helpers.
 3. `app/page.tsx` composes the saved morning edition with cached supplemental panels. Keep provider parsing and live fetching out of the page component.
 
@@ -63,7 +63,8 @@ This is the quick map for making a targeted change without needing to rediscover
 
 - `vercel.json` uses `scripts/vercel-ignore-build.mjs` to skip Vercel builds only when the full change set consists of Markdown files in `docs/` or the root documentation files. Code, assets, configuration, tests, scripts, workflows, and lockfiles keep the normal build.
 - The ignore script uses Vercel's previous-successful-deployment SHA and current commit SHA. If either SHA or the diff is unavailable, it fails closed by allowing the build.
-- GitHub Actions runs the regression suites for application/test changes; Vercel owns Next.js compilation for those changes. Markdown-only documentation changes are skipped by both workflows, while local `npm run build` remains the full test-and-build command.
+- Hobby cron schedules do not guarantee the exact minute; morning publication gates on the Stockholm hour and authenticates with `CRON_SECRET` rather than the spoofable request `User-Agent`.
+- GitHub Actions runs regression suites for application/test changes, while Vercel owns Next.js compilation. Markdown-only changes skip both workflows. Local `npm run build` remains the full test-and-build command.
 - Recent and weekly reader-activity queries read the consolidated ledger first. Legacy per-click payloads are downloaded only when their timestamps could change the visible top-N; a legacy-list failure preserves ledger-backed activity instead of turning the view empty.
 
 ## Validation and deployment

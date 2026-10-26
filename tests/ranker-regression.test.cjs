@@ -420,14 +420,18 @@ test("production morning edition contract keeps Stockholm scheduling, validation
       ["/api/cron/refresh-news", "30 5 * * *"],
       ["/api/cron/refresh-news", "34 5 * * *"],
     ],
-    "UTC schedules cover 06:30 plus one 06:34 retry in both CET and CEST"
+    "UTC schedules cover the whole 06:00–06:59 Stockholm hour in both CET and CEST, with two possible attempts"
   );
 
   const cron = fs.readFileSync(require.resolve("../app/api/cron/refresh-news/route.ts"), "utf8");
   assert.ok(cron.includes('const TIME_ZONE = "Europe/Stockholm"'));
-  assert.match(cron, /localClock\.hour !== 6 \|\| localClock\.minute < 30 \|\| localClock\.minute > 39/);
-  assert.match(cron, /localClock\.minute > 30 && await hasFreshMorningEditionForToday\(\)/,
-    "the 06:34 invocation checks whether a valid edition already exists");
+  assert.match(cron, /if \(localClock\.hour !== 6\)/,
+    "Hobby cron may start at any minute within the matching Stockholm hour");
+  assert.match(cron, /if \(await hasFreshMorningEditionForToday\(\)\)/,
+    "duplicate invocations skip a valid published edition regardless of minute");
+  assert.match(cron, /const cronSecret = process\.env\.CRON_SECRET/);
+  assert.doesNotMatch(cron, /vercel-cron\/1\.0/,
+    "a spoofable User-Agent must not authorize production cron work");
   assert.match(cron, /getArticleRefreshStatus\(stockholmDateKey\(now\)\)/,
     "the retry only repeats editorial work when the previous feed health check failed");
   assert.match(cron, /const edition = await generateMorningEdition\(profile\)/);

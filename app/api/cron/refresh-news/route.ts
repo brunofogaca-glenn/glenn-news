@@ -55,13 +55,9 @@ function stockholmDateKey(date = new Date()): string {
 function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization");
-  const userAgent = request.headers.get("user-agent");
-
-  if (cronSecret) {
-    return authorization === `Bearer ${cronSecret}`;
-  }
-
-  return userAgent === "vercel-cron/1.0";
+  // Fail closed. Vercel Cron supplies this bearer token when CRON_SECRET is set;
+  // User-Agent alone is spoofable and must never authorize a public refresh route.
+  return Boolean(cronSecret && authorization === `Bearer ${cronSecret}`);
 }
 
 async function runRefresh(request: Request) {
@@ -72,21 +68,21 @@ async function runRefresh(request: Request) {
   const now = new Date();
   const localClock = getLocalClock(now);
 
-  // Two scheduled attempts (06:30 and 06:34 Stockholm) protect against a
-  // transient failure. Duplicate UTC schedules handle CET/CEST; only the
-  // pair matching Sweden's active offset reaches this publication window.
-  if (localClock.hour !== 6 || localClock.minute < 30 || localClock.minute > 39) {
+  // Hobby Cron may run at any minute within the selected UTC hour. The CET/CEST
+  // schedule pair is intentionally gated by Stockholm's full 06:00-06:59 hour.
+  if (localClock.hour !== 6) {
     return Response.json({
       ok: true,
       refreshed: false,
-      reason: "Outside the 06:30-06:39 Stockholm publication window",
+      reason: "Outside the 06:00-06:59 Stockholm publication hour",
       localTime: `${String(localClock.hour).padStart(2, "0")}:${String(localClock.minute).padStart(2, "0")}`,
     });
   }
 
-  // The 06:34 invocation skips a successful publication. If article-source
-  // health failed at 06:30, allow one retry even if the edition was saved.
-  if (localClock.minute > 30 && await hasFreshMorningEditionForToday()) {
+  // Two invocations can land anywhere in the same Hobby hour. Once a valid
+  // edition exists, skip further source refreshes unless its recorded status
+  // explicitly requests a retry.
+  if (await hasFreshMorningEditionForToday()) {
     const previousStatus = await getArticleRefreshStatus(stockholmDateKey(now));
     if (previousStatus?.status !== "retry") {
       return Response.json({
@@ -123,7 +119,7 @@ async function runRefresh(request: Request) {
     staleFeeds: feedHealth.totals.stale,
     message: articleRefreshFailed
       ? articleCount === 0
-        ? "Inga artiklar kunde cachas; morgonjobbet försöker igen 06:34."
+        ? "Inga artiklar kunde cachas; en andra schemalagd körning kan försöka igen under publiceringsfönstret."
         : `${feedHealth.totals.errors} av ${feedHealth.totals.all} artikelkällor rapporterar fel; gränsen för ett lyckat flöde överskreds.`
       : feedHealth.totals.stale > 0
         ? `${feedHealth.totals.stale} källor har äldre publicerat innehåll; artikelhämtningen lyckades.`

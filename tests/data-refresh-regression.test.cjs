@@ -496,3 +496,14 @@ test("reader activity uses ledger history first and keeps it when legacy listing
   assert.match(weekly, /for \(let offset = 0; offset < candidates\.length; offset \+= 20\)/);
   assert.match(weekly, /Math\.min\(Number\.isFinite\(limit\) \? Math\.floor\(limit\) : 250, 300\)/);
 });
+
+test("Hobby morning cron accepts the entire local 06 hour and requires a secret", () => {
+  const morning = read("app/api/cron/refresh-news/route.ts");
+  assert.match(morning, /const cronSecret = process\.env\.CRON_SECRET/);
+  assert.match(morning, /authorization === `Bearer \$\{cronSecret\}`/);
+  assert.doesNotMatch(morning, /vercel-cron\/1\.0|request\.headers\.get\("user-agent"\)/);
+  assert.match(morning, /if \(localClock\.hour !== 6\)/);
+  assert.match(morning, /Outside the 06:00-06:59 Stockholm publication hour/);
+  assert.doesNotMatch(morning, /localClock\.minute < 30|localClock\.minute > 39/);
+  assert.match(morning, /if \(await hasFreshMorningEditionForToday\(\)\)[\s\S]*?previousStatus\?\.status !== "retry"/);
+});
