@@ -24,11 +24,9 @@ jobs:
         shell: bash
         run: |
           allowed=false
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+          # Pushes can trigger this workflow only when the migration marker path changes.
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$GITHUB_EVENT_NAME" == "push" ]]; then
             allowed=true
-          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            changed_trigger="$(jq -r '((.head_commit.added // []) + (.head_commit.modified // [])) | any(. == ".github/run-reader-history-migration")' "$GITHUB_EVENT_PATH")"
-            [[ "$changed_trigger" == "true" ]] && allowed=true
           else
             hour="$(TZ=Europe/Stockholm date +%H)"
             hour_num=$((10#$hour))
