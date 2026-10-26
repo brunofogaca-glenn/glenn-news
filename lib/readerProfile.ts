@@ -262,7 +262,7 @@ async function readReaderHistoryLedger(): Promise<ReaderHistoryLedger | null> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return emptyReaderHistoryLedger();
   try {
     const stored = await get(READER_HISTORY_LEDGER_PATH, { access: "private" });
-    if (!stored || stored.statusCode === 404) return emptyReaderHistoryLedger();
+    if (!stored) return emptyReaderHistoryLedger();
     if (!stored.stream || stored.statusCode !== 200) return null;
 
     const parsed = JSON.parse(await new Response(stored.stream).text()) as Partial<ReaderHistoryLedger>;
