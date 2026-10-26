@@ -2,7 +2,6 @@
 
 import { revalidateTag } from "next/cache";
 import { getCachedArticles } from "@/lib/articlesCache";
-import { addWeeklyReadLink } from "@/lib/weeklyRead";
 import { getCachedSportDay } from "@/lib/sportDayCache";
 import { getCachedMarketDay } from "@/lib/marketDay";
 import { getCachedFeedHealth } from "@/lib/feedHealthCache";
@@ -16,13 +15,16 @@ import {
 } from "@/lib/dailySnapshots";
 import { getCachedWeather } from "@/lib/weather";
 import { getDailyHeaderInfo } from "@/lib/dailyHeader";
-import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
+import { canRefreshEditorialSourcesNow, getStockholmClock } from "@/lib/updateSchedule";
 
 /**
  * Refresh the underlying source data used by optional homepage panels.
  * This deliberately does not regenerate today's saved morning edition.
  */
 export async function refreshNews() {
+  if (getStockholmClock().hour >= 6) {
+    throw new Error("Manuella källuppdateringar är stängda efter 06.00. Glenn News uppdateras nattetid.");
+  }
   const editorialSourcesAllowed = canRefreshEditorialSourcesNow();
   const supplementalTags = [
     "glenn-news-sport-day",
@@ -74,6 +76,10 @@ export async function refreshNews() {
  * valid edition already exists.
  */
 export async function retryMorningEdition() {
+  const clock = getStockholmClock();
+  if (clock.hour !== 6 || clock.minute >= 40) {
+    throw new Error("Återförsök av morgonutgåvan tillåts bara mellan 06.00 och 06.39 svensk tid.");
+  }
   if (!canRefreshEditorialSourcesNow()) {
     throw new Error("Morgonutgåvan kan inte återskapas före 06.00 svensk tid.");
   }
@@ -89,12 +95,4 @@ export async function retryMorningEdition() {
     generatedAt: edition.generatedAt,
     totalArticles: edition.totalArticles,
   };
-}
-
-export async function markWeeklyRead(link: string) {
-  if (!link || !/^https?:\/\//i.test(link)) {
-    throw new Error("Ogiltig artikel-länk");
-  }
-
-  await addWeeklyReadLink(link);
 }

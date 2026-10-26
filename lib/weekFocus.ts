@@ -5,7 +5,7 @@ import { canonicalizeLink, collectWeeklyCandidates, type WeeklyCandidate } from 
 import { curateWeeklyCandidates, isNewswireCandidate } from "./weekFocusQuality";
 import { inferArticleType } from "./articleType";
 import { buildWeeklyInterestProfile } from "./weekFocusInterests";
-import { createWeeklyFocusFingerprint, getOrCreateWeeklyFocus } from "./weekFocusCache";
+import { createWeeklyFocusFingerprint, getCachedWeeklyFocus, getOrCreateWeeklyFocus } from "./weekFocusCache";
 import { getWeeklyReadLinks } from "./weeklyRead";
 import {
   getSavedDailyEditions,
@@ -338,6 +338,9 @@ export async function createWeeklyFocus(
   dependencyOverrides: Partial<WeeklyFocusDependencies> = {}
 ): Promise<WeeklyFocus> {
   const dependencies = { ...defaultWeeklyFocusDependencies, ...dependencyOverrides };
+  const cached = await getCachedWeeklyFocus<WeeklyFocus>(isValidWeeklyFocus);
+  if (cached) return cached;
+
   const { startKey: weekStartKey, endKey: weekEndKey } = calendarWeekBounds();
   const weekStartDate = new Date(weekStartKey + "T00:00:00" + stockholmOffsetForDate(weekStartKey));
   const [allActivity, savedWeeklyReadLinks] = await Promise.all([

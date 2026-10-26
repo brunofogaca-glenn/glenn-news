@@ -1,4 +1,5 @@
 import { get, put } from "@vercel/blob";
+import { getStockholmClock } from "./updateSchedule";
 
 export type SupplementalRefreshMeta = {
   status: "fresh" | "stale";
@@ -71,6 +72,41 @@ export async function withLastGoodSnapshot<T extends Record<string, unknown>>(
 
   const task = (async () => {
     const attemptedAt = new Date().toISOString();
+    const clock = getStockholmClock();
+    const isNightWindow = clock.hour >= 1 && clock.hour < 6;
+
+    // Daytime traffic is read-only. Prefer the last successful snapshot to
+    // avoid source refreshes and Blob writes while Glenn is reading.
+    if (!isNightWindow) {
+      const previous = await read<T>(key);
+      if (previous) {
+        return {
+          ...previous.value,
+          refreshMeta: {
+            status: "stale" as const,
+            lastAttemptAt: attemptedAt,
+            lastSuccessAt: previous.savedAt,
+            persistent: true,
+            lastError: "Uppdatering skjuts till nattjobbet för att undvika dagsjobb och Blob-skrivningar.",
+          },
+        };
+      }
+
+      // First-install/recovery fallback: display data, but never persist it
+      // during the day. The overnight run will create the durable snapshot.
+      const value = stripMeta(await fetcher());
+      return {
+        ...value,
+        refreshMeta: {
+          status: "stale" as const,
+          lastAttemptAt: attemptedAt,
+          lastSuccessAt: null,
+          persistent: false,
+          lastError: "Ingen sparad snapshot finns ännu; värdet hämtades utan dagskrivning.",
+        },
+      };
+    }
+
     try {
       const value = stripMeta(await fetcher());
       const warnings = warningsOf(value);

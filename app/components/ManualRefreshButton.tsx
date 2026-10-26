@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { refreshNews } from "@/app/actions";
 
@@ -21,6 +21,16 @@ export function ManualRefreshButton() {
   const [isPending, startTransition] = useTransition();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [nightWindowOpen, setNightWindowOpen] = useState(false);
+
+  useEffect(() => {
+    const hour = Number(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Stockholm",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date()));
+    setNightWindowOpen(hour < 6);
+  }, []);
 
   function handleRefresh() {
     setStatusMessage(null);
@@ -52,14 +62,14 @@ export function ManualRefreshButton() {
       <button
         type="button"
         onClick={handleRefresh}
-        disabled={isPending}
+        disabled={isPending || !nightWindowOpen}
         className="inline-flex items-center gap-2 border border-slate-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-950 hover:text-slate-950 disabled:cursor-wait disabled:opacity-50"
-        aria-label="Uppdatera nyhetskällor och kringdata, inte morgoneditionen"
+        aria-label={nightWindowOpen ? "Uppdatera nyhetskällor under nattfönstret" : "Nyhetskällor uppdateras nattetid"}
       >
         <span className={isPending ? "animate-spin" : ""} aria-hidden="true">
           ↻
         </span>
-        {isPending ? "Hämtar källor…" : "Uppdatera källor"}
+        {isPending ? "Hämtar källor…" : nightWindowOpen ? "Uppdatera källor" : "Uppdateras nattetid"}
       </button>
       {statusMessage && (
         <p role="status" aria-live="polite" className="max-w-xs text-[10px] leading-4 text-emerald-700">

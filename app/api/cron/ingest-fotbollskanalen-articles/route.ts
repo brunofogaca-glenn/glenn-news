@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
+import { getStockholmClock } from "@/lib/updateSchedule";
 import {
   FOTBOLLSKANALEN_BROWSER_SOURCES,
   saveBrowserScrapedFotbollskanalenArticles,
@@ -34,6 +35,10 @@ function safeImage(value: unknown) {
 export async function POST(request: Request) {
   if (!(await authorizeGitHubActionsRefresh(request, "fotbollskanalenArticles"))) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  const clock = getStockholmClock();
+  if (clock.hour >= 6) {
+    return Response.json({ ok: true, skipped: true, reason: "Nightly write window closed at 06:00 Europe/Stockholm" });
   }
 
   const contentLength = Number(request.headers.get("content-length") ?? "0");

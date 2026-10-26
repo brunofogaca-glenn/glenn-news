@@ -11,7 +11,7 @@ test("supplemental refresh and manual editorial recovery use scoped GitHub OIDC"
   assert.ok(!config.crons.some((cron) => cron.path === "/api/cron/refresh-data"));
 
   const workflow = read(".github/workflows/refresh-supplemental-data.yml");
-  assert.match(workflow, /cron: "43 2 \* \* \*"/);
+  assert.match(workflow, /cron: "43 0 \* \* \*"/);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
   assert.match(workflow, /audience=\$OIDC_AUDIENCE/);
@@ -95,11 +95,11 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.ok(config.crons.every((cron) => cron.path === "/api/cron/refresh-news"));
 
   const boras = read(".github/workflows/refresh-boras-events.yml");
-  assert.match(boras, /cron: "13 2 \* \* \*"/);
+  assert.match(boras, /cron: "13 0 \* \* \*"/);
   const fotbollskanalen = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.match(fotbollskanalen, /cron: "17 3 \* \* \*"/);
+  assert.match(fotbollskanalen, /cron: "17 1 \* \* \*"/);
   const supplemental = read(".github/workflows/refresh-supplemental-data.yml");
-  assert.match(supplemental, /cron: "43 2 \* \* \*"/);
+  assert.match(supplemental, /cron: "43 0 \* \* \*"/);
 
   const editorial = read(".github/workflows/refresh-editorial-articles.yml");
   assert.doesNotMatch(editorial, /cron:/);
@@ -305,7 +305,7 @@ test("Borås events use an explicit public-event fallback when Borås.com has no
 
 test("Borås events are captured with a real browser and loaded from private cached snapshots", () => {
   const workflow = read(".github/workflows/refresh-boras-events.yml");
-  assert.ok(workflow.includes('cron: "13 2 * * *"'));
+  assert.ok(workflow.includes('cron: "13 0 * * *"'));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-boras-events.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-boras-events"));
@@ -345,7 +345,7 @@ test("Borås events are captured with a real browser and loaded from private cac
 
 test("Fotbollskanalen articles use a rendered-browser feed and validated private ingestion", () => {
   const workflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.ok(workflow.includes('cron: "17 3 * * *"'));
+  assert.ok(workflow.includes('cron: "17 1 * * *"'));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-fotbollskanalen-articles.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-fotbollskanalen-articles"));

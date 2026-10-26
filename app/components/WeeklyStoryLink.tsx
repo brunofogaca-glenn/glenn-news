@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type MouseEvent, type ReactNode } from "react";
-import { markWeeklyRead } from "@/app/actions";
+import { enqueueReaderEvent } from "./readerQueue";
 
 type WeeklyStoryLinkProps = {
   href: string;
@@ -13,6 +13,10 @@ type WeeklyStoryLinkProps = {
   topic?: string;
   summary?: string;
 };
+
+function makeEventId() {
+  return `${Date.now()}-${window.crypto.randomUUID().replaceAll("-", "")}`;
+}
 
 export function WeeklyStoryLink({
   href,
@@ -29,67 +33,37 @@ export function WeeklyStoryLink({
   if (hidden) return null;
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
     setHidden(true);
 
     const title =
-      event.currentTarget
-        .querySelector("h1,h2,h3")
-        ?.textContent
-        ?.trim() || topic || "Veckofokus";
+      event.currentTarget.querySelector("h1,h2,h3")?.textContent?.trim() ||
+      topic ||
+      "Veckofokus";
 
-    void markWeeklyRead(href).catch(error => {
-      console.error("Kunde inte spara lässtatus:", error);
-    });
-
-    // Match TrackableLink's event contract so the click endpoint can persist
-    // and classify this story. Retry the same ID only on transient failure.
-    const eventId = `${Date.now()}-${window.crypto.randomUUID().replaceAll("-", "")}`;
-    const payload = JSON.stringify({
-      type: "article_click",
-      eventId,
-      category,
-      articleType,
-      source,
-      topic: topic ?? title,
-      title,
-      summary: summary?.trim().slice(0, 1_200),
-      link: href,
-    });
-    void sendClickEvent(payload);
+    // Queue in the browser, like the home-page links. No per-click Blob writes,
+    // API calls, or AI classification run while the reader is browsing.
+    try {
+      const url = new URL(href, window.location.href);
+      if ((url.protocol === "http:" || url.protocol === "https:") &&
+          url.origin !== window.location.origin) {
+        enqueueReaderEvent({
+          eventId: makeEventId(),
+          timestamp: new Date().toISOString(),
+          category,
+          articleType,
+          source,
+          topic: topic ?? title,
+          title,
+          summary: summary?.trim().slice(0, 1_200),
+          link: url.toString(),
+        });
+      }
+    } catch (error) {
+      console.warn("Kunde inte lägga Veckofokus-artikeln i läskön.", error);
+    }
 
     window.open(href, "_blank", "noopener,noreferrer");
-  }
-
-  async function sendClickEvent(payload: string) {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const response = await fetch("/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: payload,
-          keepalive: true,
-          cache: "no-store",
-          credentials: "same-origin",
-        });
-        const result = await response.json().catch(() => null) as
-          | { ok?: boolean }
-          | null;
-
-        if (response.ok && result?.ok === true) return;
-        if (response.status < 500 || attempt === 1) {
-          console.warn("Veckofokus-klicket kunde inte sparas.", {
-            status: response.status,
-            responseOk: response.ok,
-          });
-          return;
-        }
-      } catch (error) {
-        if (attempt === 1) {
-          console.warn("Veckofokus-klicket nådde inte loggningen.", error);
-          return;
-        }
-      }
-    }
   }
 
   return (
@@ -97,10 +71,7 @@ export function WeeklyStoryLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={event => {
-        event.preventDefault();
-        handleClick(event);
-      }}
+      onClick={handleClick}
       className={className}
     >
       {children}

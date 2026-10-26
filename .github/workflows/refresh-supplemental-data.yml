@@ -2,8 +2,8 @@ name: Refresh supplemental data
 
 on:
   schedule:
-    # Refresh once daily before the morning edition; manual recovery remains available.
-    - cron: "43 2 * * *"
+    # Run early enough to absorb GitHub queue delays.
+    - cron: "43 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - name: Check nightly maintenance window
+        id: nightly_window
+        shell: bash
+        run: |
+          hour="$(TZ=Europe/Stockholm date +%H)"
+          hour_num=$((10#$hour))
+          if (( hour_num < 6 )); then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping data refresh after 06:00 Europe/Stockholm."
+          fi
+
       - name: Call Glenn News supplemental refresh endpoint
+        if: steps.nightly_window.outputs.allowed == 'true'
         env:
           REFRESH_URL: https://glenn-news.vercel.app/api/cron/refresh-data
           OIDC_AUDIENCE: https://glenn-news.vercel.app

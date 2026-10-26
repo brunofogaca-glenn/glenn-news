@@ -52,6 +52,8 @@ const PROFILE_PATH = "glenn-news/profile/default.json";
 const EVENT_PREFIX = "glenn-news/profile/events/";
 const SEMANTIC_EVENT_PREFIX = "glenn-news/profile/semantic-events/";
 const BATCH_EVENT_PREFIX = "glenn-news/profile/batches/";
+const PROFILE_SNAPSHOT_PATH = "glenn-news/profile/reader-profile-snapshot.json";
+const READER_HISTORY_LEDGER_PATH = "glenn-news/profile/reader-history-ledger.json";
 const MAX_PROFILE_BYTES = 32_000;
 const MAX_EVENTS = 1000;
 
@@ -220,6 +222,82 @@ function encode(value: string) {
 }
 
 export type BatchedReaderEvent = ReaderEvent & { eventId: string; timestamp: string; classification?: SemanticReaderClassification | null };
+type ReaderHistoryLedgerEvent = Omit<BatchedReaderEvent, "summary">;
+type ReaderHistoryLedger = {
+  version: 1;
+  updatedAt: string;
+  processedBatchPaths: string[];
+  events: ReaderHistoryLedgerEvent[];
+};
+
+function emptyReaderHistoryLedger(): ReaderHistoryLedger {
+  return { version: 1, updatedAt: new Date(0).toISOString(), processedBatchPaths: [], events: [] };
+}
+
+function isLedgerEvent(value: unknown): value is ReaderHistoryLedgerEvent {
+  return isRecord(value) &&
+    typeof value.eventId === "string" &&
+    typeof value.timestamp === "string" &&
+    typeof value.category === "string" &&
+    typeof value.articleType === "string" &&
+    typeof value.source === "string";
+}
+
+function compactLedgerEvent(event: BatchedReaderEvent): ReaderHistoryLedgerEvent {
+  return {
+    eventId: event.eventId,
+    timestamp: event.timestamp,
+    category: event.category,
+    articleType: event.articleType,
+    source: event.source,
+    topic: event.topic,
+    title: event.title,
+    link: event.link,
+    ...(event.classification !== undefined ? { classification: event.classification } : {}),
+  };
+}
+
+/** Read the consolidated history once. A transient read/parse failure returns null, never an empty replacement. */
+async function readReaderHistoryLedger(): Promise<ReaderHistoryLedger | null> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return emptyReaderHistoryLedger();
+  try {
+    const stored = await get(READER_HISTORY_LEDGER_PATH, { access: "private" });
+    if (!stored) return emptyReaderHistoryLedger();
+    if (!stored.stream || stored.statusCode !== 200) return null;
+
+    const parsed = JSON.parse(await new Response(stored.stream).text()) as Partial<ReaderHistoryLedger>;
+    if (parsed.version !== 1 || !Array.isArray(parsed.processedBatchPaths) || !Array.isArray(parsed.events)) {
+      return null;
+    }
+    const processedBatchPaths = parsed.processedBatchPaths.filter((item): item is string =>
+      typeof item === "string" && item.startsWith(BATCH_EVENT_PREFIX)
+    );
+    const events = parsed.events.filter(isLedgerEvent).map(event => compactLedgerEvent(event as BatchedReaderEvent));
+    return {
+      version: 1,
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date(0).toISOString(),
+      processedBatchPaths,
+      events,
+    };
+  } catch (error) {
+    if (isRecord(error) && Number(error.statusCode) === 404) return emptyReaderHistoryLedger();
+    console.error("Kunde inte läsa läshistorikens ledger:", error);
+    return null;
+  }
+}
+
+async function writeReaderHistoryLedger(ledger: ReaderHistoryLedger): Promise<boolean> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return false;
+  try {
+    await put(READER_HISTORY_LEDGER_PATH, JSON.stringify(ledger), {
+      access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json",
+    });
+    return true;
+  } catch (error) {
+    console.error("Kunde inte spara läshistorikens ledger:", error);
+    return false;
+  }
+}
 
 export async function recordReaderBatch(batchId: string, events: BatchedReaderEvent[]): Promise<boolean> {
   if (!process.env.BLOB_READ_WRITE_TOKEN || !/^[0-9]{13}-[a-f0-9]{32}$/i.test(batchId) || events.length < 1 || events.length > 50) return false;
@@ -232,6 +310,145 @@ export async function recordReaderBatch(batchId: string, events: BatchedReaderEv
     console.error("Kunde inte spara läshistorikens batch:", error);
     return false;
   }
+}
+
+export type ReaderBatchProcessingResult = {
+  storageAvailable: boolean;
+  ledgerAvailable: boolean;
+  ledgerChanged: boolean;
+  ledgerEvents: ReaderHistoryLedgerEvent[];
+  scannedBatches: number;
+  updatedBatches: number;
+  classifiedEvents: number;
+  classificationFailures: number;
+  pendingEvents: number;
+  weeklyReadLinks: string[];
+};
+
+/**
+ * Classify unprocessed reading-batch events during the nightly maintenance
+ * window. A batch is rewritten once after its events have been classified;
+ * there are no AI calls or per-article Blob writes during the reading session.
+ */
+/**
+ * Consume newly uploaded session batches into one consolidated history file.
+ * Old batch files are not downloaded again, and clicked articles are not
+ * individually classified or rewritten.
+ */
+export async function processPendingReaderBatches(
+  _maxClassifications = 100
+): Promise<ReaderBatchProcessingResult> {
+  const emptyResult: ReaderBatchProcessingResult = {
+    storageAvailable: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    ledgerAvailable: false,
+    ledgerChanged: false,
+    ledgerEvents: [],
+    scannedBatches: 0,
+    updatedBatches: 0,
+    classifiedEvents: 0,
+    classificationFailures: 0,
+    pendingEvents: 0,
+    weeklyReadLinks: [],
+  };
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return emptyResult;
+
+  const currentLedger = await readReaderHistoryLedger();
+  if (!currentLedger) return { ...emptyResult, storageAvailable: true };
+
+  const index = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+  const processedPaths = new Set(currentLedger.processedBatchPaths);
+  const knownEventIds = new Set(currentLedger.events.map(event => event.eventId));
+  const processedBatchPaths = [...currentLedger.processedBatchPaths];
+  const events = [...currentLedger.events];
+  const weeklyReadLinks = new Set<string>();
+  const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let scannedBatches = 0;
+  let changed = false;
+
+  for (const blob of index.blobs) {
+    if (processedPaths.has(blob.pathname)) continue;
+    try {
+      const stored = await get(blob.pathname, { access: "private" });
+      if (!stored?.stream || stored.statusCode !== 200) continue;
+      const parsed = JSON.parse(await new Response(stored.stream).text()) as {
+        events?: BatchedReaderEvent[];
+      };
+      if (!Array.isArray(parsed.events)) continue;
+
+      scannedBatches += 1;
+      processedBatchPaths.push(blob.pathname);
+      changed = true;
+
+      for (const rawEvent of parsed.events) {
+        if (!isLedgerEvent(rawEvent)) continue;
+        const event = rawEvent as BatchedReaderEvent;
+        const timestamp = Date.parse(event.timestamp);
+        if (
+          event.category === "weekfocus" &&
+          event.link &&
+          Number.isFinite(timestamp) &&
+          timestamp >= recentCutoff &&
+          /^https?:\/\//i.test(event.link)
+        ) {
+          weeklyReadLinks.add(event.link);
+        }
+        if (!knownEventIds.has(event.eventId)) {
+          events.push(compactLedgerEvent(event));
+          knownEventIds.add(event.eventId);
+        }
+      }
+    } catch {
+      // A failed batch is not marked processed; the next night retries it.
+    }
+  }
+
+  // Retry any recent Week Focus read marks until the weekly-read snapshot
+  // accepts them. This makes a temporary write failure recover on the next night.
+  for (const event of currentLedger.events) {
+    const timestamp = Date.parse(event.timestamp);
+    if (
+      event.category === "weekfocus" &&
+      event.link &&
+      Number.isFinite(timestamp) &&
+      timestamp >= recentCutoff &&
+      /^https?:\/\//i.test(event.link)
+    ) {
+      weeklyReadLinks.add(event.link);
+    }
+  }
+
+  let ledgerChanged = false;
+  if (changed) {
+    events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const nextLedger: ReaderHistoryLedger = {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      processedBatchPaths,
+      events,
+    };
+    const saved = await writeReaderHistoryLedger(nextLedger);
+    if (!saved) {
+      return { ...emptyResult, storageAvailable: true, ledgerAvailable: false };
+    }
+    currentLedger.version = nextLedger.version;
+    currentLedger.updatedAt = nextLedger.updatedAt;
+    currentLedger.processedBatchPaths = nextLedger.processedBatchPaths;
+    currentLedger.events = nextLedger.events;
+    ledgerChanged = true;
+  }
+
+  return {
+    storageAvailable: true,
+    ledgerAvailable: true,
+    ledgerChanged,
+    ledgerEvents: currentLedger.events,
+    scannedBatches,
+    updatedBatches: changed ? 1 : 0,
+    classifiedEvents: 0,
+    classificationFailures: 0,
+    pendingEvents: 0,
+    weeklyReadLinks: [...weeklyReadLinks],
+  };
 }
 
 async function getLegacyProfile(): Promise<ReaderProfile> {
@@ -263,7 +480,7 @@ async function getLegacyProfile(): Promise<ReaderProfile> {
   }
 }
 
-async function getEventProfile(): Promise<ReaderProfile> {
+async function getEventProfile(historyEvents: ReaderHistoryLedgerEvent[]): Promise<ReaderProfile> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return emptyProfile();
   }
@@ -345,27 +562,21 @@ async function getEventProfile(): Promise<ReaderProfile> {
       }
     }
 
-    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
-    for (const blob of batches.blobs) {
-      try {
-        const stored = await get(blob.pathname, { access: "private" });
-        if (!stored?.stream || stored.statusCode !== 200) continue;
-        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
-        for (const item of parsed.events ?? []) {
-          const stamp = Date.parse(item.timestamp);
-          if (!Number.isFinite(stamp) || stamp > Date.now() + 60000) continue;
-          const age = Math.max(0, (Date.now() - stamp) / 86400000);
-          const w = Math.max(0.15, Math.exp(-age / 45));
-          profile.category[item.category] = (profile.category[item.category] ?? 0) + w;
-          profile.articleType[item.articleType] = (profile.articleType[item.articleType] ?? 0) + w * 2;
-          profile.source[item.source] = (profile.source[item.source] ?? 0) + w * 0.5;
-          if (item.topic) profile.topic[item.topic] = (profile.topic[item.topic] ?? 0) + w * 1.5;
-          profile.totalClicks += 1;
-          const iso = new Date(stamp).toISOString();
-          if (!profile.lastUpdated || iso > profile.lastUpdated) profile.lastUpdated = iso;
-        }
-      } catch { /* Keep processing other batches. */ }
+    const now = Date.now();
+    for (const item of historyEvents) {
+      const stamp = Date.parse(item.timestamp);
+      if (!Number.isFinite(stamp) || stamp > now + 60000) continue;
+      const age = Math.max(0, (now - stamp) / 86400000);
+      const weight = Math.max(0.15, Math.exp(-age / 45));
+      profile.category[item.category] = (profile.category[item.category] ?? 0) + weight;
+      profile.articleType[item.articleType] = (profile.articleType[item.articleType] ?? 0) + weight * 2;
+      profile.source[item.source] = (profile.source[item.source] ?? 0) + weight * 0.5;
+      if (item.topic) profile.topic[item.topic] = (profile.topic[item.topic] ?? 0) + weight * 1.5;
+      profile.totalClicks += 1;
+      const iso = new Date(stamp).toISOString();
+      if (!profile.lastUpdated || iso > profile.lastUpdated) profile.lastUpdated = iso;
     }
+
     return mergeProfiles(emptyProfile(), profile);
   } catch (error) {
     await recordDiagnostic({ level: "error", component: "readerProfile.read", message: "Kunde inte läsa läsarprofilens klickhistorik", error, context: { operation: "read-profile-events" } });
@@ -453,7 +664,7 @@ function addSemanticWeight(
   profile[key] = map;
 }
 
-async function getSemanticEventProfile(): Promise<ReaderProfile> {
+async function getSemanticEventProfile(historyEvents: ReaderHistoryLedgerEvent[]): Promise<ReaderProfile> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return emptyProfile();
 
   try {
@@ -520,31 +731,26 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
       profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
     }
 
-    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
-    for (const blob of batches.blobs) {
-      try {
-        const stored = await get(blob.pathname, { access: "private" });
-        if (!stored?.stream || stored.statusCode !== 200) continue;
-        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
-        for (const item of parsed.events ?? []) {
-          const data = item.classification;
-          const stamp = Date.parse(item.timestamp);
-          if (!data || !Number.isFinite(stamp) || stamp > now + 60000) continue;
-          const age = Math.max(0, (now - stamp) / 86400000);
-          const recency = Math.max(0.15, Math.exp(-age / 45));
-          const confidence = Number.isFinite(data.confidence) ? Math.max(0, Math.min(1, data.confidence)) : 0.5;
-          const weight = recency * (0.4 + confidence * 0.6);
-          addSemanticWeight(profile, "semanticCategory", data.broadCategory, weight * 0.5);
-          addSemanticWeight(profile, "semanticArticleType", data.articleType, weight * 0.7);
-          addSemanticWeight(profile, "semanticTopic", data.mainTopic, weight * 1.4);
-          addSemanticWeight(profile, "eventKey", data.eventKey, weight * 0.35);
-          for (const tag of data.tags ?? []) addSemanticWeight(profile, "semanticTag", tag, weight * 0.7);
-          for (const entity of data.entities ?? []) addSemanticWeight(profile, "entity", entity.name, weight * 1.2);
-          for (const place of [data.geography?.country, data.geography?.region, data.geography?.city]) addSemanticWeight(profile, "geography", place, weight * 0.3);
-          profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
-        }
-      } catch { /* Keep processing other batches. */ }
+    for (const item of historyEvents) {
+      const data = item.classification;
+      const stamp = Date.parse(item.timestamp);
+      if (!data || !Number.isFinite(stamp) || stamp > now + 60000) continue;
+      const age = Math.max(0, (now - stamp) / 86400000);
+      const recency = Math.max(0.15, Math.exp(-age / 45));
+      const confidence = Number.isFinite(data.confidence) ? Math.max(0, Math.min(1, data.confidence)) : 0.5;
+      const weight = recency * (0.4 + confidence * 0.6);
+      addSemanticWeight(profile, "semanticCategory", data.broadCategory, weight * 0.5);
+      addSemanticWeight(profile, "semanticArticleType", data.articleType, weight * 0.7);
+      addSemanticWeight(profile, "semanticTopic", data.mainTopic, weight * 1.4);
+      addSemanticWeight(profile, "eventKey", data.eventKey, weight * 0.35);
+      for (const tag of data.tags ?? []) addSemanticWeight(profile, "semanticTag", tag, weight * 0.7);
+      for (const entity of data.entities ?? []) addSemanticWeight(profile, "entity", entity.name, weight * 1.2);
+      for (const place of [data.geography?.country, data.geography?.region, data.geography?.city]) {
+        addSemanticWeight(profile, "geography", place, weight * 0.3);
+      }
+      profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
     }
+
     return mergeProfiles(emptyProfile(), profile);
   } catch (error) {
     console.warn("Kunde inte läsa semantisk läsarprofil:", error);
@@ -553,10 +759,66 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
 }
 
 
-// Glenn typically reads for about 30 minutes per morning session. Keep the
-// merged profile cached for that whole session to avoid repeatedly listing the
-// same Blob event prefixes during article browsing. Click events are still
-// recorded independently; this cache is per warm server instance.
+type ReaderProfileSnapshotEnvelope = {
+  version: 1;
+  generatedAt: string;
+  profile: ReaderProfile;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isReaderProfileValue(value: unknown): value is ReaderProfile {
+  if (!isRecord(value)) return false;
+  const isMap = (candidate: unknown) =>
+    typeof candidate === "object" && candidate !== null && !Array.isArray(candidate);
+  return isMap(value.category) &&
+    isMap(value.articleType) &&
+    isMap(value.source) &&
+    isMap(value.topic) &&
+    typeof value.totalClicks === "number" &&
+    (value.lastUpdated === null || typeof value.lastUpdated === "string");
+}
+
+async function readReaderProfileSnapshotEnvelope(): Promise<ReaderProfileSnapshotEnvelope | null> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  try {
+    const result = await get(PROFILE_SNAPSHOT_PATH, { access: "private" });
+    if (!result?.stream || result.statusCode !== 200) return null;
+    const text = await new Response(result.stream).text();
+    if (text.length > 100_000) return null;
+    const value = JSON.parse(text) as Partial<ReaderProfileSnapshotEnvelope>;
+    if (value.version !== 1 || typeof value.generatedAt !== "string" ||
+        !Number.isFinite(Date.parse(value.generatedAt)) || !isReaderProfileValue(value.profile)) {
+      return null;
+    }
+    return value as ReaderProfileSnapshotEnvelope;
+  } catch {
+    return null;
+  }
+}
+
+async function buildReaderProfileFromStoredEvents(
+  historyEvents?: ReaderHistoryLedgerEvent[]
+): Promise<ReaderProfile> {
+  let storedHistory = historyEvents;
+  if (!storedHistory) {
+    const ledger = await readReaderHistoryLedger();
+    if (!ledger) throw new Error("Reader history ledger could not be read safely");
+    storedHistory = ledger.events;
+  }
+  const [legacy, events, semanticEvents] = await Promise.all([
+    getLegacyProfile(),
+    getEventProfile(storedHistory),
+    getSemanticEventProfile(storedHistory),
+  ]);
+  return mergeProfiles(mergeProfiles(legacy, events), semanticEvents);
+}
+
+// Daytime requests read one compact profile instead of repeatedly listing
+// historical events and downloading every stored batch. The one-time fallback
+// keeps a fresh deployment usable before its first nightly snapshot is made.
 const READER_PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
 let readerProfileCache: { expiresAt: number; value: ReaderProfile } | null = null;
 let readerProfileInFlight: Promise<ReaderProfile> | null = null;
@@ -566,18 +828,13 @@ export async function getReaderProfile(): Promise<ReaderProfile> {
   if (readerProfileCache && readerProfileCache.expiresAt > now) {
     return structuredClone(readerProfileCache.value);
   }
-
   if (readerProfileInFlight) {
     return structuredClone(await readerProfileInFlight);
   }
 
   readerProfileInFlight = (async () => {
-    const [legacy, events, semanticEvents] = await Promise.all([
-      getLegacyProfile(),
-      getEventProfile(),
-      getSemanticEventProfile(),
-    ]);
-    return mergeProfiles(mergeProfiles(legacy, events), semanticEvents);
+    const snapshot = await readReaderProfileSnapshotEnvelope();
+    return snapshot?.profile ?? buildReaderProfileFromStoredEvents();
   })();
 
   try {
@@ -590,6 +847,30 @@ export async function getReaderProfile(): Promise<ReaderProfile> {
   } finally {
     readerProfileInFlight = null;
   }
+}
+
+/** Rebuild and save the reader profile as part of nightly maintenance. */
+export async function rebuildAndSaveReaderProfileSnapshot(historyEvents?: ReaderHistoryLedgerEvent[]) {
+  const profile = await buildReaderProfileFromStoredEvents(historyEvents);
+  const generatedAt = new Date().toISOString();
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return { saved: false, generatedAt, profile };
+  }
+  await put(PROFILE_SNAPSHOT_PATH, JSON.stringify({
+    version: 1,
+    generatedAt,
+    profile,
+  }), {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: "application/json",
+  });
+  readerProfileCache = {
+    expiresAt: Date.now() + READER_PROFILE_CACHE_TTL_MS,
+    value: profile,
+  };
+  return { saved: true, generatedAt, profile };
 }
 
 export function updateReaderProfile(
@@ -709,26 +990,16 @@ export async function getRecentReaderActivity(
       }
     }
 
-    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
-    const batchItems: ReaderActivity[] = [];
-    for (const blob of batches.blobs) {
-      try {
-        const stored = await get(blob.pathname, { access: "private" });
-        if (!stored?.stream || stored.statusCode !== 200) continue;
-        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
-        for (const item of parsed.events ?? []) {
-          batchItems.push({
-            timestamp: item.timestamp,
-            category: item.category,
-            articleType: item.articleType,
-            source: item.source,
-            topic: item.topic,
-            title: item.title || item.topic || "Läst artikel",
-            link: item.link,
-          });
-        }
-      } catch { /* Ignore malformed batches. */ }
-    }
+    const ledger = await readReaderHistoryLedger();
+    const batchItems: ReaderActivity[] = (ledger?.events ?? []).map(item => ({
+      timestamp: item.timestamp,
+      category: item.category,
+      articleType: item.articleType,
+      source: item.source,
+      topic: item.topic,
+      title: item.title || item.topic || "Läst artikel",
+      link: item.link,
+    }));
     return [...cleaned, ...batchItems]
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
       .slice(0, Math.max(1, Math.min(limit, 50)));
@@ -828,26 +1099,19 @@ export async function getReaderActivitySince(
       activity.push(...resolved);
     }
 
-    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
-    for (const blob of batches.blobs) {
-      try {
-        const stored = await get(blob.pathname, { access: "private" });
-        if (!stored?.stream || stored.statusCode !== 200) continue;
-        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
-        for (const item of parsed.events ?? []) {
-          const timestamp = Date.parse(item.timestamp);
-          if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > Date.now()) continue;
-          activity.push({
-            timestamp: new Date(timestamp).toISOString(),
-            category: item.category,
-            articleType: item.articleType,
-            source: item.source,
-            topic: item.topic,
-            title: item.title || item.topic || "Läst artikel",
-            link: item.link,
-          });
-        }
-      } catch { /* Ignore malformed batches and keep legacy activity. */ }
+    const ledger = await readReaderHistoryLedger();
+    for (const item of ledger?.events ?? []) {
+      const timestamp = Date.parse(item.timestamp);
+      if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > Date.now()) continue;
+      activity.push({
+        timestamp: new Date(timestamp).toISOString(),
+        category: item.category,
+        articleType: item.articleType,
+        source: item.source,
+        topic: item.topic,
+        title: item.title || item.topic || "Läst artikel",
+        link: item.link,
+      });
     }
 
     return activity

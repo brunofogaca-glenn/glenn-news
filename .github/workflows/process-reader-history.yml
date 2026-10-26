@@ -1,0 +1,60 @@
+name: Process reader history nightly
+
+on:
+  schedule:
+    # Run after overnight source refreshes and well before the 06:30 edition.
+    - cron: "15 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  process-reader-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check nightly maintenance window
+        id: nightly_window
+        shell: bash
+        run: |
+          hour="$(TZ=Europe/Stockholm date +%H)"
+          hour_num=$((10#$hour))
+          if (( hour_num >= 1 && hour_num < 6 )); then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping reader-history processing outside 01:00-05:59 Europe/Stockholm."
+          fi
+
+      - name: Process reading batches and cache profile before the morning edition
+        if: steps.nightly_window.outputs.allowed == 'true'
+        env:
+          REFRESH_URL: https://glenn-news.vercel.app/api/cron/process-reader-history
+          OIDC_AUDIENCE: https://glenn-news.vercel.app
+          VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+            echo "::error::GitHub Actions did not provide OIDC credentials. Ensure id-token: write is enabled."
+            exit 1
+          fi
+          if [[ -z "$VERCEL_BYPASS_SECRET" ]]; then
+            echo "::error::Add VERCEL_AUTOMATION_BYPASS_SECRET to GitHub Actions secrets."
+            exit 1
+          fi
+
+          oidc_response="$(curl --fail-with-body --silent --show-error --max-time 20 \
+            --get \
+            --data-urlencode "audience=$OIDC_AUDIENCE" \
+            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL")"
+          oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
+
+          curl --fail-with-body --silent --show-error --max-time 270 \
+            --header "Authorization: Bearer $oidc_token" \
+            --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
+            --header "Accept: application/json" \
+            "$REFRESH_URL"

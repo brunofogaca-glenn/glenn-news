@@ -34,19 +34,40 @@ test("diagnostics use redacted, deduplicated runtime logs without Blob writes", 
   assert.ok(!logger.includes("await list("));
 });
 
-test("Week Focus persists one static edition per Stockholm date", () => {
+test("Week Focus uses one cached edition for Saturday and Sunday", () => {
   const cache = read("lib/weekFocusCache.ts");
   const focus = read("lib/weekFocus.ts");
+  const page = read("app/veckofokus/page.tsx");
 
   assert.ok(cache.includes('CACHE_PREFIX = "glenn-news/week-focus/cache/"'));
   assert.ok(cache.includes('timeZone: "Europe/Stockholm"'));
-  assert.ok(cache.includes("const dateKey = stockholmDateKey()"));
+  assert.ok(cache.includes("const dateKey = weekendEditionDateKey()"));
+  assert.ok(cache.includes("getCachedWeeklyFocus"));
   assert.ok(cache.includes("readPersistentCache(dateKey, isValid)"));
   assert.ok(cache.includes("writePersistentCache(dateKey, fingerprint, value)"));
   assert.ok(cache.includes("inFlight.get(dateKey)"));
   assert.ok(!cache.includes("WEEK_FOCUS_CACHE_TTL_MS"));
+  assert.ok(focus.includes("getCachedWeeklyFocus<WeeklyFocus>(isValidWeeklyFocus)"));
   assert.ok(focus.includes("collectWeeklyCandidates(editions, readLinks)"));
   assert.ok(focus.includes("dependencies.loadSavedEditions(7)"));
+  assert.ok(page.includes('weekday === "Sat" || weekday === "Sun"'));
+  assert.ok(page.includes('<SaveReadingHistoryButton mode="weekfocus" />'));
+});
+
+test("reader history is consolidated and clicked articles are not individually classified", () => {
+  const profile = read("lib/readerProfile.ts");
+  const processor = profile.slice(
+    profile.indexOf("export async function processPendingReaderBatches"),
+    profile.indexOf("async function getLegacyProfile")
+  );
+
+  assert.ok(profile.includes('READER_HISTORY_LEDGER_PATH = "glenn-news/profile/reader-history-ledger.json"'));
+  assert.ok(profile.includes("writeReaderHistoryLedger(nextLedger)"));
+  assert.ok(profile.includes("getEventProfile(storedHistory)"));
+  assert.ok(profile.includes("getSemanticEventProfile(storedHistory)"));
+  assert.doesNotMatch(processor, /classifyClickedArticle/);
+  assert.doesNotMatch(processor, /put\(blob\.pathname/);
+  assert.ok(profile.includes("const ledger = await readReaderHistoryLedger()"));
 });
 
 test("critical production error paths record diagnostics", () => {

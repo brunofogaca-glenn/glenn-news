@@ -1,6 +1,7 @@
 import { getReaderProfile } from "@/lib/readerProfile";
 import { createWeeklyFocus } from "@/lib/weekFocus";
 import { WeeklyStoryLink } from "@/app/components/WeeklyStoryLink";
+import { SaveReadingHistoryButton } from "@/app/components/SaveReadingHistoryButton";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,39 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function isWeekFocusWeekend(date = new Date()) {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Stockholm",
+    weekday: "short",
+  }).format(date);
+  return weekday === "Sat" || weekday === "Sun";
+}
+
 export default async function WeekFocusPage() {
+  if (!isWeekFocusWeekend()) {
+    return (
+      <main className="min-h-screen bg-[#f4f1e8] text-slate-950">
+        <div className="mx-auto max-w-6xl px-4 pb-12 pt-8 md:px-8">
+          <header className="border-y-2 border-slate-950 py-6">
+            <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-500">
+              Glenn News · Fördjupning
+            </div>
+            <h1 className="mt-1 font-serif text-5xl font-black tracking-[-0.04em] md:text-7xl">
+              VECKOFOKUS
+            </h1>
+            <p className="mt-4 max-w-2xl font-serif text-xl leading-8 text-slate-600">
+              Veckans fördjupning publiceras på lördagen och finns kvar under söndagen.
+              Utgåvan förbereds nattetid; övriga dagar håller vi sidan vilande för att minska bakgrundsjobb.
+            </p>
+          </header>
+          <a href="/" className="mt-6 inline-block text-sm font-bold underline">
+            ← Till morgontidningen
+          </a>
+        </div>
+      </main>
+    );
+  }
+
   const profile = await getReaderProfile();
   const focus = await createWeeklyFocus(profile);
 
@@ -141,6 +174,7 @@ export default async function WeekFocusPage() {
         <footer className="pt-6 text-sm leading-6 text-slate-500">
           Veckofokus jämför klickhändelser som registrerats i Glenn News under de senaste sju dygnen med artiklarna i veckans sparade morgoneditioner. Artiklar du öppnat via Glenn News räknas centralt, så läshistoriken fungerar mellan enheter. Läsning direkt på externa webbplatser som inte registrerats av Glenn News kan inte räknas. {focus.personalized ? "Urvalet är anpassat efter din faktiska läsning denna vecka." : "Just nu visas en reservordning eftersom en tillförlitlig personlig ämnesbild saknas."}
         </footer>
+      <SaveReadingHistoryButton mode="weekfocus" />
       </div>
     </main>
   );

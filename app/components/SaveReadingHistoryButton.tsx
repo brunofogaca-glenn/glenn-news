@@ -8,7 +8,9 @@ function makeBatchId() {
   return `${Date.now()}-${window.crypto.randomUUID().replaceAll("-", "")}`;
 }
 
-export function SaveReadingHistoryButton() {
+type SaveReadingHistoryButtonProps = { mode?: "home" | "weekfocus" };
+
+export function SaveReadingHistoryButton({ mode = "home" }: SaveReadingHistoryButtonProps) {
   const pathname = usePathname();
   const [count, setCount] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -45,7 +47,7 @@ export function SaveReadingHistoryButton() {
         cache: "no-store",
         credentials: "same-origin",
       });
-      const result = await response.json().catch(() => null) as { ok?: boolean; saved?: number } | null;
+      const result = await response.json().catch(() => null) as { ok?: boolean; saved?: number; queuedForNightlyProcessing?: boolean } | null;
       if (!response.ok || result?.ok !== true) throw new Error("Sparandet misslyckades.");
       const current = readReaderQueue();
       const savedIds = new Set(selected.map(item => item.eventId));
@@ -53,7 +55,7 @@ export function SaveReadingHistoryButton() {
       const next: ReaderQueueState = { events: remaining };
       sessionStorage.setItem(READER_QUEUE_KEY, JSON.stringify(next));
       setCount(remaining.length);
-      setMessage(`Sparade ${selected.length} artiklar.${remaining.length ? " Spara igen för resten." : ""}`);
+      setMessage(`Sparade ${selected.length} artiklar. De bearbetas nattetid.${remaining.length ? " Spara igen för resten." : ""}`);
     } catch {
       setMessage("Kunde inte spara just nu. Artiklarna ligger kvar i kön – försök igen.");
     } finally {
@@ -61,16 +63,18 @@ export function SaveReadingHistoryButton() {
     }
   }
 
-  if (pathname !== "/") return null;
+  if ((mode === "home" && pathname !== "/") || (mode === "weekfocus" && pathname !== "/veckofokus")) return null;
 
   return (
     <section className="mx-auto mt-10 max-w-7xl px-4 md:px-8 border-2 border-slate-950 bg-white/70 p-5 md:p-6" aria-label="Läshistorik">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">Din läshistorik</div>
-          <h2 className="mt-1 font-serif text-2xl font-black">Spara morgonens läsning</h2>
+          <h2 className="mt-1 font-serif text-2xl font-black">
+            {mode === "weekfocus" ? "Spara Veckofokus-läsning" : "Spara morgonens läsning"}
+          </h2>
           <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">
-            Artiklarna samlas i webbläsaren och skickas tillsammans när du är klar. Upp till 50 artiklar sparas per omgång.
+            Läsningen skickas tillsammans i en enda batch. Lässtatus och läsarprofil uppdateras av nattjobbet, inte medan du läser. Upp till 50 artiklar sparas per omgång.
           </p>
           {message && <p role="status" className="mt-2 text-sm font-semibold text-slate-700">{message}</p>}
         </div>

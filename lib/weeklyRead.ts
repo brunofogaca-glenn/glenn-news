@@ -16,9 +16,19 @@ export async function getWeeklyReadLinks() {
 }
 
 export async function addWeeklyReadLink(link: string) {
-  const current = await getWeeklyReadLinks();
-  const next = [link, ...current.filter(item => item !== link)].slice(0, MAX_READ_LINKS);
+  return addWeeklyReadLinks([link]);
+}
+
+/** Merge a nightly batch of newly read Week Focus links in one Blob write. */
+export async function addWeeklyReadLinks(links: string[]) {
+  const uniqueLinks = [...new Set(links.filter(link => /^https?:\/\//i.test(link)))];
+  if (!uniqueLinks.length) return true;
   if (!process.env.BLOB_READ_WRITE_TOKEN) return false;
+
+  const current = await getWeeklyReadLinks();
+  const next = [...new Set([...uniqueLinks.slice().reverse(), ...current])].slice(0, MAX_READ_LINKS);
+  if (next.length === current.length && next.every((link, index) => link === current[index])) return true;
+
   try {
     await put(READ_PATH, JSON.stringify(next), {
       access: "private",

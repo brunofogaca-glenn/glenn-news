@@ -79,6 +79,15 @@ export async function GET(request: Request) {
       localTime: `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`,
     });
   }
+  if (clock.hour >= 6) {
+    return Response.json({
+      ok: true,
+      refreshed: false,
+      skipped: true,
+      reason: "Nightly maintenance cutoff passed; no daytime Blob writes are allowed",
+      localTime: `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`,
+    });
+  }
 
   // Probe the existing cache first. Cache hits do not refetch the source; metadata
   // tells us whether the hourly refresh is due or whether a failed source needs retrying.

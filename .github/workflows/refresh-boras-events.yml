@@ -1,18 +1,9 @@
 name: Refresh Borås events
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/refresh-boras-events.yml"
-      - "scripts/scrape-boras-events.mjs"
-      - "app/api/cron/ingest-boras-events/route.ts"
-      - "lib/borasEventStore.ts"
-      - "lib/dailySnapshots.ts"
-      - "lib/githubActionsAuth.ts"
   schedule:
-    # Daily early refresh; supplemental snapshots run afterward.
-    - cron: "13 2 * * *"
+    # Run well before publication; late starts are skipped by the workflow and endpoint.
+    - cron: "13 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -24,30 +15,50 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
+      - name: Check nightly maintenance window
+        id: nightly_window
+        shell: bash
+        run: |
+          hour="$(TZ=Europe/Stockholm date +%H)"
+          hour_num=$((10#$hour))
+          if (( hour_num < 6 )); then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping data refresh after 06:00 Europe/Stockholm."
+          fi
+
       - name: Check out repository
+        if: steps.nightly_window.outputs.allowed == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: steps.nightly_window.outputs.allowed == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Cache Playwright Chromium
+        if: steps.nightly_window.outputs.allowed == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ubuntu-playwright-1.56.0-chromium
 
       - name: Install Playwright
+        if: steps.nightly_window.outputs.allowed == 'true'
         run: npm install --no-save --package-lock=false playwright@1.56.0
 
       - name: Install browser
+        if: steps.nightly_window.outputs.allowed == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Read Borås.com event cards in a real browser
+        if: steps.nightly_window.outputs.allowed == 'true'
         run: node scripts/scrape-boras-events.mjs
 
       - name: Upload rendered events and invalidate the local snapshot cache
+        if: steps.nightly_window.outputs.allowed == 'true'
         env:
           INGEST_URL: https://glenn-news.vercel.app/api/cron/ingest-boras-events
           OIDC_AUDIENCE: https://glenn-news.vercel.app
