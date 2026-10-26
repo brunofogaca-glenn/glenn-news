@@ -1,7 +1,6 @@
 import { get, list, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { recordDiagnostic } from "./diagnosticLog";
-import { classifyClickedArticle } from "./articleClassification";
 
 export type ReaderProfile = {
   category: Record<string, number>;
@@ -252,7 +251,7 @@ export type ReaderBatchProcessingResult = {
  * there are no AI calls or per-article Blob writes during the reading session.
  */
 export async function processPendingReaderBatches(
-  maxClassifications = 100
+  _maxClassifications = 100
 ): Promise<ReaderBatchProcessingResult> {
   const emptyResult: ReaderBatchProcessingResult = {
     storageAvailable: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
@@ -265,119 +264,55 @@ export async function processPendingReaderBatches(
   };
   if (!process.env.BLOB_READ_WRITE_TOKEN) return emptyResult;
 
-  const now = Date.now();
-  const recentCutoff = now - 7 * 24 * 60 * 60 * 1000;
+  const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const snapshot = await readReaderProfileSnapshotEnvelope();
-  const snapshotAt = snapshot ? Date.parse(snapshot.generatedAt) : 0;
+  const snapshotAt = snapshot ? Date.parse(snapshot.generatedAt) : Number.NaN;
   const index = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
+  // Previously processed batches are not revisited. If there is no valid
+  // snapshot, scan all batches once so the first rebuild can catch up.
   const candidates = index.blobs.filter(blob => {
+    if (!snapshot || !Number.isFinite(snapshotAt)) return true;
     const uploadedAt = Date.parse(String(blob.uploadedAt ?? ""));
-    const file = blob.pathname.slice(BATCH_EVENT_PREFIX.length).split(".")[0];
-    const createdAt = Number(file.slice(0, 13));
-    const isRecentBatch = Number.isFinite(createdAt) && createdAt >= recentCutoff;
-    const uploadedSinceSnapshot = !snapshot || !Number.isFinite(snapshotAt) ||
-      !Number.isFinite(uploadedAt) || uploadedAt >= snapshotAt;
-    return isRecentBatch || uploadedSinceSnapshot;
+    return !Number.isFinite(uploadedAt) || uploadedAt >= snapshotAt;
   }).sort((a, b) => a.pathname.localeCompare(b.pathname));
 
   const weeklyReadLinks = new Set<string>();
   let scannedBatches = 0;
-  let updatedBatches = 0;
-  let classifiedEvents = 0;
-  let classificationFailures = 0;
-  let remainingCapacity = Math.max(1, Math.min(maxClassifications, 500));
-  let pendingEvents = 0;
 
   for (const blob of candidates) {
-    const stored = await get(blob.pathname, { access: "private" });
-    if (!stored?.stream || stored.statusCode !== 200) continue;
-
-    let parsed: { version?: number; events?: BatchedReaderEvent[] };
     try {
-      parsed = JSON.parse(await new Response(stored.stream).text()) as { version?: number; events?: BatchedReaderEvent[] };
-    } catch {
-      continue;
-    }
-    if (!Array.isArray(parsed.events)) continue;
-    scannedBatches += 1;
-    let changed = false;
-    const events = parsed.events;
+      const stored = await get(blob.pathname, { access: "private" });
+      if (!stored?.stream || stored.statusCode !== 200) continue;
+      const parsed = JSON.parse(await new Response(stored.stream).text()) as {
+        events?: BatchedReaderEvent[];
+      };
+      if (!Array.isArray(parsed.events)) continue;
+      scannedBatches += 1;
 
-    for (const event of events) {
-      const timestamp = Date.parse(event.timestamp);
-      if (event.category === "weekfocus" && event.link &&
-          Number.isFinite(timestamp) && timestamp >= recentCutoff &&
-          /^https?:\/\//i.test(event.link)) {
-        weeklyReadLinks.add(event.link);
-      }
-    }
-
-    const pending = events
-      .map((event, index) => ({ event, index }))
-      .filter(({ event }) => !Object.prototype.hasOwnProperty.call(event, "classification"));
-
-    for (let offset = 0; offset < pending.length && remainingCapacity > 0; offset += 5) {
-      const group = pending.slice(offset, offset + Math.min(5, remainingCapacity));
-      const results = await Promise.all(group.map(async item => {
-        try {
-          const classification = await classifyClickedArticle({
-            link: item.event.link ?? "",
-            title: item.event.title ?? item.event.topic ?? "Läst artikel",
-            summary: item.event.summary,
-            category: item.event.category,
-            articleType: item.event.articleType,
-            source: item.event.source,
-            topic: item.event.topic,
-          });
-          return {
-            index: item.index,
-            classification: classification ? {
-              broadCategory: classification.broadCategory,
-              mainTopic: classification.mainTopic,
-              tags: classification.tags,
-              entities: classification.entities,
-              geography: classification.geography,
-              articleType: classification.articleType,
-              eventKey: classification.eventKey,
-              confidence: classification.confidence,
-            } satisfies SemanticReaderClassification : null,
-          };
-        } catch {
-          return { index: item.index, classification: null };
+      for (const event of parsed.events) {
+        const timestamp = Date.parse(event.timestamp);
+        if (
+          event.category === "weekfocus" &&
+          event.link &&
+          Number.isFinite(timestamp) &&
+          timestamp >= recentCutoff &&
+          /^https?:\/\//i.test(event.link)
+        ) {
+          weeklyReadLinks.add(event.link);
         }
-      }));
-
-      for (const result of results) {
-        events[result.index].classification = result.classification;
-        classifiedEvents += 1;
-        if (!result.classification) classificationFailures += 1;
       }
-      remainingCapacity -= results.length;
-      changed = changed || results.length > 0;
-    }
-
-    pendingEvents += events.filter(event =>
-      !Object.prototype.hasOwnProperty.call(event, "classification")
-    ).length;
-
-    if (changed) {
-      await put(blob.pathname, JSON.stringify({ version: parsed.version ?? 1, events }), {
-        access: "private",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        contentType: "application/json",
-      });
-      updatedBatches += 1;
+    } catch {
+      // Leave malformed batches untouched and continue processing other batches.
     }
   }
 
   return {
     storageAvailable: true,
     scannedBatches,
-    updatedBatches,
-    classifiedEvents,
-    classificationFailures,
-    pendingEvents,
+    updatedBatches: 0,
+    classifiedEvents: 0,
+    classificationFailures: 0,
+    pendingEvents: 0,
     weeklyReadLinks: [...weeklyReadLinks],
   };
 }
@@ -668,31 +603,6 @@ async function getSemanticEventProfile(): Promise<ReaderProfile> {
       profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
     }
 
-    const batches = await list({ prefix: BATCH_EVENT_PREFIX, limit: MAX_EVENTS });
-    for (const blob of batches.blobs) {
-      try {
-        const stored = await get(blob.pathname, { access: "private" });
-        if (!stored?.stream || stored.statusCode !== 200) continue;
-        const parsed = JSON.parse(await new Response(stored.stream).text()) as { events?: BatchedReaderEvent[] };
-        for (const item of parsed.events ?? []) {
-          const data = item.classification;
-          const stamp = Date.parse(item.timestamp);
-          if (!data || !Number.isFinite(stamp) || stamp > now + 60000) continue;
-          const age = Math.max(0, (now - stamp) / 86400000);
-          const recency = Math.max(0.15, Math.exp(-age / 45));
-          const confidence = Number.isFinite(data.confidence) ? Math.max(0, Math.min(1, data.confidence)) : 0.5;
-          const weight = recency * (0.4 + confidence * 0.6);
-          addSemanticWeight(profile, "semanticCategory", data.broadCategory, weight * 0.5);
-          addSemanticWeight(profile, "semanticArticleType", data.articleType, weight * 0.7);
-          addSemanticWeight(profile, "semanticTopic", data.mainTopic, weight * 1.4);
-          addSemanticWeight(profile, "eventKey", data.eventKey, weight * 0.35);
-          for (const tag of data.tags ?? []) addSemanticWeight(profile, "semanticTag", tag, weight * 0.7);
-          for (const entity of data.entities ?? []) addSemanticWeight(profile, "entity", entity.name, weight * 1.2);
-          for (const place of [data.geography?.country, data.geography?.region, data.geography?.city]) addSemanticWeight(profile, "geography", place, weight * 0.3);
-          profile.semanticClicks = (profile.semanticClicks ?? 0) + 1;
-        }
-      } catch { /* Keep processing other batches. */ }
-    }
     return mergeProfiles(emptyProfile(), profile);
   } catch (error) {
     console.warn("Kunde inte läsa semantisk läsarprofil:", error);
