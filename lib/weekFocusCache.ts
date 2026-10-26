@@ -11,6 +11,17 @@ function stockholmDateKey(date = new Date()): string {
   const day = parts.find(part => part.type === "day")?.value ?? "01";
   return year + "-" + month + "-" + day;
 }
+
+// One edition for the whole weekend, keyed to Saturday's Stockholm date.
+function weekendEditionDateKey(date = new Date()): string {
+  const [year, month, day] = stockholmDateKey(date).split("-").map(Number);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day, 12));
+  const weekday = calendarDate.getUTCDay();
+  calendarDate.setUTCDate(calendarDate.getUTCDate() + (weekday === 0 ? -1 : 6 - weekday));
+  return calendarDate.getUTCFullYear() + "-" +
+    String(calendarDate.getUTCMonth() + 1).padStart(2, "0") + "-" +
+    String(calendarDate.getUTCDate()).padStart(2, "0");
+}
 function cachePath(dateKey: string) {
   return CACHE_PREFIX + dateKey + ".json";
 }
@@ -26,6 +37,7 @@ type CacheEnvelope = {
 // Keyed by Stockholm calendar date: the first generated edition stays fixed all day.
 const memoryCache = new Map<string, { value: unknown }>();
 const inFlight = new Map<string, Promise<unknown>>();
+const persistentCacheChecked = new Set<string>();
 
 function stableSerialize(value: unknown): string {
   if (value === null) return "null";
@@ -68,6 +80,7 @@ async function readPersistentCache<T>(
   isValid: (value: unknown) => value is T
 ): Promise<T | null> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  persistentCacheChecked.add(dateKey);
 
   try {
     const result = await get(cachePath(dateKey), { access: "private" });
@@ -114,17 +127,33 @@ async function writePersistentCache(dateKey: string, fingerprint: string, value:
   }
 }
 
+/** Return the weekend snapshot without loading the underlying article history. */
+export async function getCachedWeeklyFocus<T>(
+  isValid: (value: unknown) => value is T
+): Promise<T | null> {
+  const dateKey = weekendEditionDateKey();
+  const cached = memoryCache.get(dateKey);
+  if (cached && isValid(cached.value)) return cached.value as T;
+  if (cached) memoryCache.delete(dateKey);
+
+  const existingPromise = inFlight.get(dateKey);
+  if (existingPromise) {
+    const value = await existingPromise;
+    return isValid(value) ? value : null;
+  }
+  return readPersistentCache(dateKey, isValid);
+}
+
 /**
- * Generate one Week Focus edition per Stockholm calendar day. The first request
- * persists a snapshot; later requests reuse it even if reading activity or the
- * profile changes during the day. Same-instance requests coalesce.
+ * Generate one Week Focus edition for Saturday and Sunday. The first edition
+ * stays fixed through the weekend; same-instance requests coalesce.
  */
 export async function getOrCreateWeeklyFocus<T>(
   fingerprint: string,
   create: () => Promise<T>,
   isValid: (value: unknown) => value is T
 ): Promise<T> {
-  const dateKey = stockholmDateKey();
+  const dateKey = weekendEditionDateKey();
   const cached = memoryCache.get(dateKey);
   if (cached && isValid(cached.value)) return cached.value;
   if (cached) memoryCache.delete(dateKey);
@@ -133,7 +162,7 @@ export async function getOrCreateWeeklyFocus<T>(
   if (existingPromise) return existingPromise as Promise<T>;
 
   const task = (async () => {
-    const persistedValue = await readPersistentCache(dateKey, isValid);
+    const persistedValue = persistentCacheChecked.has(dateKey) ? null : await readPersistentCache(dateKey, isValid);
     if (persistedValue !== null) return persistedValue;
 
     const value = await create();
