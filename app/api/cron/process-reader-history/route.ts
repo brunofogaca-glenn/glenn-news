@@ -28,15 +28,19 @@ export async function GET(request: Request) {
 
   try {
     const processed = await processPendingReaderBatches(100);
+    const { ledgerEvents, ledgerAvailable, ledgerChanged, ...processedSummary } = processed;
     if (!processed.storageAvailable) {
       return NextResponse.json({ ok: false, error: "Blob storage is unavailable" }, { status: 503 });
     }
-    if (processed.pendingEvents > 0) {
-      return NextResponse.json({ ok: false, snapshotUpdated: false, ...processed }, { status: 503 });
+    if (!ledgerAvailable) {
+      return NextResponse.json({
+        ok: false, snapshotUpdated: false,
+        error: "Reader-history ledger could not be read or saved safely", ...processedSummary,
+      }, { status: 503 });
     }
 
-    const weeklyReadSaved = processed.weeklyReadLinks.length
-      ? await addWeeklyReadLinks(processed.weeklyReadLinks)
+    const weeklyReadSaved = processedSummary.weeklyReadLinks.length
+      ? await addWeeklyReadLinks(processedSummary.weeklyReadLinks)
       : true;
     if (!weeklyReadSaved) {
       return NextResponse.json({
@@ -45,7 +49,7 @@ export async function GET(request: Request) {
       }, { status: 503 });
     }
 
-    const snapshot = await rebuildAndSaveReaderProfileSnapshot();
+    const snapshot = await rebuildAndSaveReaderProfileSnapshot(ledgerEvents);
     if (!snapshot.saved) {
       return NextResponse.json({
         ok: false, snapshotUpdated: false,
@@ -71,7 +75,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       ok: true, snapshotUpdated: true, snapshotGeneratedAt: snapshot.generatedAt,
-      weeklyFocusPrecomputed, ...processed,
+      weeklyFocusPrecomputed, ledgerChanged, ...processedSummary,
     });
   } catch (error) {
     console.error("Nightly reader-history processing failed:", error);
