@@ -1,6 +1,6 @@
 # Glenn News — architecture and change map
 
-This is the quick map for making a targeted change without needing to rediscover the whole repository. Keep it in sync when a data flow or cross-module contract changes. For the complete inventory of visible UI and interactions, see [UI and feature guide](ui-feature-guide.md).
+This is the quick map for making a targeted change without needing to rediscover the whole repository. Keep it in sync when a data flow or cross-module contract changes. **Before any task, start with the canonical [product requirements](product-requirements.md)** and identify the relevant requirement IDs. For the complete inventory of visible UI and interactions, see [UI and feature guide](ui-feature-guide.md).
 
 ## Request and data flows
 
