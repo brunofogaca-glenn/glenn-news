@@ -11,7 +11,7 @@ This inventory distinguishes editorial article ingestion from the supplemental f
 | `lib/feedHealth.ts` | Checks the health and freshness of RSS and editorial web sources | Never run before 06:00, because checks perform live requests |
 | `lib/dailyEdition.ts` | Builds and persists the morning edition | Explicit guard prevents editorial fetch before 06:00 |
 | `app/api/cron/refresh-articles/route.ts` | Manual recovery of the article cache and feed-health status | Manual GitHub Actions dispatch only. The automatic morning refresh is owned by `app/api/cron/refresh-news/route.ts` during the 06:00–06:59 Stockholm hour |
-| `app/api/cron/refresh-news/route.ts` | Publishes the morning edition | Existing publication/retry window remains around 06:30; it performs a final editorial refresh before edition generation |
+| `app/api/cron/refresh-news/route.ts` | Publishes the morning edition | Accepts the entire 06:00–06:59 Stockholm hour because Hobby cron start minutes are not guaranteed; a second invocation retries only when needed. Protected by production `CRON_SECRET` |
 
 The homepage, direct feed-health page, and manual refresh action are also gated so they cannot initiate article-feed requests before 06:00. The sports-panel loader no longer imports or calls the editorial article cache.
 

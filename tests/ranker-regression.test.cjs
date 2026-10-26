@@ -448,6 +448,10 @@ test("production morning edition contract keeps Stockholm scheduling, validation
   const retry = actions.slice(actions.indexOf("export async function retryMorningEdition()"));
   assert.match(retry, /generateMorningEdition\(profile\)/,
     "explicit recovery must be able to generate the missing edition");
+  assert.match(retry, /if \(clock\.hour !== 6\)/,
+    "manual recovery follows the entire Hobby publication hour");
+  assert.doesNotMatch(retry, /clock\.minute >= 40/,
+    "manual recovery must not become unavailable after 06:39 when Hobby cron may start later in the hour");
 
   const edition = fs.readFileSync(require.resolve("../lib/dailyEdition.ts"), "utf8");
   const validateBeforeSave = edition.indexOf("validateDailyEditionForSave(edition, dateKey);", edition.indexOf("export async function generateMorningEdition"));
