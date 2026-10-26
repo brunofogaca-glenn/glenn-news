@@ -5,6 +5,7 @@ import {
   rebuildAndSaveReaderProfileSnapshot,
 } from "@/lib/readerProfile";
 import { addWeeklyReadLinks } from "@/lib/weeklyRead";
+import { createWeeklyFocus } from "@/lib/weekFocus";
 import { getStockholmClock } from "@/lib/updateSchedule";
 
 export const dynamic = "force-dynamic";
@@ -52,8 +53,25 @@ export async function GET(request: Request) {
       }, { status: 503 });
     }
 
+    let weeklyFocusPrecomputed = false;
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Europe/Stockholm",
+      weekday: "short",
+    }).format(new Date());
+    if (weekday === "Sat") {
+      try {
+        // Create the fixed weekend edition overnight, before the reader arrives.
+        await createWeeklyFocus(snapshot.profile);
+        weeklyFocusPrecomputed = true;
+      } catch (error) {
+        // Reader-history maintenance remains successful if optional editorial work fails.
+        console.warn("Week Focus precomputation failed:", error);
+      }
+    }
+
     return NextResponse.json({
-      ok: true, snapshotUpdated: true, snapshotGeneratedAt: snapshot.generatedAt, ...processed,
+      ok: true, snapshotUpdated: true, snapshotGeneratedAt: snapshot.generatedAt,
+      weeklyFocusPrecomputed, ...processed,
     });
   } catch (error) {
     console.error("Nightly reader-history processing failed:", error);
