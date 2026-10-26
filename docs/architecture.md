@@ -63,7 +63,7 @@ This is the quick map for making a targeted change without needing to rediscover
 
 - `vercel.json` uses `scripts/vercel-ignore-build.mjs` to skip Vercel builds only when the full change set consists of Markdown files in `docs/` or the root documentation files. Code, assets, configuration, tests, scripts, workflows, and lockfiles keep the normal build.
 - The ignore script uses Vercel's previous-successful-deployment SHA and current commit SHA. If either SHA or the diff is unavailable, it fails closed by allowing the build.
-- GitHub Actions still runs the regression tests and production build for pull requests, including documentation changes, so source-of-truth docs remain checked.
+- GitHub Actions runs the regression suites for application/test changes; Vercel owns Next.js compilation for those changes. Markdown-only documentation changes are skipped by both workflows, while local `npm run build` remains the full test-and-build command.
 - Recent and weekly reader-activity queries read the consolidated ledger first. Legacy per-click payloads are downloaded only when their timestamps could change the visible top-N; a legacy-list failure preserves ledger-backed activity instead of turning the view empty.
 
 ## Validation and deployment
