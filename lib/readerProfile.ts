@@ -402,6 +402,21 @@ export async function processPendingReaderBatches(
     }
   }
 
+  // Retry any recent Week Focus read marks until the weekly-read snapshot
+  // accepts them. This makes a temporary write failure recover on the next night.
+  for (const event of currentLedger.events) {
+    const timestamp = Date.parse(event.timestamp);
+    if (
+      event.category === "weekfocus" &&
+      event.link &&
+      Number.isFinite(timestamp) &&
+      timestamp >= recentCutoff &&
+      /^https?:\/\//i.test(event.link)
+    ) {
+      weeklyReadLinks.add(event.link);
+    }
+  }
+
   let ledgerChanged = false;
   if (changed) {
     events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
