@@ -68,6 +68,6 @@ This is the quick map for making a targeted change without needing to rediscover
 
 ## Validation and deployment
 
-CI runs `npm run build`, which executes the ranking regression suite, refresh/diagnostic regression suites, and `next build`. Use one full build per coherent source change; don't run the same tests separately immediately before that command unless diagnosing a failure. Run `npm run lint` for source edits.
+GitHub Actions runs the ranking and refresh/diagnostic regression suites; Vercel runs `npm run build:vercel` (`next build`) for preview and production compilation. This avoids compiling the same Next.js app a second time in GitHub Actions. Locally, `npm run build` still runs both regression suites and a full production build. Documentation-only changes skip both checks. Run `npm run lint` for source edits.
 
 The CI workflow is `.github/workflows/ci.yml`. Cron schedules and refresh authentication are in `.github/workflows/`; the operational source of truth for data times is [data-refresh-inventory.md](data-refresh-inventory.md).

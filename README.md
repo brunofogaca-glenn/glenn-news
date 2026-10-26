@@ -35,7 +35,7 @@ npm run build
 npm run lint
 ```
 
-`npm run build` already runs the ranking regression tests, refresh/diagnostic regression tests, and the Next.js production build. Do not run those same tests separately and then repeat the full build unless a failing test is being investigated. Vercel skips deployment builds for Markdown-only documentation changes; GitHub Actions still validates those changes.
+`npm run build` runs the regression tests and the Next.js production build for local validation. In CI, GitHub Actions runs regression suites and Vercel performs the Next.js compilation, rather than compiling the same app twice in GitHub Actions. Documentation-only changes skip both checks.
 
 ## Operational notes
 

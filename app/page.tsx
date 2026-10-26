@@ -28,16 +28,6 @@ import { ReaderCount } from "./components/ReaderCount";
 
 export const dynamic = "force-dynamic";
 
-const CATEGORY_CONFIG = [
-  { key: "elfsborg", title: "Elfsborg" },
-  { key: "boras", title: "Lokalt" },
-  { key: "sverige", title: "Sverige" },
-  { key: "varlden", title: "Världen" },
-  { key: "ekonomi", title: "Ekonomi" },
-  { key: "sport", title: "Sport" },
-  { key: "livsstil", title: "Kultur, Mat & Livsstil" },
-] as const;
-
 const CATEGORY_ACCENTS = {
   elfsborg: "text-yellow-700",
   boras: "text-orange-700",
