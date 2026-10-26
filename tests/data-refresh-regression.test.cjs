@@ -97,7 +97,7 @@ test("scheduled background refreshes are daily and article status is written by 
   const boras = read(".github/workflows/refresh-boras-events.yml");
   assert.match(boras, /cron: "13 0 \* \* \*"/);
   const fotbollskanalen = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.match(fotbollskanalen, /cron: "17 3 \* \* \*"/);
+  assert.match(fotbollskanalen, /cron: "17 1 \* \* \*"/);
   const supplemental = read(".github/workflows/refresh-supplemental-data.yml");
   assert.match(supplemental, /cron: "43 2 \* \* \*"/);
 
