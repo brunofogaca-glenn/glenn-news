@@ -10,7 +10,7 @@ This inventory distinguishes editorial article ingestion from the supplemental f
 | `lib/webSources.ts` / `WEB_SOURCES` | Extract editorial article links from publisher pages | Never fetched before 06:00 |
 | `lib/feedHealth.ts` | Checks the health and freshness of RSS and editorial web sources | Never run before 06:00, because checks perform live requests |
 | `lib/dailyEdition.ts` | Builds and persists the morning edition | Explicit guard prevents editorial fetch before 06:00 |
-| `app/api/cron/refresh-articles/route.ts` | Warms the article cache and checks feed health | GitHub Actions calls it at minutes 03 and 33; first eligible run is after 06:00. After success it refreshes hourly; after a substantial failure it retries every 30 minutes |
+| `app/api/cron/refresh-articles/route.ts` | Manual recovery of the article cache and feed-health status | Manual GitHub Actions dispatch only. The automatic morning refresh is owned by `app/api/cron/refresh-news/route.ts` during the 06:00–06:59 Stockholm hour |
 | `app/api/cron/refresh-news/route.ts` | Publishes the morning edition | Existing publication/retry window remains around 06:30; it performs a final editorial refresh before edition generation |
 
 The homepage, direct feed-health page, and manual refresh action are also gated so they cannot initiate article-feed requests before 06:00. The sports-panel loader no longer imports or calls the editorial article cache.
@@ -28,10 +28,14 @@ The homepage, direct feed-health page, and manual refresh action are also gated 
 | `lib/weather.ts` | Borås forecast (Open-Meteo) | 1 hour | Fetch failure throws so last good snapshot can be reused |
 | `lib/dailyHeader.ts` | Name day and historical event (Tammergård API/Wikimedia) | 7 days per date key | If both upstreams fail, use last good snapshot |
 
-Two independent GitHub Actions workflows run at minutes 03 and 33 each hour because the Vercel Hobby plan rejected a subdaily Vercel Cron schedule.
+## Actual schedule and ordering
 
-- Supplemental fact data is refreshed through `/api/cron/refresh-data`. The route skips before 01:00 Stockholm time, refreshes sources about hourly and retries stale/failed sources on the next half-hour run.
-- Editorial articles are refreshed through `/api/cron/refresh-articles`. The route skips before 06:00 Stockholm time, refreshes about hourly after success and retries after a substantial failure on the next half-hour run. It records the article count and source health in private Blob storage.
+The Hobby schedule is intentionally conservative: the Vercel cron expressions are daily, but Hobby does **not** guarantee the minute within the selected UTC hour. Vercel documents a possible 0–59 minute spread inside that hour, and it does not automatically retry failed cron invocations. Therefore, `/api/cron/refresh-news` accepts the full 06:00–06:59 Stockholm hour instead of relying on minute 30/34. Four daily entries cover both UTC offsets: 04:30/04:34 UTC during Swedish summer time and 05:30/05:34 UTC during standard time; the other pair is rejected by the Stockholm-hour guard. The second invocation can retry if the article status says `retry`, while a valid already-published edition is skipped. If both scheduled attempts fail, the homepage still has its own edition-generation fallback after 06:00.
+
+The other background jobs are GitHub Actions schedules (UTC), ordered to leave a buffer before the morning edition:
+
+- Supplemental fact data is refreshed through `/api/cron/refresh-data` once each night by `.github/workflows/refresh-supplemental-data.yml` at `00:43 UTC` (01:43 CET / 02:43 CEST). The route skips before 01:00 and after 06:00 Stockholm time. Daytime page requests prefer the last good snapshot and do not persist refreshes.
+- Editorial articles and the saved morning edition are refreshed through `/api/cron/refresh-news` during the 06:00–06:59 Stockholm hour. The first invocation checks article-cache contents and source health; an additional invocation retries only when the status is `retry`. The route records article count and source health in private Blob storage. `/api/cron/refresh-articles` is a manual recovery path, not an automatic hourly schedule.
 
 The workflows call the fixed production URLs and authenticate with short-lived GitHub Actions OIDC tokens. They request tokens with audience `https://glenn-news.vercel.app`; each route verifies the token signature against GitHub's published signing keys and restricts access to this repository, the `main` branch, and its specific workflow. Only scheduled and manually dispatched runs on `main` are accepted. No `GITHUB_CRON_SECRET` or URL variables are required for API authentication.
 
@@ -45,8 +49,8 @@ This Vercel project also has SSO deployment protection enabled for all deploymen
 
 - A successful HTTP response can still contain malformed or incomplete content. Source-specific validation should be tightened whenever a provider's response schema is known.
 - Market indices reflect the latest completed trading session; a correct closed-market result is not necessarily stale.
-- The first scheduled article refresh occurs at 06:03 Stockholm time, and the half-hour retry workflow begins then; no RSS or editorial article-source request is permitted before 06:00. The 06:30 publication job still performs a final refresh so the edition can include any stories published since the initial cache warm.
-- GitHub Actions schedule expressions are UTC; route gates and status timestamps use `Europe/Stockholm`. This means the actual first eligible run happens at 06:03 local time in both daylight and standard time, after the route checks the local clock.
+- No RSS or editorial article-source request is permitted before 06:00. Supplemental snapshots, Borås events, Fotbollskanalen browser ingestion, and reader-history/profile consolidation run in the night window before the morning edition. The 06-hour publication endpoint refreshes RSS and feed health, then saves the dated edition; the homepage can generate a fallback edition after 06:00 if a scheduled invocation did not produce one.
+- GitHub Actions cron expressions use UTC, while the ingestion guards and status timestamps use `Europe/Stockholm`. Expected order is Borås scrape at `00:13 UTC`, supplemental snapshots at `00:43 UTC`, Fotbollskanalen browser ingestion at `01:17 UTC`, reader-history consolidation at `02:15 UTC`, then morning publication in the UTC hour that maps to 06:00 Stockholm time. Hobby queue jitter can change exact start minutes, so routes enforce their local safety windows rather than trusting the scheduled minute.
 
 
 ## League table markers
