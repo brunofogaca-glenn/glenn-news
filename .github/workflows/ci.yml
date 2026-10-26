@@ -2,9 +2,19 @@ name: Glenn News validation
 
 on:
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "AGENTS.md"
+      - "CLAUDE.md"
   push:
     branches:
       - main
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "AGENTS.md"
+      - "CLAUDE.md"
 
 permissions:
   contents: read
@@ -26,5 +36,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run regression tests and production build
-        run: npm run build
+      # Vercel owns Next.js compilation. GitHub Actions runs regression tests,
+      # avoiding a second full Next.js build for the same commit.
+      - name: Run regression tests
+        run: npm run test:ranker && npm run test:refresh

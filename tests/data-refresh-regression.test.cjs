@@ -453,3 +453,26 @@ test("unused create-next-app decorative SVGs stay removed", () => {
     assert.equal(fs.existsSync(path.join(root, asset)), false, asset + " should remain deleted");
   }
 });
+
+test("CI checks regression suites while Vercel owns Next.js compilation", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  assert.match(workflow, /pull_request:\s*\n\s+paths-ignore:/);
+  assert.match(workflow, /push:\s*\n\s+branches:\s*\n\s+- main/);
+  assert.match(workflow, /"docs\/\*\*"/);
+  assert.match(workflow, /"README\.md"/);
+  assert.match(workflow, /"AGENTS\.md"/);
+  assert.match(workflow, /npm run test:ranker && npm run test:refresh/);
+  assert.doesNotMatch(workflow, /run: npm run build/);
+
+  const packageJson = JSON.parse(read("package.json"));
+  assert.equal(packageJson.scripts["build:vercel"], "next build");
+  assert.equal(packageJson.scripts.build, "npm run test:ranker && npm run test:refresh && next build");
+
+  const config = JSON.parse(read("vercel.json"));
+  assert.equal(config.buildCommand, "npm run build:vercel");
+});
+
+test("the home page does not keep the unused category configuration", () => {
+  const homepage = read("app/page.tsx");
+  assert.doesNotMatch(homepage, /CATEGORY_CONFIG/);
+});

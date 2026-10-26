@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "npm run test:ranker && npm run test:refresh && next build",
+    "build:vercel": "next build",
     "start": "next start",
     "lint": "eslint",
     "test:ranker": "node --test tests/ranker-regression.test.cjs",
