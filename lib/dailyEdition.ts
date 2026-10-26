@@ -1,3 +1,12 @@
+/**
+ * Daily editorial publication and persistence.
+ *
+ * Date keys are calendar dates in Europe/Stockholm. Keep validation, duplicate-story
+ * filtering, the 06:00 source-fetch guard, the 06:30 publication expectation, and the
+ * once-per-date/idempotent save path aligned. The homepage should prefer the saved
+ * edition and use the existing previous-edition/waiting-state fallback on failure.
+ */
+
 import { del, get, list, put } from "@vercel/blob";
 import { unstable_cache } from "next/cache";
 import { recordDiagnostic } from "./diagnosticLog";

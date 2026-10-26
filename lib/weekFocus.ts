@@ -1,3 +1,12 @@
+/**
+ * Week Focus selection and editorial generation.
+ *
+ * This module combines reading signals, saved daily editions, ranking, candidate
+ * quality filters, and editorial generation. Candidate/interest/quality helpers are
+ * split into neighbouring modules; cache and weekend date semantics belong to
+ * weekFocusCache.ts. Preserve one fixed Saturday-keyed edition for the weekend.
+ */
+
 import OpenAI from "openai";
 import { AI_MODEL } from "./aiConfig";
 import { rankArticles } from "./ranker";

@@ -1,3 +1,16 @@
+/**
+ * Reading-history storage and profile aggregation.
+ *
+ * Performance contract:
+ * - The browser queues reads and uploads bounded batches; do not add Blob writes per click.
+ * - New batches are consolidated into the ledger, and the daytime profile normally comes
+ *   from the compact profile snapshot rather than listing/downloading historical batches.
+ * - A failed ledger read must remain distinguishable from an empty ledger so it cannot
+ *   accidentally replace valid history. Batch processing is idempotent.
+ *
+ * See docs/architecture.md before changing the batch -> ledger -> profile flow.
+ */
+
 import { get, list, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { recordDiagnostic } from "./diagnosticLog";

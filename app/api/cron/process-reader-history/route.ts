@@ -1,3 +1,11 @@
+/**
+ * Authenticated nightly reader-history maintenance endpoint.
+ *
+ * GitHub Actions OIDC authorization is required before the manual=1 time-window bypass
+ * is considered. The job consolidates batches, safely updates the reader-profile snapshot,
+ * retries reading-status writes, and precomputes Week Focus only on Saturday.
+ */
+
 import { NextResponse } from "next/server";
 import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
 import {
