@@ -45,4 +45,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Build efficiency
 
-7. Vercel's ignored-build rule skips only Markdown-only edits. If the change includes code, config, tests, scripts, assets, workflows, or dependency files, retain the normal build. The ignore check fails closed (builds) when Git SHAs or the diff are unavailable.
+- Vercel's ignored-build rule skips only Markdown-only edits. If the change includes code, config, tests, scripts, assets, workflows, or dependency files, retain the normal build. The ignore check fails closed (builds) when Git SHAs or the diff are unavailable.

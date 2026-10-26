@@ -45,7 +45,7 @@ This is the quick map for making a targeted change without needing to rediscover
 | Reusable UI and browser interaction | `app/components/` |
 | RSS and publisher-page ingestion | `lib/rss.ts`, `lib/webSources.ts`, `lib/categorizer.ts` |
 | Article types, normalization, classification | `lib/articleType.ts`, `lib/articleUrl.ts`, `lib/categorizer.ts` |
-| Editorial ranking and generation | `lib/ranker.ts`, `lib/editor.ts`, `lib/editorV2.ts`, `lib/dailyEdition.ts` |
+| Editorial ranking and generation | `lib/ranker.ts`, `lib/editorV2.ts`, `lib/dailyEdition.ts` |
 | Personalization and history | `lib/readerProfile.ts`, `lib/weeklyRead.ts`, `lib/weekFocus*.ts` |
 | Supplemental snapshots and fallbacks | `lib/dailySnapshots.ts`, `lib/supplementalCache.ts`, source-specific `*Cache.ts` modules |
 | Job orchestration and authorization | `.github/workflows/`, `lib/githubActionsAuth.ts`, `app/api/cron/` |
