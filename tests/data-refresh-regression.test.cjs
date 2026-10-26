@@ -376,7 +376,7 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
 
   const auth = read("lib/githubActionsAuth.ts");
   assert.ok(auth.includes("refresh-fotbollskanalen-articles.yml"));
-  assert.ok(auth.includes('(workflow === "borasEvents" || workflow === "fotbollskanalenArticles") && payload.event_name === "push"'));
+  assert.ok(auth.includes('(workflow === "borasEvents" || workflow === "fotbollskanalenArticles" || workflow === "readerHistory") && payload.event_name === "push"'));
 
   const source = read("lib/webSources.ts");
   assert.ok(source.includes("getBrowserScrapedFotbollskanalenArticles"));
