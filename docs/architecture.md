@@ -21,7 +21,7 @@ Visible sections, interactions, responsive navigation and empty/error states are
 - Out-of-window calls return HTTP 503 rather than a successful skip. Missed browser-ingestion and reader-history windows fail visibly instead of producing green no-op jobs.
 - `lib/dailySnapshots.ts` contains source adapters and parsers for local events, national/parliament news, culture reviews, and world indicators.
 - Sport, market, weather, and daily header data have dedicated modules: `lib/sportDay.ts`, `lib/marketDay.ts`, `lib/weather.ts`, and `lib/dailyHeader.ts`. All use the last-good-snapshot contract, including market data. A successful Borås browser ingestion rebuilds the merged local snapshot immediately.
-- The refresh route respects per-source TTLs instead of applying one hourly threshold to every source. Exact intervals and fallbacks are in [data-refresh-inventory.md](data-refresh-inventory.md).
+- The refresh route respects per-source refresh intervals rather than applying one hourly threshold to every source. Market data is revalidated after 20 hours (while its underlying cache TTL stays at 24 hours) to account for the variable run minute on Vercel Hobby. Exact intervals and fallbacks are in [data-refresh-inventory.md](data-refresh-inventory.md).
 
 ### Reading history and personalization
 
