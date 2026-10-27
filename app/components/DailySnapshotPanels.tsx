@@ -28,6 +28,19 @@ function SourceFooter({ children }: { children: ReactNode }) {
   );
 }
 
+function formatFetchedAt(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return "Hämtningstid saknas";
+  return "Hämtad " + new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(timestamp));
+}
+
 function SmallEntry({
   item,
   meta,
@@ -200,7 +213,7 @@ export function LocalSnapshotPanel({ data, profile }: { data: LocalSnapshot; pro
         </div>
       </div>
       <SourceFooter>
-        <span>Hämtad {new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).format(new Date(data.updatedAt))}</span>
+        <span>{formatFetchedAt(data.updatedAt)}</span>
         <span>
           {data.eventSource === "boras-stad-fallback"
             ? " · Evenemang: Borås Stad (reservkälla) · sammanträden: Borås Stad"
@@ -244,7 +257,7 @@ export function NationalSnapshotPanel({ data }: { data: NationalSnapshot }) {
         </div>
       </div>
       <SourceFooter>
-        <span>Hämtad {new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).format(new Date(data.updatedAt))}</span>
+        <span>{formatFetchedAt(data.updatedAt)}</span>
         <span> · Källa: Sveriges riksdag</span>
       </SourceFooter>
     </section>
@@ -337,6 +350,7 @@ export function WorldSnapshotPanel({ data }: { data: WorldSnapshot }) {
       </div>
 
       <SourceFooter>
+        <span>{formatFetchedAt(data.updatedAt)}</span>
         <span>Källor: Yahoo Finance · Riksbanken · FRED · World Bank</span>
         {data.warnings.length ? <span> · Vissa delkällor svarade inte</span> : null}
         <span> · BNP publiceras årsvis; marknadsdata kan släpa efter.</span>
@@ -397,7 +411,7 @@ export function CultureSnapshotPanel({ data }: { data: CultureSnapshot }) {
       </div>
 
       <SourceFooter>
-        <span>Hämtad {new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" }).format(new Date(data.updatedAt))}</span>
+        <span>{formatFetchedAt(data.updatedAt)}</span>
         <span> · Källor: DN:s film- och skivrecensioner</span>
       </SourceFooter>
     </section>

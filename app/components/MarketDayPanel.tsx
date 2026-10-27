@@ -4,6 +4,28 @@ function changeLabel(value: number) {
   return (value > 0 ? "+" : "") + value.toFixed(2) + "%";
 }
 
+function formatMarketDate(value: string) {
+  const timestamp = Date.parse(value + "T12:00:00Z");
+  if (!Number.isFinite(timestamp)) return "datum saknas";
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(timestamp));
+}
+
+function formatFetchedAt(value: string | null | undefined) {
+  if (!value || !Number.isFinite(Date.parse(value))) return "Hämtningstid saknas";
+  return "Hämtad " + new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(value));
+}
+
 export function MarketDayPanel({ data }: { data: MarketDay }) {
   const orderedNames = ["Stockholm", "DAX", "S&P 500", "Nasdaq"];
   const ordered = orderedNames
@@ -18,10 +40,16 @@ export function MarketDayPanel({ data }: { data: MarketDay }) {
             Marknaden · senaste handelsdagen
           </div>
           <div className="mt-1 font-serif text-xl font-black md:text-2xl">
-            Börsen igår
+            Börsens senaste stängning
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            Senaste handelsdag: {formatMarketDate(data.date)}
           </div>
           <div className="mt-1 text-xs text-slate-500">
             Förändring mot föregående handelsdag
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {formatFetchedAt(data.refreshMeta?.lastSuccessAt)}
           </div>
         </div>
 
