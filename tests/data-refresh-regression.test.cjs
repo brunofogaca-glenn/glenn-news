@@ -6,12 +6,20 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("supplemental refresh and manual editorial recovery use scoped GitHub OIDC", () => {
+test("supplemental Vercel cron and manual recovery use scoped authentication", () => {
   const config = JSON.parse(read("vercel.json"));
-  assert.ok(!config.crons.some((cron) => cron.path === "/api/cron/refresh-data"));
+  const supplementalCrons = config.crons.filter((cron) => cron.path === "/api/cron/refresh-data");
+  assert.deepEqual(
+    supplementalCrons.map((cron) => cron.schedule).sort(),
+    ["13 0 * * *", "13 1 * * *"]
+  );
 
   const workflow = read(".github/workflows/refresh-supplemental-data.yml");
-  assert.match(workflow, /cron: "43 0 \* \* \*"/);
+  assert.doesNotMatch(workflow, /schedule:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /force=1/);
+  assert.match(workflow, /hour_num >= 1 && hour_num < 6/);
+  assert.match(workflow, /exit 1/);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /ACTIONS_ID_TOKEN_REQUEST_URL/);
   assert.match(workflow, /audience=\$OIDC_AUDIENCE/);
@@ -49,8 +57,22 @@ test("supplemental refresh and manual editorial recovery use scoped GitHub OIDC"
 
   const route = read("app/api/cron/refresh-data/route.ts");
   assert.match(route, /authorizeGitHubActionsRefresh\(request, "supplemental"\)/);
+  assert.match(route, /process\.env\.CRON_SECRET/);
+  assert.match(route, /getSupplementalRefreshRun/);
+  assert.match(route, /force/);
   assert.match(route, /if \(clock\.hour < 1\)/);
+  assert.match(route, /status: 503/);
+  assert.match(route, /refreshIntervalMs/);
+  assert.match(route, /stale sources retry on the next eligible run/);
+  assert.match(route, /Today's supplemental refresh already succeeded/);
+  assert.match(route, /sources\.every\(source => source\.persistent\)/);
   assert.match(route, /articleFeedsTouched: false/);
+
+  assert.match(route, /name: "marknad", tag: "glenn-news-market-day", refreshIntervalMs: DAY_MS/);
+  assert.match(route, /name: "lokalt och Borås Stad", tag: "glenn-news-daily-local", refreshIntervalMs: 2 \* HOUR_MS/);
+
+  const market = read("lib/marketDay.ts");
+  assert.match(market, /withLastGoodSnapshot\("market-day", getMarketDayInternal\)/);
   assert.doesNotMatch(route, /getCachedArticles|getCachedFeedHealth|getArticles\(/);
   assert.ok(!route.includes("user-agent"));
 
@@ -87,19 +109,33 @@ test("editorial sources are gated until 06:00", () => {
 
 test("scheduled background refreshes are daily and article status is written by the morning job", () => {
   const config = JSON.parse(read("vercel.json"));
-  assert.equal(config.crons.length, 4);
+  const morningCrons = config.crons.filter((cron) => cron.path === "/api/cron/refresh-news");
+  assert.equal(morningCrons.length, 4);
   assert.deepEqual(
-    config.crons.map((cron) => cron.schedule).sort(),
+    morningCrons.map((cron) => cron.schedule).sort(),
     ["30 4 * * *", "30 5 * * *", "34 4 * * *", "34 5 * * *"].sort()
   );
-  assert.ok(config.crons.every((cron) => cron.path === "/api/cron/refresh-news"));
+  const supplementalCrons = config.crons.filter((cron) => cron.path === "/api/cron/refresh-data");
+  assert.deepEqual(
+    supplementalCrons.map((cron) => cron.schedule).sort(),
+    ["13 0 * * *", "13 1 * * *"]
+  );
+  assert.equal(config.crons.length, 6);
 
   const boras = read(".github/workflows/refresh-boras-events.yml");
   assert.match(boras, /cron: "13 0 \* \* \*"/);
+  assert.match(boras, /hour_num >= 1 && hour_num < 6/);
+  assert.match(boras, /::error::Scheduled browser refresh started outside/);
   const fotbollskanalen = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
   assert.match(fotbollskanalen, /cron: "17 1 \* \* \*"/);
+  assert.match(fotbollskanalen, /hour_num >= 1 && hour_num < 6/);
+  assert.match(fotbollskanalen, /::error::Scheduled browser refresh started outside/);
+  const readerHistory = read(".github/workflows/process-reader-history.yml");
+  assert.match(readerHistory, /hour_num >= 1 && hour_num < 6/);
+  assert.match(readerHistory, /::error::Scheduled reader-history job started outside/);
   const supplemental = read(".github/workflows/refresh-supplemental-data.yml");
-  assert.match(supplemental, /cron: "43 0 \* \* \*"/);
+  assert.doesNotMatch(supplemental, /schedule:/);
+  assert.match(supplemental, /workflow_dispatch:/);
 
   const editorial = read(".github/workflows/refresh-editorial-articles.yml");
   assert.doesNotMatch(editorial, /cron:/);
@@ -248,6 +284,9 @@ test("culture panel shows DN film and album reviews without MovieZine", () => {
   assert.doesNotMatch(snapshots, /MovieZine|MOVIEZINE_CALENDAR_URL|parseMovieCalendar/);
 
   const panel = read("app/components/DailySnapshotPanels.tsx");
+  assert.match(panel, /function formatFetchedAt/);
+  assert.match(panel, /month: "short"/);
+  assert.match(panel, /formatFetchedAt\(data.updatedAt\)/);
   assert.match(panel, /Senaste filmrecensionerna/);
   assert.match(panel, /Senaste skivrecensionerna/);
   assert.match(panel, /data\.filmReviews\.slice\(0, 6\)/);
@@ -281,6 +320,12 @@ test("Borås local events prioritize reader interests and keep Borås Stad event
   assert.match(panel, /orgelfestival/);
   assert.match(panel, /Evenemang från Borås\.com, prioriterade efter dina läsintressen/);
   assert.match(panel, /rankLocalEvents\(data\.events, profile\)\.slice\(0, 4\)/);
+
+  const sportPanel = read("app/components/SportDayPanel.tsx");
+  assert.match(sportPanel, /formatFetchedAt\(data.fetchedAt\)/);
+  const marketPanel = read("app/components/MarketDayPanel.tsx");
+  assert.match(marketPanel, /Senaste handelsdag/);
+  assert.match(marketPanel, /refreshMeta\?\.lastSuccessAt/);
 
   const homepage = read("app/page.tsx");
   assert.match(homepage, /LocalSnapshotPanel data=\{localSnapshot\} profile=\{profile\}/);
@@ -331,6 +376,10 @@ test("Borås events are captured with a real browser and loaded from private cac
 
   const ingest = read("app/api/cron/ingest-boras-events/route.ts");
   assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "borasEvents")'));
+  assert.ok(ingest.includes("clock.hour < 1 || clock.hour >= 6"));
+  assert.ok(ingest.includes("status: 503"));
+  assert.ok(ingest.includes("getCachedLocalSnapshot"));
+  assert.ok(ingest.includes("localSnapshotUpdatedAt"));
   assert.ok(ingest.includes("Färre än sex kommande Borås-evenemang"));
   assert.ok(ingest.includes('revalidateTag("glenn-news-daily-local"'));
 
@@ -370,6 +419,8 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
 
   const ingest = read("app/api/cron/ingest-fotbollskanalen-articles/route.ts");
   assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "fotbollskanalenArticles")'));
+  assert.ok(ingest.includes("clock.hour < 1 || clock.hour >= 6"));
+  assert.ok(ingest.includes("status: 503"));
   assert.ok(ingest.includes("Färre än sex giltiga Fotbollskanalen-artiklar"));
   assert.ok(ingest.includes('revalidateTag("glenn-news-articles"'));
   assert.ok(ingest.includes('revalidateTag("glenn-news-feed-health"'));
