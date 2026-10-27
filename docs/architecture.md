@@ -16,10 +16,12 @@ Visible sections, interactions, responsive navigation and empty/error states are
 
 ### Supplemental homepage panels
 
-- `app/api/cron/refresh-data/route.ts` is the background refresh entry point.
+- `app/api/cron/refresh-data/route.ts` is the background refresh entry point, called by two Vercel Cron entries at 00:13 and 01:13 UTC. Their invocation windows land at local hours 01/02 in standard time and 02/03 in daylight-saving time; both are before the 06:00 cutoff.
+- Vercel Cron authenticates with the production `CRON_SECRET`. The GitHub Actions supplemental workflow is manual recovery only and uses repository/workflow-scoped OIDC with `force=1`. A successful run for the same Stockholm date makes the backup invocation a cheap no-op; failed/incomplete runs can be retried.
+- Out-of-window calls return HTTP 503 rather than a successful skip. Missed browser-ingestion and reader-history windows fail visibly instead of producing green no-op jobs.
 - `lib/dailySnapshots.ts` contains source adapters and parsers for local events, national/parliament news, culture reviews, and world indicators.
-- Sport, market, weather, and daily header data have dedicated modules: `lib/sportDay.ts`, `lib/marketDay.ts`, `lib/weather.ts`, and `lib/dailyHeader.ts`.
-- Reuse the cache-aware exports and existing last-good-snapshot behavior. Exact time windows and TTLs are documented in [data-refresh-inventory.md](data-refresh-inventory.md).
+- Sport, market, weather, and daily header data have dedicated modules: `lib/sportDay.ts`, `lib/marketDay.ts`, `lib/weather.ts`, and `lib/dailyHeader.ts`. All use the last-good-snapshot contract, including market data. A successful Borås browser ingestion rebuilds the merged local snapshot immediately.
+- The refresh route respects per-source TTLs instead of applying one hourly threshold to every source. Exact intervals and fallbacks are in [data-refresh-inventory.md](data-refresh-inventory.md).
 
 ### Reading history and personalization
 
@@ -65,7 +67,8 @@ Visible sections, interactions, responsive navigation and empty/error states are
 
 - `vercel.json` uses `scripts/vercel-ignore-build.mjs` to skip Vercel builds only when the full change set consists of Markdown files in `docs/` or the root documentation files. Code, assets, configuration, tests, scripts, workflows, and lockfiles keep the normal build.
 - The ignore script uses Vercel's previous-successful-deployment SHA and current commit SHA. If either SHA or the diff is unavailable, it fails closed by allowing the build.
-- Hobby cron schedules do not guarantee the exact minute; morning publication gates on the Stockholm hour and authenticates with `CRON_SECRET` rather than the spoofable request `User-Agent`.
+- Vercel Hobby cron schedules do not guarantee the exact minute within the UTC hour; morning publication and supplemental refresh use redundant scheduled entries and local Stockholm time guards. Routes use `CRON_SECRET` for Vercel Cron and never trust a spoofable `User-Agent`.
+- GitHub Actions scheduled workflows can be delayed or dropped. Browser-ingestion and reader-history guards must fail visibly if a run misses its nightly window, rather than return a green no-op.
 - GitHub Actions runs regression suites for application/test changes, while Vercel owns Next.js compilation. Markdown-only changes skip both workflows. Local `npm run build` remains the full test-and-build command.
 - Recent and weekly reader-activity queries read the consolidated ledger first. Legacy per-click payloads are downloaded only when their timestamps could change the visible top-N; a legacy-list failure preserves ledger-backed activity instead of turning the view empty.
 
