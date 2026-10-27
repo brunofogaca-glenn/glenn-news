@@ -32,13 +32,13 @@ jobs:
             hour_num=$((10#$hour))
             if (( hour_num >= 1 && hour_num < 6 )); then
               allowed=true
+            else
+              echo "::error::Scheduled reader-history job started outside 01:00–05:59 Europe/Stockholm. Failing visibly instead of reporting a successful skip."
+              exit 1
             fi
           fi
 
           echo "allowed=$allowed" >> "$GITHUB_OUTPUT"
-          if [[ "$allowed" != "true" ]]; then
-            echo "::notice::Skipping reader-history processing outside the nightly window or without an explicit migration trigger."
-          fi
 
       - name: Process reading batches and cache profile before the morning edition
         if: steps.nightly_window.outputs.allowed == 'true'

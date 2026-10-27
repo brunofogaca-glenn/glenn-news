@@ -21,11 +21,11 @@ jobs:
         run: |
           hour="$(TZ=Europe/Stockholm date +%H)"
           hour_num=$((10#$hour))
-          if (( hour_num < 6 )); then
+          if (( hour_num >= 1 && hour_num < 6 )); then
             echo "allowed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "allowed=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping data refresh after 06:00 Europe/Stockholm."
+            echo "::error::Scheduled browser refresh started outside 01:00–05:59 Europe/Stockholm. Failing visibly instead of reporting a successful skip."
+            exit 1
           fi
 
       - name: Check out repository
