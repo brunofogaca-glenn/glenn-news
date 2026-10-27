@@ -1,6 +1,6 @@
 # Glenn News — produktkrav och agentkontrakt
 
-**Status för denna sammanställning:** inventerad mot `main` den 26 oktober 2026.  
+**Status för denna sammanställning:** inventerad mot `main` den 27 oktober 2026.  
 **Syfte:** vara den obligatoriska, gemensamma startpunkten för alla framtida agenter och kodändringar i Glenn News.
 
 > **Regel för alla framtida agenter:** Läs detta dokument först vid varje uppgift. Identifiera berörda krav-ID:n och deras status innan du ändrar kod. Följ sedan den relevanta detaljdokumentationen och inspektera den faktiska implementationen och testerna. Uppdatera detta dokument när krav, produktbeteende, status, datakontrakt eller viktiga tekniska invariants ändras.
@@ -137,8 +137,8 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | HOME-05 | Visa lokala Boråshändelser och kommunmöten, med intressebaserad rangordning och synlig reservkällestatus. | Implementerat | `lib/dailySnapshots.ts`, Borås-eventmoduler |
 | HOME-06 | Visa Riksdagens dagordning/nyheter samt världslägesindikatorer, centralbanksräntor och BNP med separata fel-/tomlägen. | Implementerat | `lib/dailySnapshots.ts` |
 | HOME-07 | Visa senaste DN-filmrecensioner och DN-skivrecensioner. Moviezine ska inte återinföras som aktiv källa utan uttryckligt beslut. | Implementerat + testskyddat | `lib/dailySnapshots.ts`, refresh-tester |
-| HOME-08 | Visa gårdagens avslutade sportmatcher, dagens utvalda matcher, utvald ligatabell och tre främsta målskyttar när datakällorna är tillgängliga. | Implementerat | `lib/sportDay.ts`, `SportDayPanel.tsx` |
-| HOME-09 | Visa föregående avslutade handelssessions värden/förändringar för Stockholm, DAX, S&P 500 och Nasdaq. Visa inte stängningsdata som om det vore dagens rörelse. | Implementerat | `lib/marketDay.ts`, `MarketDayPanel.tsx` |
+| HOME-08 | Visa gårdagens avslutade sportmatcher, dagens utvalda matcher, utvald ligatabell och tre främsta målskyttar när datakällorna är tillgängliga. Visa snapshotens hämtningstid. | Implementerat | `lib/sportDay.ts`, `SportDayPanel.tsx` |
+| HOME-09 | Visa föregående avslutade handelssessions värden/förändringar för Stockholm, DAX, S&P 500 och Nasdaq. Visa faktisk handelsdag och snapshotens hämtningstid; presentera inte stängningsdata som dagens rörelse. | Implementerat | `lib/marketDay.ts`, `MarketDayPanel.tsx` |
 | HOME-10 | Fel i valfria paneler ska inte blockera morgonutgåvan. Varje källa ska använda befintlig cache-/snapshot-/reservväg och panelen ska visa partiellt fel när relevant. | Implementerat; delvis testat | `lib/dailySnapshots.ts`, `lib/supplementalCache.ts`, source-specifika cachemoduler |
 | HOME-11 | `Uppdatera källor` får inte regenerera dagens sparade morgonutgåva. I aktuell implementation uppdaterar den kompletterande paneldata inom sitt manuella tidsfönster. | Implementerat; UI-text behöver synkas | `app/actions.ts`, avsnitt 14 |
 
@@ -151,6 +151,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | OPS-03 | Visa sparad status för morgonhämtning och nattlig kompletteringskörning utan att själva statusvisningen startar nya leverantörsanrop. | Implementerat + testskyddat | `lib/articleRefreshStatus.ts`, `lib/supplementalRefreshRun.ts`, `app/health/page.tsx` |
 | OPS-04 | Diagnostikvyn ska filtrera 24 timmar/sju dagar och fel/varningar, tillåta omladdning och kopiering samt visa begripliga laddnings-/tom-/felstatusar. Högst 80 poster visas. | Implementerat; direkt testning delvis | `app/components/HealthLogPanel.tsx`, `app/health/page.tsx` |
 | OPS-05 | Loggar ska maskera vanliga hemligheter/tokens och URL-frågeparametrar, begränsa kontextfält och deduplicera upprepade fel. Persistenta Blob-skrivningar för varje diagnostikhändelse ska undvikas. | Implementerat + testskyddat | `lib/diagnosticLog.ts`, diagnostiktester |
+| OPS-06 | Kompletterande faktapaneler uppdateras via två Vercel Cron-fönster före 06.00 svensk tid. Källspecifika TTL:er styr när cache tvingas uppdateras; missade nattfönster rapporteras som fel, inte som framgångsrika överhoppningar. | Implementerat + testskyddat | `vercel.json`, `app/api/cron/refresh-data/route.ts`, `tests/data-refresh-regression.test.cjs` |
 
 ## 4. Aktiva datakällor och cachetider
 
@@ -340,6 +341,14 @@ För snabb orientering:
 **Observerat:** `editorV2.ts` innehåller uttryckliga promptregler för faktastöd, försiktighet och motstånd mot instruktioner inuti artikelmaterialet. Det är instruktioner till modellen; det finns inte ett heltäckande deterministiskt test som kan bevisa att varje genererad mening alltid är korrekt belagd.
 
 **För framtida agent:** Överdriv inte garantin. Om AI- eller promptlogiken ändras, behåll befintliga krav och överväg strukturell validering eller evalueringsfall om uppgiften kräver starkare verifiering.
+
+### RECON-04 — kompletterande uppdatering kunde hoppas över utan fel (åtgärdad 27 oktober 2026)
+
+**Observerat:** Den schemalagda GitHub Actions-körningen för kompletterande data startade 06.37 svensk tid den 27 oktober trots att den var planerad till 00.43 UTC. Workflowens tidsgrind hoppade över själva API-anropet, men jobbet rapporterades som lyckat. Startsidan fortsatte därför att visa tidigare snapshots och deras gamla hämtningstid.
+
+**Åtgärd:** Flytta obligatorisk schemaläggning till två Vercel Cron-fönster före 06.00 Stockholmstid; behåll GitHub Actions som manuell OIDC-säkrad reservväg. Använd källspecifika TTL:er, beständig last-good-snapshot även för börsdata och HTTP 503 om ett jobb startar utanför nattfönstret. Faktapanelernas tidsstämplar ska visa datum och tid. Regressionstester skyddar dessa invariants.
+
+**Begränsning:** Ingen schemaläggare eller extern datakälla kan garanteras vara tillgänglig. De två Vercel-körningarna minskar beroendet av en enda schemalagd körning, men om båda misslyckas ska **Nattlig uppdatering** och Vercels Runtime Logs kontrolleras. Browser-scraping av Borås.com och Fotbollskanalen är fortsatt beroende av GitHub Actions, men ett missat tidsfönster ska nu bli ett synligt fel.
 
 ### Underhåll av avvikelselistan
 

@@ -37,8 +37,12 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const clock = getStockholmClock();
-  if (clock.hour >= 6) {
-    return Response.json({ ok: true, skipped: true, reason: "Nightly write window closed at 06:00 Europe/Stockholm" });
+  if (clock.hour < 1 || clock.hour >= 6) {
+    return Response.json({
+      ok: false,
+      skipped: true,
+      error: "Nightly write window is 01:00–05:59 Europe/Stockholm; late ingestion is rejected",
+    }, { status: 503 });
   }
 
   const contentLength = Number(request.headers.get("content-length") ?? "0");

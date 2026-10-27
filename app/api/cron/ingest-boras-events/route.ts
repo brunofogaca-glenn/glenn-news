@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
+import { getCachedLocalSnapshot } from "@/lib/dailySnapshots";
 import { getStockholmClock } from "@/lib/updateSchedule";
 import { saveBrowserScrapedBorasEvents, type BrowserScrapedBorasEvent } from "@/lib/borasEventStore";
 
@@ -39,8 +40,12 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const clock = getStockholmClock();
-  if (clock.hour >= 6) {
-    return Response.json({ ok: true, skipped: true, reason: "Nightly write window closed at 06:00 Europe/Stockholm" });
+  if (clock.hour < 1 || clock.hour >= 6) {
+    return Response.json({
+      ok: false,
+      skipped: true,
+      error: "Nightly write window is 01:00–05:59 Europe/Stockholm; late ingestion is rejected",
+    }, { status: 503 });
   }
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(contentLength) && contentLength > 1_500_000) {
@@ -90,7 +95,17 @@ export async function POST(request: Request) {
   try {
     const snapshot = await saveBrowserScrapedBorasEvents(events);
     revalidateTag("glenn-news-daily-local", { expire: 0 });
-    return Response.json({ ok: true, stored: snapshot.events.length, savedAt: snapshot.savedAt, source: snapshot.sourceUrl });
+    const localSnapshot = await getCachedLocalSnapshot();
+    if (localSnapshot.refreshMeta.status !== "fresh" || !localSnapshot.refreshMeta.persistent) {
+      throw new Error("Borås-evenemangen sparades, men den sammanslagna faktapanelen kunde inte uppdateras beständigt.");
+    }
+    return Response.json({
+      ok: true,
+      stored: snapshot.events.length,
+      savedAt: snapshot.savedAt,
+      localSnapshotUpdatedAt: localSnapshot.updatedAt,
+      source: snapshot.sourceUrl,
+    });
   } catch (error) {
     console.error("Borås browser scrape could not be saved:", error);
     return Response.json({ ok: false, error: "Kunde inte spara Borås-evenemangen." }, { status: 500 });

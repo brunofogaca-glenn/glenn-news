@@ -18,6 +18,19 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function formatFetchedAt(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return "Hämtningstid saknas";
+  return "Hämtad " + new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(timestamp));
+}
+
 const ZONE_SWATCH_CLASS: Record<ZoneKind, string> = {
   champions: "bg-blue-800",
   europa: "bg-sky-600",
@@ -331,6 +344,9 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
           </div>
         </section>
       )}
+      <div className="mt-4 border-t border-slate-300 pt-2 text-[9px] uppercase tracking-[0.12em] text-slate-400">
+        {formatFetchedAt(data.fetchedAt)} · Sportresultat och tabell
+      </div>
     </div>
   );
 }

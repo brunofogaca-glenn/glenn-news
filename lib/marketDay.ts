@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { withLastGoodSnapshot } from "./supplementalCache";
+import { withLastGoodSnapshot, type SupplementalRefreshMeta } from "./supplementalCache";
 
 const TIME_ZONE = "Europe/Stockholm";
 
@@ -24,6 +24,7 @@ export type MarketDay = {
   date: string;
   indices: MarketIndex[];
   source: "Yahoo Finance · historiska stängningar";
+  refreshMeta?: SupplementalRefreshMeta;
   error?: string;
 };
 
@@ -188,8 +189,8 @@ async function getMarketDayInternal(): Promise<MarketDay> {
 }
 
 const getCachedMarketDayInternal = unstable_cache(
-  getMarketDayInternal,
-  ["glenn-news-market-day-v7"],
+  () => withLastGoodSnapshot("market-day", getMarketDayInternal),
+  ["glenn-news-market-day-v8"],
   {
     revalidate: 24 * 60 * 60,
     tags: ["glenn-news-market-day"],
