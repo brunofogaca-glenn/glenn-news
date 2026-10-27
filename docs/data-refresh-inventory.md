@@ -46,7 +46,7 @@ On 27 October 2026, the supplemental GitHub scheduled workflow started at 06:37 
 
 `lib/supplementalCache.ts` stores the most recent successful supplemental result in private Vercel Blob storage for weather, sport, market, local, national, world, culture, and daily-header data. Returned values include refresh metadata: status, last attempt, last success, and whether the snapshot was persisted. Failed upstream calls return the last known good payload when available, rather than replacing it with empty data.
 
-The refresh route respects each source's documented TTL when deciding to force tag revalidation: weather, sport and national data 1 hour; local 2 hours; world 3 hours; culture 4 hours; market 24 hours; daily-header data 7 days per date key. Stale sources can retry after 25 minutes. A successful report for the current Stockholm date makes the second cron invocation a cheap no-op; a failed/incomplete report remains eligible for retry.
+The refresh route respects source-specific intervals when deciding to force tag revalidation: weather, sport and national data 1 hour; local 2 hours; world 3 hours; culture 4 hours; market data is proactively refreshed after 20 hours; daily-header data 7 days per date key. The market module's underlying cache TTL remains 24 hours, but the refresh threshold is shorter so the nightly job still updates the market snapshot when the previous run occurred late in its allowed hour and the next one starts early. Stale sources can retry after 25 minutes. A successful report for the current Stockholm date makes the second cron invocation a cheap no-op; a failed/incomplete report remains eligible for retry.
 
 ## Operational caveats
 

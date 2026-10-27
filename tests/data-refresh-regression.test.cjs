@@ -69,7 +69,7 @@ test("supplemental Vercel cron and manual recovery use scoped authentication", (
   assert.match(route, /sources\.every\(source => source\.persistent\)/);
   assert.match(route, /articleFeedsTouched: false/);
 
-  assert.match(route, /name: "marknad", tag: "glenn-news-market-day", refreshIntervalMs: DAY_MS/);
+  assert.match(route, /name: "marknad", tag: "glenn-news-market-day", refreshIntervalMs: 20 \* HOUR_MS/);
   assert.match(route, /name: "lokalt och Borås Stad", tag: "glenn-news-daily-local", refreshIntervalMs: 2 \* HOUR_MS/);
 
   const market = read("lib/marketDay.ts");

@@ -34,7 +34,7 @@ const RETRY_MS = 25 * MINUTE_MS;
 const SOURCES: Source[] = [
   { name: "väder", tag: "glenn-news-weather", refreshIntervalMs: HOUR_MS, load: getCachedWeather },
   { name: "sport och tabeller", tag: "glenn-news-sport-day", refreshIntervalMs: HOUR_MS, load: getCachedSportDay },
-  { name: "marknad", tag: "glenn-news-market-day", refreshIntervalMs: DAY_MS, load: getCachedMarketDay },
+  { name: "marknad", tag: "glenn-news-market-day", refreshIntervalMs: 20 * HOUR_MS, load: getCachedMarketDay },
   { name: "lokalt och Borås Stad", tag: "glenn-news-daily-local", refreshIntervalMs: 2 * HOUR_MS, load: getCachedLocalSnapshot },
   { name: "riksdagen", tag: "glenn-news-daily-national", refreshIntervalMs: HOUR_MS, load: getCachedNationalSnapshot },
   { name: "världsdata", tag: "glenn-news-daily-world", refreshIntervalMs: 3 * HOUR_MS, load: getCachedWorldSnapshot },
