@@ -132,7 +132,7 @@ export async function GET(request: Request) {
   const probes = await Promise.allSettled(SOURCES.map(source => source.load()));
   const dueSources = SOURCES.filter((source, index) => {
     const probe = probes[index];
-    return probe.status === "rejected" || due(probe.value.refreshMeta, now.getTime(), source.refreshIntervalMs);
+    return force || probe.status === "rejected" || due(probe.value.refreshMeta, now.getTime(), source.refreshIntervalMs);
   });
 
   const refreshed = await Promise.all(dueSources.map(async source => {

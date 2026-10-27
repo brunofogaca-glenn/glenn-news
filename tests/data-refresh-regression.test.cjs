@@ -60,6 +60,7 @@ test("supplemental Vercel cron and manual recovery use scoped authentication", (
   assert.match(route, /process\.env\.CRON_SECRET/);
   assert.match(route, /getSupplementalRefreshRun/);
   assert.match(route, /force/);
+  assert.match(route, /return force \|\| probe\.status === "rejected" \|\| due\(/);
   assert.match(route, /if \(clock\.hour < 1\)/);
   assert.match(route, /status: 503/);
   assert.match(route, /refreshIntervalMs/);
