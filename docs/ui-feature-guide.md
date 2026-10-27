@@ -4,6 +4,8 @@ This is the source-oriented handbook for the **user-visible interface**. It reco
 
 For data-source schedules and cache lifetime, read [Data refresh inventory](data-refresh-inventory.md). For the main code/data-flow map, read [Architecture](architecture.md). Contributor workflow and production invariants are in [AGENTS.md](../AGENTS.md).
 
+The homepage sport panel and supplemental panel footers display the snapshot fetch date/time in the Stockholm timezone. The market panel additionally displays the actual trading-session date, which can be older than its fetch date due to weekends, holidays or source availability.
+
 ## At a glance
 
 Glenn News is a Swedish, personalized, AI-edited morning newspaper. The interface has four pages:
@@ -127,7 +129,7 @@ Primary page/component: `app/health/page.tsx`, `app/components/HealthLogPanel.ts
 ### Saved refresh status
 
 - **Morgonhämtning** displays the recorded status for the article-cache refresh: status, cached article count, number of source errors, last successful refresh and any explanatory message. Reading this stored status does not itself make RSS calls.
-- **Nattlig uppdatering** displays the saved supplemental-job report: last run time, refreshed-source count, failures, stale sources, each source's status, last successful time and its error or snapshot-persistence note. Reading this report does not re-run the external providers.
+- **Nattlig uppdatering** displays the saved supplemental-job report: last recorded refresh time, refreshed-source count, failures, stale sources, each source's status, last successful time and its error or snapshot-persistence note. The report is written by the Vercel Cron refresh route and viewed without re-running external providers. If both scheduled attempts fail, inspect Vercel Runtime Logs; GitHub Actions remains the manual recovery path.
 
 ### Diagnostic logs
 
