@@ -1,9 +1,6 @@
 name: Refresh supplemental data
 
 on:
-  schedule:
-    # Run early enough to absorb GitHub queue delays.
-    - cron: "43 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -21,17 +18,17 @@ jobs:
         run: |
           hour="$(TZ=Europe/Stockholm date +%H)"
           hour_num=$((10#$hour))
-          if (( hour_num < 6 )); then
+          if (( hour_num >= 1 && hour_num < 6 )); then
             echo "allowed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "allowed=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping data refresh after 06:00 Europe/Stockholm."
+            echo "::error::Manual supplemental recovery is allowed only from 01:00 to 05:59 Europe/Stockholm. No refresh was run."
+            exit 1
           fi
 
       - name: Call Glenn News supplemental refresh endpoint
         if: steps.nightly_window.outputs.allowed == 'true'
         env:
-          REFRESH_URL: https://glenn-news.vercel.app/api/cron/refresh-data
+          REFRESH_URL: https://glenn-news.vercel.app/api/cron/refresh-data?force=1
           OIDC_AUDIENCE: https://glenn-news.vercel.app
           VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         shell: bash
