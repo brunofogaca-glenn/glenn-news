@@ -25,6 +25,12 @@ type Source = {
   load: () => Promise<RefreshedValue>;
 };
 
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
+const RETRY_MS = 25 * MINUTE_MS;
+
 const SOURCES: Source[] = [
   { name: "väder", tag: "glenn-news-weather", refreshIntervalMs: HOUR_MS, load: getCachedWeather },
   { name: "sport och tabeller", tag: "glenn-news-sport-day", refreshIntervalMs: HOUR_MS, load: getCachedSportDay },
@@ -35,12 +41,6 @@ const SOURCES: Source[] = [
   { name: "kultur", tag: "glenn-news-daily-culture", refreshIntervalMs: 4 * HOUR_MS, load: getCachedCultureSnapshot },
   { name: "namnsdag och historik", tag: "glenn-news-daily-header", refreshIntervalMs: WEEK_MS, load: getDailyHeaderInfo },
 ];
-
-const MINUTE_MS = 60 * 1000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
-const WEEK_MS = 7 * DAY_MS;
-const RETRY_MS = 25 * MINUTE_MS;
 
 function due(meta: SupplementalRefreshMeta | undefined, now: number, refreshIntervalMs: number) {
   if (!meta) return true;
