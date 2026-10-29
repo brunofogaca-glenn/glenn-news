@@ -45,6 +45,12 @@ export async function authorizeGitHubActionsRefresh(
       clockTolerance: 5,
     });
 
+    // The reader-history time-window bypass is limited to the repository's
+    // one-time migration-marker push; workflow_dispatch is recovery, not an override.
+    const manualMigration =
+      workflow === "readerHistory" &&
+      new URL(request.url).searchParams.get("manual") === "1";
+
     return (
       payload.repository === REPOSITORY &&
       payload.repository_owner === OWNER &&
@@ -54,6 +60,7 @@ export async function authorizeGitHubActionsRefresh(
         payload.event_name === "workflow_dispatch" ||
         ((workflow === "borasEvents" || workflow === "fotbollskanalenArticles" || workflow === "readerHistory") && payload.event_name === "push")
       ) &&
+      (!manualMigration || payload.event_name === "push") &&
       payload.workflow_ref === ALLOWED_WORKFLOWS[workflow]
     );
   } catch {
