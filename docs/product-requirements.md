@@ -361,7 +361,7 @@ Ta bort eller ändra ett avvikelse-ID först när koden, regressionstester och r
 
 **Konsekvens:** En fördröjd GitHub-schemakörning ger ingen ny data trots att felskyddet fungerar avsett. Detta är inte belägg för att själva sidextraktionen eller ingestion är trasig; de stegen hoppades över.
 
-**Åtgärd på arbetsgrenen:** Fyra schemakörningar ligger vid 00.17, 01.17, 02.17 och 03.17 UTC. En autentiserad read-only preflight kontrollerar om dagens snapshot redan sparats, så senare försök inte installerar Playwright, skrapar eller skriver Blob i onödan. Både preflight och ingestion avvisar anrop efter 05.59 svensk tid. Verifiera efter merge att workflow-körningen blir grön och att `/health` visar en färsk artikel innan ärendet stängs.
+**Åtgärd på arbetsgrenen:** Fyra schemakörningar ligger vid 00.17, 01.17, 02.17 och 03.17 UTC. En autentiserad read-only preflight kontrollerar om dagens snapshot redan sparats **och** den senaste artikeln är högst 72 timmar gammal; då hoppar senare försök över Playwright, scrape och Blob-skrivning. Både scraper och ingestion avvisar resultat vars senaste giltiga artikel är äldre än 72 timmar, så en lyckad lagring inte kan maskera en inaktuell källa. Både preflight och ingestion avvisar anrop efter 05.59 svensk tid. Verifiera efter merge att workflow-körningen blir grön och att `/health` visar en färsk artikel innan ärendet stängs.
 
 Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
 
