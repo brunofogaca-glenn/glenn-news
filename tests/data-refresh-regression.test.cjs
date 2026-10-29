@@ -128,7 +128,7 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(boras, /hour_num >= 1 && hour_num < 6/);
   assert.match(boras, /::error::Scheduled browser refresh started outside/);
   const fotbollskanalen = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.match(fotbollskanalen, /cron: "17 1 \* \* \*"/);
+  assert.match(fotbollskanalen, /cron: "17 0,1,2,3 \* \* \*"/);
   assert.match(fotbollskanalen, /hour_num >= 1 && hour_num < 6/);
   assert.match(fotbollskanalen, /::error::Scheduled browser refresh started outside/);
   const readerHistory = read(".github/workflows/process-reader-history.yml");
@@ -328,6 +328,13 @@ test("Borås local events prioritize reader interests and keep Borås Stad event
   assert.match(marketPanel, /Senaste handelsdag/);
   assert.match(marketPanel, /refreshMeta\?\.lastSuccessAt/);
 
+  const worldSnapshots = read("lib/dailySnapshots.ts");
+  assert.match(worldSnapshots, /const latestOtherMarketDate = markets/);
+  assert.match(worldSnapshots, /Brentolja: senaste observationen/);
+  const worldPanel = read("app/components/DailySnapshotPanels.tsx");
+  assert.match(worldPanel, /data\.refreshMeta\?\.status === "stale"/);
+  assert.match(worldPanel, /Observationsdatum släpar/);
+
   const homepage = read("app/page.tsx");
   assert.match(homepage, /LocalSnapshotPanel data=\{localSnapshot\} profile=\{profile\}/);
 });
@@ -395,13 +402,17 @@ test("Borås events are captured with a real browser and loaded from private cac
 
 test("Fotbollskanalen articles use a rendered-browser feed and validated private ingestion", () => {
   const workflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.ok(workflow.includes('cron: "17 1 * * *"'));
+  assert.ok(workflow.includes('cron: "17 0,1,2,3 * * *"'));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-fotbollskanalen-articles.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-fotbollskanalen-articles"));
   assert.ok(workflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
   assert.ok(workflow.includes("VERCEL_AUTOMATION_BYPASS_SECRET"));
   assert.ok(!workflow.includes("/api/cron/refresh-articles"));
+  assert.ok(workflow.includes("id: snapshot_check"));
+  assert.ok(workflow.includes("Check whether today's snapshot already exists"));
+  assert.ok(workflow.includes("steps.snapshot_check.outputs.should_refresh == 'true'"));
+  assert.ok(workflow.includes("STATUS_URL: https://glenn-news.vercel.app/api/cron/ingest-fotbollskanalen-articles"));
 
   const scraper = read("scripts/scrape-fotbollskanalen-articles.mjs");
   assert.ok(scraper.includes("chromium.launch"));
@@ -420,6 +431,10 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
 
   const ingest = read("app/api/cron/ingest-fotbollskanalen-articles/route.ts");
   assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "fotbollskanalenArticles")'));
+  assert.ok(ingest.includes("export async function GET(request: Request)"));
+  assert.ok(ingest.includes("getBrowserScrapedFotbollskanalenArticles()"));
+  assert.ok(ingest.includes("shouldRefresh: !savedToday"));
+  assert.ok(ingest.includes("Fotbollskanalen preflight is only allowed from 01:00"));
   assert.ok(ingest.includes("clock.hour < 1 || clock.hour >= 6"));
   assert.ok(ingest.includes("status: 503"));
   assert.ok(ingest.includes("Färre än sex giltiga Fotbollskanalen-artiklar"));
