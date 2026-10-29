@@ -66,12 +66,20 @@ jobs:
           EOF
           )"
 
-            existing_number="$(gh issue list --state open --limit 1000 --json number,title | jq -r --arg title "$title" '.[] | select(.title == $title) | .number' | head -n 1)"
-            if [[ -n "$existing_number" ]]; then
-              gh issue comment "$existing_number" --body "$body"
-              echo "Updated existing issue #${existing_number} for ${SOURCE_WORKFLOW} / ${job_name}"
+            # Prefer an open issue; if a matching incident was closed, reopen the most recently updated one.
+            # This preserves one traceable issue per workflow/job fingerprint instead of creating duplicates.
+            existing_open_number="$(gh issue list --state open --limit 1000 --json number,title,updatedAt | jq -r --arg title "$title" '[.[] | select(.title == $title)] | sort_by(.updatedAt) | reverse | first | .number // empty')"
+            if [[ -n "$existing_open_number" ]]; then
+              gh issue comment "$existing_open_number" --body "$body"
+              echo "Updated existing issue #${existing_open_number} for ${SOURCE_WORKFLOW} / ${job_name}"
             else
-              gh issue create --title "$title" --body "$body"
-              echo "Created issue for ${SOURCE_WORKFLOW} / ${job_name}"
+              existing_closed_number="$(gh issue list --state closed --limit 1000 --json number,title,updatedAt | jq -r --arg title "$title" '[.[] | select(.title == $title)] | sort_by(.updatedAt) | reverse | first | .number // empty')"
+              if [[ -n "$existing_closed_number" ]]; then
+                gh issue reopen "$existing_closed_number" --comment "$body"
+                echo "Reopened existing issue #${existing_closed_number} for ${SOURCE_WORKFLOW} / ${job_name}"
+              else
+                gh issue create --title "$title" --body "$body"
+                echo "Created issue for ${SOURCE_WORKFLOW} / ${job_name}"
+              fi
             fi
           done < <(jq -r '.[]' <<< "$failed_jobs_json")
