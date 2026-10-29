@@ -148,8 +148,21 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(fotbollskanalen, /hour_num >= 1 && hour_num < 6/);
   assert.match(fotbollskanalen, /::error::Scheduled browser refresh started outside/);
   const readerHistory = read(".github/workflows/process-reader-history.yml");
+  assert.match(readerHistory, /cron: "15 1,2 \\* \\* \\*"/);
   assert.match(readerHistory, /hour_num >= 1 && hour_num < 6/);
-  assert.match(readerHistory, /::error::Scheduled reader-history job started outside/);
+  assert.match(readerHistory, /::error::Reader-history scheduled\\/manual run started outside/);
+  assert.match(readerHistory, /if \\[\\[ "\\$GITHUB_EVENT_NAME" == "push" \\]\\]; then[\\s\\S]*request_url="\\$\\{REFRESH_URL\\}\\?manual=1"/);
+  assert.doesNotMatch(readerHistory, /GITHUB_EVENT_NAME" == "workflow_dispatch" \\|\\| "\\$GITHUB_EVENT_NAME" == "push"/);
+
+  const readerHistoryRoute = read("app/api/cron/process-reader-history/route.ts");
+  assert.match(readerHistoryRoute, /getReaderProfileSnapshotForMaintenance/);
+  assert.match(readerHistoryRoute, /currentSnapshot\\.sourceLedgerUpdatedAt === ledgerUpdatedAt/);
+  assert.match(readerHistoryRoute, /snapshotSkipped: !snapshot\\.updated/);
+  const readerProfile = read("lib/readerProfile.ts");
+  assert.match(readerProfile, /sourceLedgerUpdatedAt/);
+  assert.match(readerProfile, /ledgerUpdatedAt: currentLedger\\.updatedAt/);
+  const auth = read("lib/githubActionsAuth.ts");
+  assert.match(auth, /manualMigration[\\s\\S]*payload\\.event_name === "push"/);
   const supplemental = read(".github/workflows/refresh-supplemental-data.yml");
   assert.doesNotMatch(supplemental, /schedule:/);
   assert.match(supplemental, /workflow_dispatch:/);
