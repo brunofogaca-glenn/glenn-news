@@ -15,6 +15,11 @@ permissions:
   contents: read
   id-token: write
 
+# The ledger and profile snapshot are shared mutable state; retries must not overlap.
+concurrency:
+  group: process-reader-history-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   process-reader-history:
     runs-on: ubuntu-latest
