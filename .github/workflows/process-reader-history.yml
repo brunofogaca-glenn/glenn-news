@@ -73,8 +73,19 @@ jobs:
             request_url="${REFRESH_URL}?manual=1"
           fi
 
-          curl --fail-with-body --silent --show-error --max-time 270 \
+          response="$(curl --fail-with-body --silent --show-error --max-time 270 \
             --header "Authorization: Bearer $oidc_token" \
             --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
             --header "Accept: application/json" \
-            "$request_url"
+            "$request_url")"
+
+          # The endpoint can skip if the time window closes between the workflow guard and API call.
+          # Treat a skipped/non-processing response as a visible failure, not a green run.
+          printf '%s\n' "$response" | jq -e '
+            .ok == true and .skipped != true and
+            (.snapshotUpdated == true or .snapshotSkipped == true)
+          ' >/dev/null
+          printf '%s\n' "$response" | jq '{
+            ok, snapshotUpdated, snapshotSkipped, snapshotGeneratedAt,
+            ledgerChanged, ledgerUpdatedAt, scannedBatches, updatedBatches
+          }'
