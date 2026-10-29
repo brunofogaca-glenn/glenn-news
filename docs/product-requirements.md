@@ -382,7 +382,7 @@ Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och
 
 **Change in the recovery workflow:** Schedule two attempts at `01:15` and `02:15 UTC`, both within the local maintenance window across CET/CEST. Manual recovery dispatches are also required to be inside the window. The `manual=1` bypass is reserved for the restricted one-time migration-marker push and is enforced against the GitHub OIDC event claim. The workflow checks the API response so `ok: true, skipped: true` cannot be mistaken for successful processing.
 
-**Cost and idempotency:** The profile snapshot records the update timestamp of its source ledger. Retries reuse the snapshot when that marker still matches, avoiding a redundant Blob write. If the ledger changes or the marker does not match (including when the ledger save succeeded but snapshot save failed), rebuild the snapshot. Weekly read marks and Saturday Week Focus precomputation remain retryable.
+**Cost and idempotency:** The workflow serializes overlapping maintenance runs. The profile snapshot records the update timestamp of its source ledger. Retries reuse the snapshot when that marker still matches, avoiding a redundant Blob write. If the ledger changes or the marker does not match (including when the ledger save succeeded but snapshot save failed), rebuild the snapshot. Weekly read marks and Saturday Week Focus precomputation remain retryable.
 
 **Limitation:** GitHub Actions can delay or drop both schedule opportunities. This is a risk reduction, not a guarantee. After release, verify that an in-window run reached the API and that the ledger/profile state is correct. Do not relax authorization, idempotency, last-good data or the local write guard to make the workflow green.
 
