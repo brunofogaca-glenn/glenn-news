@@ -157,8 +157,6 @@ export function HealthLogPanel() {
           className="inline-flex w-fit border border-slate-950 bg-slate-950 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white hover:bg-slate-800 disabled:opacity-40">
           {copied === "all" ? "Rapport kopierad ✓" : "Kopiera hela felrapporten"}
         </button>
-      </div>
-
       </div>}
 
       {available && <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
