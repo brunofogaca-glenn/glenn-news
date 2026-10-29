@@ -153,7 +153,7 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(readerHistory, /::error::Reader-history scheduled\/manual run started outside/);
   assert.match(readerHistory, /if \[\[ "\$GITHUB_EVENT_NAME" == "push" \]\]; then[\s\S]*request_url="\$\{REFRESH_URL\}\?manual=1"/);
   assert.doesNotMatch(readerHistory, /GITHUB_EVENT_NAME" == "workflow_dispatch" \|\| "\$GITHUB_EVENT_NAME" == "push"/);
-  assert.match(readerHistory, /\.skipped !== true/);
+  assert.match(readerHistory, /\.skipped != true/);
 
   const readerHistoryRoute = read("app/api/cron/process-reader-history/route.ts");
   assert.match(readerHistoryRoute, /getReaderProfileSnapshotForMaintenance/);
@@ -163,7 +163,7 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(readerProfile, /sourceLedgerUpdatedAt/);
   assert.match(readerProfile, /ledgerUpdatedAt: currentLedger\.updatedAt/);
   const auth = read("lib/githubActionsAuth.ts");
-  assert.match(auth, /manualMigration[\s\S]*payload\.event_name === "push"/);
+  assert.match(auth, /\(!manualMigration \|\| payload\.event_name === "push"\)/);
   const supplemental = read(".github/workflows/refresh-supplemental-data.yml");
   assert.doesNotMatch(supplemental, /schedule:/);
   assert.match(supplemental, /workflow_dispatch:/);
