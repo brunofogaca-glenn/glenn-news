@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:ranker": "node --test tests/ranker-regression.test.cjs",
-    "test:refresh": "node --test tests/data-refresh-regression.test.cjs tests/diagnostic-log-regression.test.cjs"
+    "test:refresh": "node --test tests/data-refresh-regression.test.cjs tests/diagnostic-log-regression.test.cjs tests/workflow-issue-reporter-regression.test.cjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.6.1",
