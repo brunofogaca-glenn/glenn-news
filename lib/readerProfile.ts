@@ -324,6 +324,7 @@ export type ReaderBatchProcessingResult = {
   storageAvailable: boolean;
   ledgerAvailable: boolean;
   ledgerChanged: boolean;
+  ledgerUpdatedAt: string | null;
   ledgerEvents: ReaderHistoryLedgerEvent[];
   scannedBatches: number;
   updatedBatches: number;
@@ -350,6 +351,7 @@ export async function processPendingReaderBatches(
     storageAvailable: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
     ledgerAvailable: false,
     ledgerChanged: false,
+    ledgerUpdatedAt: null,
     ledgerEvents: [],
     scannedBatches: 0,
     updatedBatches: 0,
@@ -449,6 +451,7 @@ export async function processPendingReaderBatches(
     storageAvailable: true,
     ledgerAvailable: true,
     ledgerChanged,
+    ledgerUpdatedAt: currentLedger.updatedAt,
     ledgerEvents: currentLedger.events,
     scannedBatches,
     updatedBatches: changed ? 1 : 0,
@@ -712,6 +715,7 @@ async function getSemanticEventProfile(historyEvents: ReaderHistoryLedgerEvent[]
 type ReaderProfileSnapshotEnvelope = {
   version: 1;
   generatedAt: string;
+  sourceLedgerUpdatedAt?: string;
   profile: ReaderProfile;
 };
 
@@ -740,13 +744,20 @@ async function readReaderProfileSnapshotEnvelope(): Promise<ReaderProfileSnapsho
     if (text.length > 100_000) return null;
     const value = JSON.parse(text) as Partial<ReaderProfileSnapshotEnvelope>;
     if (value.version !== 1 || typeof value.generatedAt !== "string" ||
-        !Number.isFinite(Date.parse(value.generatedAt)) || !isReaderProfileValue(value.profile)) {
+        !Number.isFinite(Date.parse(value.generatedAt)) ||
+        (typeof value.sourceLedgerUpdatedAt !== "undefined" && typeof value.sourceLedgerUpdatedAt !== "string") ||
+        !isReaderProfileValue(value.profile)) {
       return null;
     }
     return value as ReaderProfileSnapshotEnvelope;
   } catch {
     return null;
   }
+}
+
+/** Read the saved profile snapshot and its source-ledger marker for idempotent nightly retries. */
+export async function getReaderProfileSnapshotForMaintenance() {
+  return readReaderProfileSnapshotEnvelope();
 }
 
 async function buildReaderProfileFromStoredEvents(
@@ -800,7 +811,10 @@ export async function getReaderProfile(): Promise<ReaderProfile> {
 }
 
 /** Rebuild and save the reader profile as part of nightly maintenance. */
-export async function rebuildAndSaveReaderProfileSnapshot(historyEvents?: ReaderHistoryLedgerEvent[]) {
+export async function rebuildAndSaveReaderProfileSnapshot(
+  historyEvents?: ReaderHistoryLedgerEvent[],
+  sourceLedgerUpdatedAt?: string
+) {
   const profile = await buildReaderProfileFromStoredEvents(historyEvents);
   const generatedAt = new Date().toISOString();
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
@@ -809,6 +823,7 @@ export async function rebuildAndSaveReaderProfileSnapshot(historyEvents?: Reader
   await put(PROFILE_SNAPSHOT_PATH, JSON.stringify({
     version: 1,
     generatedAt,
+    sourceLedgerUpdatedAt,
     profile,
   }), {
     access: "private",

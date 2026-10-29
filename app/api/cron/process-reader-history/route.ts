@@ -1,14 +1,15 @@
 /**
  * Authenticated nightly reader-history maintenance endpoint.
  *
- * GitHub Actions OIDC authorization is required before the manual=1 time-window bypass
- * is considered. The job consolidates batches, safely updates the reader-profile snapshot,
+ * GitHub Actions OIDC authorization is required. Only the restricted migration-marker push
+ * may use manual=1 outside the normal window. The job consolidates batches, safely updates the reader-profile snapshot,
  * retries reading-status writes, and precomputes Week Focus only on Saturday.
  */
 
 import { NextResponse } from "next/server";
 import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
 import {
+  getReaderProfileSnapshotForMaintenance,
   processPendingReaderBatches,
   rebuildAndSaveReaderProfileSnapshot,
 } from "@/lib/readerProfile";
@@ -25,8 +26,7 @@ export async function GET(request: Request) {
   }
 
   const clock = getStockholmClock();
-  // A manually dispatched, OIDC-authenticated job may perform the initial
-  // ledger migration outside the normal nightly window.
+  // The OIDC helper permits manual=1 only for the restricted migration-marker push.
   const manualRun = new URL(request.url).searchParams.get("manual") === "1";
   if (!manualRun && (clock.hour < 1 || clock.hour >= 6)) {
     return NextResponse.json({
@@ -39,7 +39,13 @@ export async function GET(request: Request) {
 
   try {
     const processed = await processPendingReaderBatches(100);
-    const { ledgerEvents, ledgerAvailable, ledgerChanged, ...processedSummary } = processed;
+    const {
+      ledgerEvents,
+      ledgerAvailable,
+      ledgerChanged,
+      ledgerUpdatedAt,
+      ...processedSummary
+    } = processed;
     if (!processed.storageAvailable) {
       return NextResponse.json({ ok: false, error: "Blob storage is unavailable" }, { status: 503 });
     }
@@ -60,7 +66,23 @@ export async function GET(request: Request) {
       }, { status: 503 });
     }
 
-    const snapshot = await rebuildAndSaveReaderProfileSnapshot(ledgerEvents);
+    const currentSnapshot = manualRun ? null : await getReaderProfileSnapshotForMaintenance();
+    const snapshotAlreadyCurrent = Boolean(
+      currentSnapshot &&
+      ledgerUpdatedAt &&
+      currentSnapshot.sourceLedgerUpdatedAt === ledgerUpdatedAt
+    );
+    const snapshot = snapshotAlreadyCurrent && currentSnapshot
+      ? {
+          saved: true,
+          generatedAt: currentSnapshot.generatedAt,
+          profile: currentSnapshot.profile,
+          updated: false,
+        }
+      : {
+          ...(await rebuildAndSaveReaderProfileSnapshot(ledgerEvents, ledgerUpdatedAt ?? undefined)),
+          updated: true,
+        };
     if (!snapshot.saved) {
       return NextResponse.json({
         ok: false, snapshotUpdated: false,
@@ -85,8 +107,14 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      ok: true, snapshotUpdated: true, snapshotGeneratedAt: snapshot.generatedAt,
-      weeklyFocusPrecomputed, ledgerChanged, ...processedSummary,
+      ok: true,
+      snapshotUpdated: snapshot.updated,
+      snapshotSkipped: !snapshot.updated,
+      snapshotGeneratedAt: snapshot.generatedAt,
+      weeklyFocusPrecomputed,
+      ledgerChanged,
+      ledgerUpdatedAt,
+      ...processedSummary,
     });
   } catch (error) {
     console.error("Nightly reader-history processing failed:", error);
