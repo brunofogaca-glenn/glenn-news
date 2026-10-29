@@ -353,3 +353,18 @@ För snabb orientering:
 ### Underhåll av avvikelselistan
 
 Ta bort eller ändra ett avvikelse-ID först när koden, regressionstester och relevanta dokument är synkade. Lägg till nya avvikelser med observerad kod, konsekvens och vägledning till framtida agenter; håll denna lista kort och handlingsorienterad.
+
+
+### RECON-05 — Fotbollskanalen schedule delay caused two skipped scrape/ingestion runs (observed 29 October 2026)
+
+**Observerat:** Produktionspanelen `/health` markerar Fotbollskanalen som inaktuell, med senaste daterade artikel 24 oktober 2026 kl. 14.00 svensk tid (cirka 115 timmar gammal). GitHub Actions-körningarna [#24 den 28 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40646434245) och [#25 den 29 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40833131784) misslyckades i steget `Check nightly maintenance window`: GitHub startade jobben efter kl. 06.00 svensk tid. Browser scraping och ingestion kördes därför inte.
+
+**Konsekvens:** En fördröjd GitHub-schemakörning ger ingen ny data trots att felskyddet fungerar avsett. Detta är inte belägg för att själva sidextraktionen eller ingestion är trasig; de stegen hoppades över.
+
+**För framtida agent:** Behåll tidsgränsen och skyddet mot dagskrivningar tills kostnads-/färskhetskraven uttryckligen har ändrats. Manuell återställning ska ske under 01.00–05.59 svensk tid; kontrollera scrape-antal, ingestion-svar och sedan källhälsans färskhet. Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
+
+### RECON-06 — nattlig refresh-status bevisar inte att underliggande observationsdatum är aktuellt (observerat 29 oktober 2026)
+
+**Observerat:** `/health` rapporterade kompletterande uppdatering OK kl. 01.13 svensk tid och visade sport/tabeller samt marknad som uppdaterade/cachade. Brent hämtas från Yahoos dagliga `BZ=F`-serie; `getWorldMarkets()` använder en färdig observation före dagens datum i Stockholm. En uppdaterad snapshot kan därför innehålla en äldre, men korrekt senast färdigställd handelsobservation.
+
+**För framtida agent:** Kontrollera panelens faktiska sport-/tabell- och Brent-datum, inte bara snapshotens hämtningstid eller nattjobbets sammanlagda OK-status. Behåll och visa både `lastSuccessAt` och källans faktiska observationsdatum. Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
