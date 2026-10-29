@@ -53,14 +53,14 @@ jobs:
             body="$(cat <<EOF
           ## Automated workflow failure
 
-          A GitHub Actions run on `main` failed. This issue is deduplicated by workflow and failed job; later failures append a comment while the issue remains open.
+          A GitHub Actions run on the main branch failed. This issue is deduplicated by workflow and failed job; later failures append a comment while the issue remains open.
 
           - **Workflow:** ${SOURCE_WORKFLOW}
           - **Failed job:** ${job_name}
           - **Run:** [#${SOURCE_RUN_NUMBER}](${run_url})
           - **Trigger:** ${SOURCE_EVENT}
           - **Branch:** ${SOURCE_BRANCH}
-          - **Commit:** `${SOURCE_SHA}`
+          - **Commit SHA:** ${SOURCE_SHA}
 
           Open the linked run for the authoritative logs. Raw log excerpts, tokens, environment variables and request payloads are intentionally not copied into issues.
           EOF
