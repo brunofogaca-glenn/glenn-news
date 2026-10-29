@@ -184,7 +184,7 @@ Tider uttrycks i UTC i CI/cron-konfiguration men tidsgränser i applikationskod 
 | --- | --- | --- |
 | Borås-händelser | 00.13 | Webbläsarhämtning och sparning av lokala event-snapshots. |
 | Kompletterande fakta | 00.43 | Uppdatering av sport, marknad, lokalt, Riksdag, kultur, världsläge, väder och headerdata. |
-| Fotbollskanalen-artiklar | 01.17 | Webbläsarbaserad hämtning och validerad ingestion. |
+| Fotbollskanalen-artiklar | 00.17, 01.17, 02.17, 03.17 UTC | Fyra nattliga försök med autentiserad preflight; skippa scrape och Blob-skrivning när dagens Stockholmssnapshot redan finns. Ingestion spärras fortsatt utanför 01.00–05.59 lokal tid. |
 | Läshistorik/profil/Veckofokus | 02.15 | Konsolidera batchar, uppdatera ledger och profil-snapshot, försök igen med veckoläststatus och förbereda lördagens Veckofokus. |
 | Morgonutgåva | Fyra Vercel-anrop: 04.30, 04.34, 05.30, 05.34 | De aktuella offset-paren täcker 06-timmen i CET/CEST; lokal tidsgrind tillåter bara 06.00–06.59 svensk tid. |
 
@@ -361,10 +361,16 @@ Ta bort eller ändra ett avvikelse-ID först när koden, regressionstester och r
 
 **Konsekvens:** En fördröjd GitHub-schemakörning ger ingen ny data trots att felskyddet fungerar avsett. Detta är inte belägg för att själva sidextraktionen eller ingestion är trasig; de stegen hoppades över.
 
-**För framtida agent:** Behåll tidsgränsen och skyddet mot dagskrivningar tills kostnads-/färskhetskraven uttryckligen har ändrats. Manuell återställning ska ske under 01.00–05.59 svensk tid; kontrollera scrape-antal, ingestion-svar och sedan källhälsans färskhet. Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
+**Åtgärd på arbetsgrenen:** Fyra schemakörningar ligger vid 00.17, 01.17, 02.17 och 03.17 UTC. En autentiserad read-only preflight kontrollerar om dagens snapshot redan sparats, så senare försök inte installerar Playwright, skrapar eller skriver Blob i onödan. Både preflight och ingestion avvisar anrop efter 05.59 svensk tid. Verifiera efter merge att workflow-körningen blir grön och att `/health` visar en färsk artikel innan ärendet stängs.
+
+Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
 
 ### RECON-06 — nattlig refresh-status bevisar inte att underliggande observationsdatum är aktuellt (observerat 29 oktober 2026)
 
 **Observerat:** `/health` rapporterade kompletterande uppdatering OK kl. 01.13 svensk tid och visade sport/tabeller samt marknad som uppdaterade/cachade. Brent hämtas från Yahoos dagliga `BZ=F`-serie; `getWorldMarkets()` använder en färdig observation före dagens datum i Stockholm. En uppdaterad snapshot kan därför innehålla en äldre, men korrekt senast färdigställd handelsobservation.
 
-**För framtida agent:** Kontrollera panelens faktiska sport-/tabell- och Brent-datum, inte bara snapshotens hämtningstid eller nattjobbets sammanlagda OK-status. Behåll och visa både `lastSuccessAt` och källans faktiska observationsdatum. Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
+**Åtgärd på arbetsgrenen:** `getWorldSnapshotInternal()` lägger nu en varning till snapshoten om Brent (`BZ=F`) har ett äldre observationsdatum än övriga marknadsindikatorer. Last-good-snapshoten bevaras i stället för att en partiell refresh sparas som färsk, panelen visar varning för stale snapshot och för Brent-datumet, och den andra nattliga körningen får försöka igen.
+
+**Begränsning:** Detta upptäcker och synliggör att Brent-källan släpar; det garanterar inte att Yahoo publicerar ett nyare värde före morgonläsningen. Kontrollera både källans datum och panelens `lastSuccessAt` vid produktionsverifiering. Äldre handelsdatum är inte automatiskt fel under helger/helgdagar.
+
+Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
