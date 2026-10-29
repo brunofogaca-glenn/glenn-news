@@ -217,6 +217,17 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
 
   return (
     <div className="border-y border-slate-300 py-5">
+      {data.refreshMeta?.status === "stale" ? (
+        <div role="status" className="mb-4 border-l-2 border-amber-700 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          <div className="font-bold">Sportdata visas från senast sparade snapshot</div>
+          <p className="mt-1">
+            {data.refreshMeta.lastError ?? "Den senaste nattliga uppdateringen kunde inte bekräftas."}
+          </p>
+          {data.refreshMeta.lastSuccessAt ? (
+            <p className="mt-1">Snapshot sparad: {formatFetchedAt(data.refreshMeta.lastSuccessAt)}.</p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid gap-6 md:grid-cols-2">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
@@ -334,6 +345,12 @@ export function SportDayPanel({ data }: { data: SportDayData }) {
               </div>
               <div className="mt-1">
                 Säsong {data.selectedLeague.season}
+              </div>
+              <div className="mt-1 text-[10px] text-slate-500">
+                FotMob hämtad: {data.selectedLeague.retrievedAt ? formatFetchedAt(data.selectedLeague.retrievedAt) : "hämtningstid saknas"}.
+              </div>
+              <div className="text-[10px] text-slate-500">
+                Källan exponerar ingen separat observationstid för tabellen.
               </div>
             </div>
           </div>
