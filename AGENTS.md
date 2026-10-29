@@ -2,6 +2,8 @@
 
 The goal is to deliver correct changes with the **smallest relevant investigation, one coherent patch, and minimal repeated validation**. This is a live production application; avoid unnecessary code churn and repeated deployments.
 
+For iterative product work, user-reported bugs, or requests for the next improvement, follow [docs/improvement-process.md](docs/improvement-process.md) and keep [issue #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52) current. Treat user feedback as product evidence, investigate before guessing at causes, and distinguish code fixes, deployment, and production verification.
+
 ## Fast path for every task
 
 1. **Always start with [docs/product-requirements.md](docs/product-requirements.md).** Identify the relevant requirement IDs and read their status and known discrepancies before touching code. It is the canonical product-level starting point for every task, not an optional reference.
