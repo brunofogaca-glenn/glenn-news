@@ -447,6 +447,8 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
   assert.ok(workflow.includes("Check whether today's snapshot already exists"));
   assert.ok(workflow.includes("steps.snapshot_check.outputs.should_refresh == 'true'"));
   assert.ok(workflow.includes("STATUS_URL: https://glenn-news.vercel.app/api/cron/ingest-fotbollskanalen-articles"));
+  assert.ok(workflow.includes("concurrency:"));
+  assert.ok(workflow.includes("cancel-in-progress: false"));
 
 
   const scraper = read("scripts/scrape-fotbollskanalen-articles.mjs");
@@ -469,6 +471,7 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
   assert.ok(ingest.includes("export async function GET(request: Request)"));
   assert.ok(ingest.includes("getBrowserScrapedFotbollskanalenArticles()"));
   assert.ok(ingest.includes("shouldRefresh: !savedToday"));
+  assert.ok(ingest.includes("Today's Fotbollskanalen snapshot is already stored"));
   assert.ok(ingest.includes("Fotbollskanalen preflight is only allowed from 01:00"));
   assert.ok(ingest.includes("clock.hour < 1 || clock.hour >= 6"));
   assert.ok(ingest.includes("status: 503"));
