@@ -459,6 +459,8 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
   assert.ok(scraper.includes('a[href*="/artiklar/"],a[href*="/bloggar/"]'));
   assert.ok(scraper.includes("parsePublishedDate"));
   assert.ok(scraper.includes("refusing to replace the previous snapshot"));
+  assert.ok(scraper.includes("MAX_ARTICLE_STALENESS_MS"));
+  assert.ok(scraper.includes("Newest valid Fotbollskanalen article is older than 72 hours"));
 
   const store = read("lib/fotbollskanalenArticleStore.ts");
   assert.ok(store.includes('access: "private"'));
@@ -470,8 +472,11 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
   assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "fotbollskanalenArticles")'));
   assert.ok(ingest.includes("export async function GET(request: Request)"));
   assert.ok(ingest.includes("getBrowserScrapedFotbollskanalenArticles()"));
-  assert.ok(ingest.includes("shouldRefresh: !savedToday"));
-  assert.ok(ingest.includes("Today's Fotbollskanalen snapshot is already stored"));
+  assert.ok(ingest.includes("shouldRefresh: !savedFreshSnapshotToday"));
+  assert.ok(ingest.includes("MAX_ARTICLE_STALENESS_MS"));
+  assert.ok(ingest.includes("latestArticleAgeHours"));
+  assert.ok(ingest.includes("Senaste giltiga Fotbollskanalen-artikeln är äldre än 72 timmar"));
+  assert.ok(ingest.includes("Today's fresh Fotbollskanalen snapshot is already stored"));
   assert.ok(ingest.includes("Fotbollskanalen preflight is only allowed from 01:00"));
   assert.ok(ingest.includes("clock.hour < 1 || clock.hour >= 6"));
   assert.ok(ingest.includes("status: 503"));
