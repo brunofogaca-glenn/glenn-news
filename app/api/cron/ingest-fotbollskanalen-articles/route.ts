@@ -128,6 +128,24 @@ export async function POST(request: Request) {
   }
 
   try {
+    // The workflow preflight avoids most duplicate work. Recheck immediately
+    // before writing so a concurrent/retried job does not overwrite a snapshot
+    // that another run already stored for today's Stockholm date.
+    const existingSnapshot = await getBrowserScrapedFotbollskanalenArticles();
+    const today = stockholmDateKey(new Date());
+    if (
+      existingSnapshot &&
+      stockholmDateKey(new Date(existingSnapshot.savedAt)) === today
+    ) {
+      return Response.json({
+        ok: true,
+        skipped: true,
+        reason: "Today's Fotbollskanalen snapshot is already stored",
+        stored: existingSnapshot.articles.length,
+        savedAt: existingSnapshot.savedAt,
+      });
+    }
+
     const snapshot = await saveBrowserScrapedFotbollskanalenArticles(articles);
     revalidateTag("glenn-news-articles", { expire: 0 });
     revalidateTag("glenn-news-feed-health", { expire: 0 });
