@@ -76,7 +76,7 @@ export function HealthLogPanel() {
       }
     } catch {
       setAvailable(false);
-      setMessage("Kunde inte ansluta till loggarkivet. Ladda om sidan och försök igen.");
+      setMessage("Kunde inte hämta diagnostikstatus. Kontrollera Vercel Runtime Logs och försök igen.");
     } finally {
       setLoading(false);
     }
@@ -99,7 +99,7 @@ export function HealthLogPanel() {
     "",
     ...visibleEntries.map((entry, index) => "===== LOGG " + (index + 1) + " =====\n" + formatEntry(entry)),
     "",
-    "Integritet: vanliga API-nycklar, bearer-token och URL-frågeparametrar maskeras före lagring.",
+    "Integritet: typiska hemligheter och URL-frågeparametrar maskeras före diagnostiken skrivs till Vercel Runtime Logs; historiken sparas inte i Blob.",
   ].filter(Boolean).join("\n\n"), [days, lastLoaded, commit, visibleEntries, truncated]);
 
   async function copyText(value: string, id: string) {
@@ -118,9 +118,13 @@ export function HealthLogPanel() {
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">Felsökning</div>
           <h2 className="mt-1 font-serif text-2xl font-black">Fel- och loggpanel</h2>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
-            Samlar registrerade applikationsfel så att du kan kopiera en enskild logg eller hela rapporten till ChatGPT.
-            Hemligheter och URL-frågeparametrar maskeras före lagring.
+            Diagnostik skrivs till Vercel Runtime Logs. Historisk felloggning i Blob är avstängd för att minska Advanced Blob Operations.
+            Tom historik här betyder därför inte att produktionen saknat fel.
           </p>
+          <a href="https://vercel.com/glenn-holvik-s-projects/glenn-news" target="_blank" rel="noreferrer"
+            className="mt-2 inline-flex text-xs font-bold text-slate-700 underline underline-offset-2 hover:text-slate-950">
+            Öppna projektet i Vercel ↗
+          </a>
         </div>
         <button
           type="button" onClick={() => void loadLogs(days)} disabled={loading}
@@ -130,7 +134,7 @@ export function HealthLogPanel() {
         </button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {available && <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label className="font-bold text-slate-600" htmlFor="diagnostic-range">Period</label>
           <select id="diagnostic-range" value={days}
@@ -153,9 +157,9 @@ export function HealthLogPanel() {
           className="inline-flex w-fit border border-slate-950 bg-slate-950 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white hover:bg-slate-800 disabled:opacity-40">
           {copied === "all" ? "Rapport kopierad ✓" : "Kopiera hela felrapporten"}
         </button>
-      </div>
+      </div>}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {available && <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="border border-slate-300 bg-white/40 px-3 py-3">
           <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Loggrader</div>
           <div className="mt-1 font-serif text-2xl font-black tabular-nums">{visibleEntries.length}</div>
@@ -172,12 +176,12 @@ export function HealthLogPanel() {
           <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Git-commit</div>
           <div className="mt-2 truncate font-mono text-xs">{commit ? commit.slice(0, 10) : "Okänd"}</div>
         </div>
-      </div>
+      </div>}
 
       {message && <div role="status" className="mt-4 border border-amber-600 bg-amber-50 px-3 py-3 text-sm text-amber-950">{message}</div>}
       {!available && !message && (
         <div className="mt-4 border border-amber-600 bg-amber-50 px-3 py-3 text-sm text-amber-950">
-          Loggarkivet är inte tillgängligt. Kontrollera att Vercel Blob är konfigurerat med BLOB_READ_WRITE_TOKEN.
+          Historisk felloggning i Blob är avstängd för att begränsa Advanced Blob Operations. Använd Vercel Runtime Logs för den faktiska logghistoriken.
         </div>
       )}
       {truncated && <p className="mt-3 text-xs text-amber-800">Rapporten är begränsad till de 80 senaste loggarna för vald period.</p>}
@@ -186,7 +190,9 @@ export function HealthLogPanel() {
         {loading ? <p className="py-6 text-sm text-slate-500">Läser in felhistoriken…</p> :
           visibleEntries.length === 0 ? (
             <p className="py-6 font-serif text-sm leading-6 text-slate-500">
-              Inga registrerade fel eller varningar under den valda perioden. Alla typer av fel fångas inte automatiskt ännu.
+              {available
+                ? "Inga registrerade fel eller varningar under den valda perioden. Alla typer av fel fångas inte automatiskt ännu."
+                : "Ingen historisk fellogg visas här eftersom beständig lagring i Blob är avstängd. Det bevisar inte att inga fel har inträffat; använd Vercel Runtime Logs."}
             </p>
           ) : visibleEntries.map(entry => (
             <article key={entry.id} className="py-4">
@@ -221,7 +227,7 @@ export function HealthLogPanel() {
       </div>
       <div className="mt-4 border-t border-slate-300 pt-3 text-xs leading-5 text-slate-500">
         {lastLoaded ? "Loggar hämtade " + formatTimestamp(lastLoaded) + ". " : ""}
-        Applikationsloggar sparas privat i Blob. Byggfel och fel innan applikationskoden startar visas i Vercels separata bygg- och runtime-loggar.
+        Applikationsdiagnostik skrivs till Vercel Runtime Logs. Historisk felloggning i Blob är avstängd för att minska Advanced Blob Operations. Byggfel och fel innan applikationskoden startar visas i Vercels separata bygg- och runtime-loggar.
       </div>
     </section>
   );

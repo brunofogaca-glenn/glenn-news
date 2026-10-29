@@ -141,7 +141,7 @@ Primary page/component: `app/health/page.tsx`, `app/components/HealthLogPanel.ts
 - Per-entry technical details that can be expanded, a copy action for an individual log, and a copy action for the complete report.
 - Clear empty/loading/error states. The rendered report is capped to the latest 80 log entries for the selected period.
 
-Normal logs can contain technical context. The diagnostic storage path masks typical API keys, bearer tokens and URL query secrets before saving. Preserve these protections when adding new diagnostic fields.
+Diagnostic events are redacted before being written to Vercel Runtime Logs. Persistent diagnostic history in Blob is intentionally disabled to limit Advanced Blob Operations. When that history is unavailable, the panel must not interpret an empty entry list as proof that no errors occurred; it explains the limitation and points users to the Vercel project. Preserve secret/query redaction and the existing 10-minute best-effort deduplication when adding diagnostic fields.
 
 ## Cross-cutting user-visible rules
 

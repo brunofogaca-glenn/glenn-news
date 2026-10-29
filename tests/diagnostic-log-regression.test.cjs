@@ -17,6 +17,11 @@ test("health page includes a copyable diagnostic log panel", () => {
   assert.ok(panel.includes("Senaste 24 timmarna"));
   assert.ok(panel.includes("Senaste 7 dagarna"));
   assert.ok(panel.includes("Visa tekniska detaljer"));
+  assert.ok(panel.includes("Historisk felloggning i Blob är avstängd"));
+  assert.ok(panel.includes("Vercel Runtime Logs"));
+  assert.ok(panel.includes("Ingen historisk fellogg visas här"));
+  assert.doesNotMatch(panel, /Applikationsloggar sparas privat i Blob/);
+  assert.doesNotMatch(panel, /Kontrollera att Vercel Blob är konfigurerat med BLOB_READ_WRITE_TOKEN/);
   assert.ok(route.includes("Cache-Control"));
   assert.ok(route.includes('endsWith(".vercel.app")'));
 });
