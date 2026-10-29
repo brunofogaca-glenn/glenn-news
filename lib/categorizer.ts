@@ -90,8 +90,8 @@ export function detectCategory(
     text.includes("matlagning") ||
     text.includes("matkultur") ||
     text.includes("bakning") ||
-    /(?:^|[^\\p{L}])vin(?:$|[^\\p{L}])/u.test(text) ||
-    /(?:^|[^\\p{L}])öl(?:$|[^\\p{L}])/u.test(text)
+    /(?:^|[^\p{L}])vin(?:$|[^\p{L}])/u.test(text) ||
+    /(?:^|[^\p{L}])öl(?:$|[^\p{L}])/u.test(text)
   ) {
     return "livsstil";
   }
