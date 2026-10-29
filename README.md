@@ -5,6 +5,7 @@ Glenn News is a personal Swedish news reader built with Next.js App Router, Type
 ## Start here
 
 - **[Product requirements and agent contract](docs/product-requirements.md)** — mandatory first read for every task; canonical requirement IDs, product intent, current implementation status, and known discrepancies.
+- **[Continuous improvement process](docs/improvement-process.md)** — how user-reported bugs, prioritization, small changes, validation, and the next improvement are handled; current focus lives in [issue #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52).
 - **[UI and feature guide](docs/ui-feature-guide.md)** — every user-facing page, panel, interaction, empty/error state and owning component.
 - **[Architecture map](docs/architecture.md)** — where features live, how data moves, and which performance constraints to preserve.
 - **[Data refresh inventory](docs/data-refresh-inventory.md)** — source-specific refresh windows, cache lifetimes, fallback behavior, and operational jobs.
