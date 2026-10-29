@@ -1,6 +1,6 @@
 # Glenn News — produktkrav och agentkontrakt
 
-**Status för denna sammanställning:** inventerad mot `main` den 27 oktober 2026.  
+**Status för denna sammanställning:** uppdaterad mot produktionskod och den aktuella datakvalitetskompletteringen den 29 oktober 2026.  
 **Syfte:** vara den obligatoriska, gemensamma startpunkten för alla framtida agenter och kodändringar i Glenn News.
 
 > **Regel för alla framtida agenter:** Läs detta dokument först vid varje uppgift. Identifiera berörda krav-ID:n och deras status innan du ändrar kod. Följ sedan den relevanta detaljdokumentationen och inspektera den faktiska implementationen och testerna. Uppdatera detta dokument när krav, produktbeteende, status, datakontrakt eller viktiga tekniska invariants ändras.
@@ -37,7 +37,7 @@ Läs alltid denna kravspecifikation först. Läs därefter bara de detaljerade d
 - **Produktavsikt / ej kodregel** — det är ett mål eller användningsmönster, inte ett hårt krav som aktuell kod upprätthåller.
 - **Behöver synkas** — det finns en känd motsägelse eller oklarhet som inte ska döljas.
 
-Statusen avser källkodsgranskningen den 26 oktober 2026; den är inte ett påstående om att varje extern datakälla eller produktionskörning fungerar just nu.
+Statusen avser senast granskad kod den 29 oktober 2026; den är inte ett påstående om att varje extern datakälla eller den första nattliga körningen efter utrullning redan har verifierats.
 
 ## 2. Produktdefinition och designprinciper
 
@@ -355,22 +355,22 @@ För snabb orientering:
 Ta bort eller ändra ett avvikelse-ID först när koden, regressionstester och relevanta dokument är synkade. Lägg till nya avvikelser med observerad kod, konsekvens och vägledning till framtida agenter; håll denna lista kort och handlingsorienterad.
 
 
-### RECON-05 — Fotbollskanalen schedule delay caused two skipped scrape/ingestion runs (observed 29 October 2026)
+### RECON-05 — Fotbollskanalen schedule delay caused skipped scrape/ingestion runs (observed 29 October 2026)
 
-**Observerat:** Produktionspanelen `/health` markerar Fotbollskanalen som inaktuell, med senaste daterade artikel 24 oktober 2026 kl. 14.00 svensk tid (cirka 115 timmar gammal). GitHub Actions-körningarna [#24 den 28 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40646434245) och [#25 den 29 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40833131784) misslyckades i steget `Check nightly maintenance window`: GitHub startade jobben efter kl. 06.00 svensk tid. Browser scraping och ingestion kördes därför inte.
+**Observerat:** Produktionspanelen `/health` markerade Fotbollskanalen som inaktuell, med senaste daterade artikel 24 oktober 2026 kl. 14.00 svensk tid. De tidigare GitHub Actions-körningarna [#24 den 28 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40646434245) och [#25 den 29 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40833131784) startade efter kl. 06.00 och misslyckades i tidsgrinden; scraping och ingestion kördes därför inte.
 
-**Konsekvens:** En fördröjd GitHub-schemakörning ger ingen ny data trots att felskyddet fungerar avsett. Detta är inte belägg för att själva sidextraktionen eller ingestion är trasig; de stegen hoppades över.
+**Åtgärd i kod:** PR #50 lades i produktion via commit [403464d](https://github.com/brunofogaca-glenn/glenn-news/commit/403464dbec1679ab7d530dfecac2b188910c514d). Den införde fyra nattliga schemaförsök, en autentiserad read-only preflight, idempotent ingestion samt 72-timmarsvalidering. Den kompletterande uppföljningen ökar nu till åtta schematillfällen: minuter 17 och 47 under UTC-timmarna 00–03. Preflight hoppar över Playwright och Blob-skrivning när dagens sparade snapshot redan har artiklar som är högst 72 timmar gamla. Tidsgränsen 01.00–05.59 och kravet på minst sex giltiga artiklar behålls. Den stora Fotbollskanalen-HTML-reserven hämtas utan Next.js-datacache eftersom svaret överskrider gränsen för cachelagrade svar.
 
-**Åtgärd på arbetsgrenen:** Fyra schemakörningar ligger vid 00.17, 01.17, 02.17 och 03.17 UTC. En autentiserad read-only preflight kontrollerar om dagens snapshot redan sparats **och** den senaste artikeln är högst 72 timmar gammal; då hoppar senare försök över Playwright, scrape och Blob-skrivning. Både scraper och ingestion avvisar resultat vars senaste giltiga artikel är äldre än 72 timmar, så en lyckad lagring inte kan maskera en inaktuell källa. Både preflight och ingestion avvisar anrop efter 05.59 svensk tid. Verifiera efter merge att workflow-körningen blir grön och att `/health` visar en färsk artikel innan ärendet stängs.
+**Fortfarande att observera:** Vid denna dokumentrevision har en färsk post-release-import ännu inte bekräftats. Koden är utrullad men datakällans nästa nattkörning måste fortfarande bevisa att artiklarna har sparats och att `/health` visar nyare artikeldata. Den daterade morgonutgåvan skrivs inte om under dagen; kategorikorrigeringen syns i nästa nygenererade utgåva. Om nattkörningen inte lyckas, följ workflowloggar och `/health` och återöppna ärendet.
 
 Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
 
-### RECON-06 — nattlig refresh-status bevisar inte att underliggande observationsdatum är aktuellt (observerat 29 oktober 2026)
+### RECON-06 — refresh-status bevisar inte att underliggande marknads- eller sportobservationer är aktuella (observerat 29 oktober 2026)
 
-**Observerat:** `/health` rapporterade kompletterande uppdatering OK kl. 01.13 svensk tid och visade sport/tabeller samt marknad som uppdaterade/cachade. Brent hämtas från Yahoos dagliga `BZ=F`-serie; `getWorldMarkets()` använder en färdig observation före dagens datum i Stockholm. En uppdaterad snapshot kan därför innehålla en äldre, men korrekt senast färdigställd handelsobservation.
+**Observerat:** En lyckad snapshot-refresh visar hämtning/lagring, inte nödvändigtvis när källan senast observerade värdet. Brentpanelens tidigare värde var USD 113,88 med datum 27 oktober. Financial Times historiska tabell gav en senare färdig stängning på USD 115,90 daterad 28 oktober 2026 vid källkontrollen den 29 oktober.
 
-**Åtgärd på arbetsgrenen:** `getWorldSnapshotInternal()` lägger nu en varning till snapshoten om Brent (`BZ=F`) har ett äldre observationsdatum än övriga marknadsindikatorer. Last-good-snapshoten bevaras i stället för att en partiell refresh sparas som färsk, panelen visar varning för stale snapshot och för Brent-datumet, och den andra nattliga körningen får försöka igen.
+**Åtgärd i kod:** PR #50 lade in en reservhämtning från Financial Times när Yahoo BZ=F ligger efter de andra marknadsdatumen. Den senaste hämtningen måste fortfarande bekräftas i den sparade produktionssnapshoten vid nästa tillåtna nattjobb. Misslyckande ska lämna senaste giltiga snapshot kvar och visa varning, inte låtsas att värdet är nytt.
 
-**Begränsning:** Detta upptäcker och synliggör att Brent-källan släpar; det garanterar inte att Yahoo publicerar ett nyare värde före morgonläsningen. Kontrollera både källans datum och panelens `lastSuccessAt` vid produktionsverifiering. Äldre handelsdatum är inte automatiskt fel under helger/helgdagar.
+**Sporttabellens begränsning:** FotMob-payloaden som används för tabellraderna exponerar inte en separat observationstid. Sportpanelen anger därför hämtningstid och säger uttryckligen att den inte är källans observationstid. När snapshoten markeras stale visas dess senast sparade tid och varning. Detta förbättrar transparensen men ersätter inte en framtida verifiering mot en oberoende tabellkälla.
 
 Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).

@@ -273,6 +273,13 @@ export async function fetchWebSource(source: WebSourceConfig) {
     throw new Error("Hämtning av artikelwebbkällor är spärrad före 06.00 Europe/Stockholm.");
   }
 
+  // Fotbollskanalen's HTML is larger than Next.js's 2 MB data-cache limit.
+  // Do not request a cache write for that fallback; other publishers keep the
+  // short revalidation window. The normal Fotbollskanalen path uses the
+  // validated browser snapshot and avoids downloading this page entirely.
+  const cacheOptions = source.domain === "www.fotbollskanalen.se"
+    ? { cache: "no-store" as const }
+    : { next: { revalidate: 900 } };
   const response = await fetch(source.url, {
     signal: AbortSignal.timeout(10000),
     headers: {
@@ -280,7 +287,7 @@ export async function fetchWebSource(source: WebSourceConfig) {
         "Mozilla/5.0 (compatible; Glenn News/1.0)",
       Accept: "text/html,application/xhtml+xml",
     },
-    next: { revalidate: 900 },
+    ...cacheOptions,
   });
 
   if (!response.ok) {

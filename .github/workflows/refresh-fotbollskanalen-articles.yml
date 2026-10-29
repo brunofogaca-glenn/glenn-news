@@ -2,10 +2,10 @@ name: Refresh Fotbollskanalen articles
 
 on:
   schedule:
-    # GitHub schedules can be substantially delayed. Retry at several points
-    # within the overnight window; an authenticated preflight avoids duplicate
-    # scrapes and Blob writes after the first successful ingestion.
-    - cron: "17 0,1,2,3 * * *"
+    # GitHub schedules can be substantially delayed. Retry twice per UTC hour
+    # inside the overnight Stockholm write window. The authenticated preflight
+    # avoids duplicate scraping and Blob writes after a successful ingestion.
+    - cron: "17,47 0,1,2,3 * * *"
   workflow_dispatch:
 
 permissions:

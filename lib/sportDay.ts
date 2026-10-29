@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import type { SupplementalRefreshMeta } from "./supplementalCache";
 
 
 type ApiFootballFixture = {
@@ -120,6 +121,8 @@ export type SportLeagueTable = {
   season: string;
   dayLabel: string;
   isSeasonalFallback?: boolean;
+  /** Time Glenn News retrieved this table payload; the provider exposes no distinct observation timestamp here. */
+  retrievedAt?: string;
   rows: SportLeagueTableRow[];
   scorers: SportLeagueScorer[];
   tableError?: string;
@@ -136,6 +139,7 @@ export type SportDayData = {
   };
   fetchedAt: string;
   warnings?: string[];
+  refreshMeta?: SupplementalRefreshMeta;
 };
 
 const STOCKHOLM_TIME_ZONE = "Europe/Stockholm";
@@ -732,6 +736,7 @@ async function fetchSelectedLeagueTable(): Promise<SportLeagueTable | null> {
       season,
       dayLabel: selected.dayLabel,
       isSeasonalFallback: selected.isSeasonalFallback,
+      retrievedAt: new Date().toISOString(),
       rows,
       scorers,
       tableError: rows.length
