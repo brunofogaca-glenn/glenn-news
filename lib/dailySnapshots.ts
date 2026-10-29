@@ -8,7 +8,8 @@
  */
 
 import { unstable_cache } from "next/cache";
-import { withLastGoodSnapshot } from "./supplementalCache";
+import { withLastGoodSnapshot, type SupplementalRefreshMeta } from "./supplementalCache";
+import { parseFtBrentHistory } from "./brentHistoryParser";
 import { getBrowserScrapedBorasEvents } from "./borasEventStore";
 
 const TIME_ZONE = "Europe/Stockholm";
@@ -76,6 +77,7 @@ export type WorldSnapshot = {
   gdp: WorldGdp[];
   updatedAt: string;
   warnings: string[];
+  refreshMeta?: SupplementalRefreshMeta;
 };
 
 export type CultureSnapshot = {
@@ -888,6 +890,50 @@ async function getWorldMarkets(): Promise<WorldMarketIndicator[]> {
     });
   }
 
+  const brent = output.find(item => item.symbol === "BZ=F");
+  const latestOtherMarketDate = output
+    .filter(item => item.symbol !== "BZ=F")
+    .map(item => item.date)
+    .sort()
+    .at(-1);
+
+  // Yahoo's BZ=F series can lag the other market dates. Try a second completed
+  // daily-close source only in that case; if the fallback is unavailable, the
+  // downstream snapshot validator marks the discrepancy stale and preserves
+  // the previous working snapshot rather than silently accepting the old price.
+  if (brent && latestOtherMarketDate && brent.date < latestOtherMarketDate) {
+    const ftUrl = "https://markets.ft.markitdigital.com/data/commodities/tearsheet/historical?c=Brent+Crude+Oil";
+    try {
+      const response = await fetch(ftUrl, {
+        signal: AbortSignal.timeout(9000),
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; Glenn-News/1.0)",
+          Accept: "text/html",
+        },
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Financial Times HTTP " + response.status);
+      const fallback = parseFtBrentHistory(await response.text(), cutoff);
+      if (!fallback || fallback.date <= brent.date) {
+        throw new Error("Financial Times did not return a newer completed Brent close");
+      }
+      const index = output.findIndex(item => item.symbol === "BZ=F");
+      output[index] = {
+        ...brent,
+        value: fallback.value,
+        changePct: fallback.changePct,
+        date: fallback.date,
+        source: "Financial Times · historiska dagsstängningar",
+        url: ftUrl,
+      };
+    } catch (error) {
+      console.warn(
+        "Brentolja från Yahoo Finance släpar; Financial Times-reserven misslyckades:",
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
+
   return output;
 }
 
@@ -1045,6 +1091,21 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
       warnings.push(labels[index] + ": " + (result.reason instanceof Error ? result.reason.message : "data kunde inte hämtas"));
     }
   });
+
+  // A successful HTTP response must not make an old Brent observation look
+  // fresh when the other market symbols have advanced to a newer session.
+  const brent = markets.find(item => item.symbol === "BZ=F");
+  const latestOtherMarketDate = markets
+    .filter(item => item.symbol !== "BZ=F")
+    .map(item => item.date)
+    .sort()
+    .at(-1);
+  if (brent && latestOtherMarketDate && brent.date < latestOtherMarketDate) {
+    warnings.push(
+      "Brentolja: senaste observationen (" + brent.date +
+      ") släpar efter övriga marknadsdata (" + latestOtherMarketDate + ")."
+    );
+  }
 
   return {
     markets,

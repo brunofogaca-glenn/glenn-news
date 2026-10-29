@@ -277,8 +277,17 @@ function formatMarketValue(value: number, unit: string) {
 }
 
 export function WorldSnapshotPanel({ data }: { data: WorldSnapshot }) {
+  const latestMarketDate = data.markets.map(item => item.date).sort().at(-1);
+  const worldDataStale = data.refreshMeta?.status === "stale";
+
   return (
     <section className="border-y border-slate-300 bg-[#e7ece5] px-4 py-4 md:px-5 md:py-5">
+      {worldDataStale ? (
+        <div role="status" className="mb-4 border-l-2 border-amber-700 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          <div className="font-bold">Världsdata använder senast fungerande snapshot</div>
+          <p className="mt-1">{data.refreshMeta?.lastError ?? "En eller flera marknadsobservationer är inaktuella."}</p>
+        </div>
+      ) : null}
       <div className="flex flex-col justify-between gap-2 border-b border-slate-300 pb-3 sm:flex-row sm:items-end">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-800">Världen · globala indikatorer</div>
@@ -292,7 +301,9 @@ export function WorldSnapshotPanel({ data }: { data: WorldSnapshot }) {
         <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Marknader · senaste tillgängliga stängning</div>
         {data.markets.length ? (
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {data.markets.map(item => (
+            {data.markets.map(item => {
+              const brentLagging = item.symbol === "BZ=F" && Boolean(latestMarketDate) && item.date < latestMarketDate!;
+              return (
               <a key={item.symbol} href={item.url} target="_blank" rel="noreferrer" className="border-l-2 border-slate-950 pl-3 transition hover:bg-white/30">
                 <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">{item.name}</div>
                 <div className="mt-1 font-serif text-lg font-black tabular-nums">{formatMarketValue(item.value, item.unit)}</div>
@@ -302,8 +313,13 @@ export function WorldSnapshotPanel({ data }: { data: WorldSnapshot }) {
                   </div>
                 ) : null}
                 <div className="mt-1 text-[9px] text-slate-400">{item.date}</div>
+                <div className="mt-0.5 text-[9px] text-slate-400">{item.source}</div>
+                {brentLagging ? (
+                  <div className="mt-1 text-[9px] font-bold text-amber-800">Observationsdatum släpar</div>
+                ) : null}
               </a>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="mt-2 text-sm text-slate-500">Marknadsdata kunde inte hämtas just nu.</p>

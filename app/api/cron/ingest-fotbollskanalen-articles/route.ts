@@ -3,6 +3,7 @@ import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
 import { getStockholmClock } from "@/lib/updateSchedule";
 import {
   FOTBOLLSKANALEN_BROWSER_SOURCES,
+  getBrowserScrapedFotbollskanalenArticles,
   saveBrowserScrapedFotbollskanalenArticles,
   type BrowserScrapedFotbollskanalenArticle,
 } from "@/lib/fotbollskanalenArticleStore";
@@ -13,6 +14,7 @@ const ALLOWED_SOURCE_URLS = new Set<string>(
   FOTBOLLSKANALEN_BROWSER_SOURCES.map(source => source.url)
 );
 const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+const MAX_ARTICLE_STALENESS_MS = 72 * 60 * 60 * 1000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -30,6 +32,24 @@ function safeImage(value: unknown) {
   } catch {
     return undefined;
   }
+}
+
+function latestArticleTimestamp(articles: BrowserScrapedFotbollskanalenArticle[]) {
+  const timestamps = articles
+    .map(article => Date.parse(article.date))
+    .filter(timestamp => Number.isFinite(timestamp));
+  return timestamps.length ? Math.max(...timestamps) : null;
+}
+
+function hasFreshSnapshotForToday(
+  snapshot: { savedAt: string; articles: BrowserScrapedFotbollskanalenArticle[] } | null,
+  now = new Date()
+) {
+  if (!snapshot || stockholmDateKey(new Date(snapshot.savedAt)) !== stockholmDateKey(now)) return false;
+  const newestArticleAt = latestArticleTimestamp(snapshot.articles);
+  return newestArticleAt !== null &&
+    newestArticleAt <= now.getTime() + 5 * 60 * 1000 &&
+    now.getTime() - newestArticleAt <= MAX_ARTICLE_STALENESS_MS;
 }
 
 export async function POST(request: Request) {
@@ -126,7 +146,30 @@ export async function POST(request: Request) {
     }, { status: 422 });
   }
 
+  const newestArticleAt = latestArticleTimestamp(articles);
+  if (newestArticleAt === null || now - newestArticleAt > MAX_ARTICLE_STALENESS_MS) {
+    return Response.json({
+      ok: false,
+      error: "Senaste giltiga Fotbollskanalen-artikeln är äldre än 72 timmar; den sparade listan lämnades orörd.",
+      newestArticleAt: newestArticleAt === null ? null : new Date(newestArticleAt).toISOString(),
+    }, { status: 422 });
+  }
+
   try {
+    // The workflow preflight avoids most duplicate work. Recheck immediately
+    // before writing so a concurrent/retried job does not overwrite a snapshot
+    // that another run already stored for today's Stockholm date.
+    const existingSnapshot = await getBrowserScrapedFotbollskanalenArticles();
+    if (hasFreshSnapshotForToday(existingSnapshot, new Date())) {
+      return Response.json({
+        ok: true,
+        skipped: true,
+        reason: "Today's fresh Fotbollskanalen snapshot is already stored",
+        stored: existingSnapshot?.articles.length ?? 0,
+        savedAt: existingSnapshot?.savedAt ?? null,
+      });
+    }
+
     const snapshot = await saveBrowserScrapedFotbollskanalenArticles(articles);
     revalidateTag("glenn-news-articles", { expire: 0 });
     revalidateTag("glenn-news-feed-health", { expire: 0 });
@@ -140,4 +183,51 @@ export async function POST(request: Request) {
     console.error("Fotbollskanalen browser article scrape could not be saved:", error);
     return Response.json({ ok: false, error: "Kunde inte spara Fotbollskanalen-artiklarna." }, { status: 500 });
   }
+}
+
+
+function stockholmDateKey(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find(part => part.type === "year")?.value ?? "0000";
+  const month = parts.find(part => part.type === "month")?.value ?? "00";
+  const day = parts.find(part => part.type === "day")?.value ?? "00";
+  return year + "-" + month + "-" + day;
+}
+
+/**
+ * Read-only preflight for the retrying GitHub Actions schedule. It avoids
+ * another browser scrape and Blob overwrite once today's snapshot is stored.
+ */
+export async function GET(request: Request) {
+  if (!(await authorizeGitHubActionsRefresh(request, "fotbollskanalenArticles"))) {
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const clock = getStockholmClock();
+  if (clock.hour < 1 || clock.hour >= 6) {
+    return Response.json({
+      ok: false,
+      error: "Fotbollskanalen preflight is only allowed from 01:00–05:59 Europe/Stockholm",
+    }, { status: 503 });
+  }
+
+  const snapshot = await getBrowserScrapedFotbollskanalenArticles();
+  const now = new Date();
+  const newestArticleAt = snapshot ? latestArticleTimestamp(snapshot.articles) : null;
+  const savedFreshSnapshotToday = hasFreshSnapshotForToday(snapshot, now);
+
+  return Response.json({
+    ok: true,
+    shouldRefresh: !savedFreshSnapshotToday,
+    snapshotSavedAt: snapshot?.savedAt ?? null,
+    articleCount: snapshot?.articles.length ?? 0,
+    newestArticleAt: newestArticleAt === null ? null : new Date(newestArticleAt).toISOString(),
+    latestArticleAgeHours: newestArticleAt === null ? null : Math.round((now.getTime() - newestArticleAt) / (60 * 60 * 1000)),
+    localTime: String(clock.hour).padStart(2, "0") + ":" + String(clock.minute).padStart(2, "0"),
+  });
 }

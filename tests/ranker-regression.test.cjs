@@ -20,6 +20,7 @@ require.extensions[".ts"] = (module, filename) => {
 };
 
 const { rankArticles } = require("../lib/ranker.ts");
+const { detectCategory } = require("../lib/categorizer.ts");
 const { collectWeeklyCandidates, canonicalizeLink } = require("../lib/weekFocusCandidates.ts");
 const { buildWeeklyInterestProfile } = require("../lib/weekFocusInterests.ts");
 const { isSlowResponse, summarizeResponseTimes, prioritizeHealthFeeds, SLOW_RESPONSE_THRESHOLD_MS } = require("../lib/feedHealthMetrics.ts");
@@ -57,6 +58,30 @@ function article(overrides = {}) {
     ...overrides,
   };
 }
+
+test("football stories cannot leak into lifestyle through source labels or the word stem vin", () => {
+  const headline = {
+    title: "Analysen efter Blåvitt–Djurgården: Firandet hade han kunnat skippa",
+    description: "Expressens analys efter 1–1 mellan IFK Göteborg och Djurgården.",
+    source: "Expressen: Fotboll",
+  };
+  assert.equal(detectCategory(headline), "fotboll");
+
+  assert.notEqual(
+    detectCategory({
+      title: "Vinnaren firas efter finalen",
+      description: "Spelaren vinner igen.",
+    }),
+    "livsstil",
+    "the word stem 'vin' inside 'vinner' must not classify a football/general story as lifestyle"
+  );
+
+  assert.equal(
+    detectCategory({ title: "Vin till helgens middag", description: "Tips om vinval." }),
+    "livsstil",
+    "a genuine wine topic should still be classified as lifestyle"
+  );
+});
 
 test("major public-interest news gets a signal without click history", () => {
   const [ranked] = rankArticles([
