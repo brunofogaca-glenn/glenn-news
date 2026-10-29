@@ -149,6 +149,7 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(fotbollskanalen, /::error::Scheduled browser refresh started outside/);
   const readerHistory = read(".github/workflows/process-reader-history.yml");
   assert.match(readerHistory, /cron: "15 1,2 \* \* \*"/);
+  assert.match(readerHistory, /concurrency:[\s\S]*cancel-in-progress: false/);
   assert.match(readerHistory, /hour_num >= 1 && hour_num < 6/);
   assert.match(readerHistory, /::error::Reader-history scheduled\/manual run started outside/);
   assert.match(readerHistory, /if \[\[ "\$GITHUB_EVENT_NAME" == "push" \]\]; then[\s\S]*request_url="\$\{REFRESH_URL\}\?manual=1"/);
