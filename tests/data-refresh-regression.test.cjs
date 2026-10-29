@@ -144,7 +144,7 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(boras, /hour_num >= 1 && hour_num < 6/);
   assert.match(boras, /::error::Scheduled browser refresh started outside/);
   const fotbollskanalen = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.match(fotbollskanalen, /cron: "17 0,1,2,3 \* \* \*"/);
+  assert.match(fotbollskanalen, /cron: "17,47 0,1,2,3 \* \* \*"/);
   assert.match(fotbollskanalen, /hour_num >= 1 && hour_num < 6/);
   assert.match(fotbollskanalen, /::error::Scheduled browser refresh started outside/);
   const readerHistory = read(".github/workflows/process-reader-history.yml");
@@ -340,6 +340,10 @@ test("Borås local events prioritize reader interests and keep Borås Stad event
 
   const sportPanel = read("app/components/SportDayPanel.tsx");
   assert.match(sportPanel, /formatFetchedAt\(data.fetchedAt\)/);
+  assert.match(read("lib/sportDay.ts"), /retrievedAt\?: string/);
+  assert.match(sportPanel, /data\.selectedLeague\.retrievedAt/);
+  assert.match(sportPanel, /ingen separat observationstid/i);
+  assert.match(sportPanel, /data\.refreshMeta\?\.status === "stale"/);
   const marketPanel = read("app/components/MarketDayPanel.tsx");
   assert.match(marketPanel, /Senaste handelsdag/);
   assert.match(marketPanel, /refreshMeta\?\.lastSuccessAt/);
@@ -436,7 +440,7 @@ test("FT Brent parser selects the latest completed close and ignores the current
 
 test("Fotbollskanalen articles use a rendered-browser feed and validated private ingestion", () => {
   const workflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.ok(workflow.includes('cron: "17 0,1,2,3 * * *"'));
+  assert.ok(workflow.includes('cron: "17,47 0,1,2,3 * * *"'));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-fotbollskanalen-articles.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-fotbollskanalen-articles"));
@@ -490,6 +494,8 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
 
   const source = read("lib/webSources.ts");
   assert.ok(source.includes("getBrowserScrapedFotbollskanalenArticles"));
+  assert.match(source, /source\.domain === "www\.fotbollskanalen\.se"[\s\S]*?cache: "no-store" as const/);
+  assert.match(source, /next: \{ revalidate: 900 \}/);
   assert.ok(source.includes('source: "Fotbollskanalen – Senaste"'));
   assert.ok(source.includes("browserSnapshot.articles"));
 
