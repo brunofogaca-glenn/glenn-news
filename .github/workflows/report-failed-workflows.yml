@@ -28,6 +28,8 @@ jobs:
       - name: Create or update a deduplicated GitHub Issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # workflow_run jobs do not check out the repository; tell gh which repo owns the issue.
+          GH_REPO: ${{ github.repository }}
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
           SOURCE_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
           SOURCE_WORKFLOW: ${{ github.event.workflow_run.name }}
