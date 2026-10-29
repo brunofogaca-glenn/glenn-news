@@ -1,10 +1,7 @@
 export function detectCategory(
   article: any
 ) {
-  const text =
-    `${article.title} ${
-      article.description ?? ""
-    }`.toLowerCase();
+  const text = `${article.title} ${article.description ?? ""} ${article.source ?? ""}`.toLowerCase();
 
   // ELFSBORG
 
