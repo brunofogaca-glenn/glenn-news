@@ -9,6 +9,7 @@ const SOURCES = [
 ];
 const ARTICLE_PATH = /^\/(?:artiklar|bloggar)\//;
 const MAX_ARTICLES_PER_PAGE = 80;
+const MAX_ARTICLE_STALENESS_MS = 72 * 60 * 60 * 1000;
 
 function stockholmDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -327,6 +328,24 @@ async function main() {
       }));
       console.error("Fotbollskanalen extraction diagnostics:", JSON.stringify({ errors, sample }));
       throw new Error("Only " + articles.length + " recent articles extracted; refusing to replace the previous snapshot.");
+    }
+
+    const newestArticleAt = Date.parse(articles[0]?.date ?? "");
+    if (!Number.isFinite(newestArticleAt) || now - newestArticleAt > MAX_ARTICLE_STALENESS_MS) {
+      const sample = articles.slice(0, 6).map(item => ({
+        title: item.title,
+        url: item.url,
+        date: item.date,
+        sourcePages: item.sourcePages,
+      }));
+      const ageHours = Number.isFinite(newestArticleAt)
+        ? Math.round((now - newestArticleAt) / (60 * 60 * 1000))
+        : null;
+      console.error("Fotbollskanalen freshness diagnostics:", JSON.stringify({ errors, ageHours, sample }));
+      throw new Error(
+        "Newest valid Fotbollskanalen article is older than 72 hours (" +
+        (ageHours ?? "unknown") + "h); refusing to replace the previous snapshot."
+      );
     }
 
     await writeFile(OUTPUT_PATH, JSON.stringify({
