@@ -4,7 +4,7 @@ This is the source-oriented handbook for the **user-visible interface**. It reco
 
 For data-source schedules and cache lifetime, read [Data refresh inventory](data-refresh-inventory.md). For the main code/data-flow map, read [Architecture](architecture.md). Contributor workflow and production invariants are in [AGENTS.md](../AGENTS.md).
 
-The homepage sport panel and supplemental panel footers display the snapshot fetch date/time in the Stockholm timezone. The market panel additionally displays the actual trading-session date, which can be older than its fetch date due to weekends, holidays or source availability.
+The homepage sport panel and supplemental panel footers display the snapshot fetch date/time in the Stockholm timezone. The sport table also shows when Glenn News retrieved the table response and explicitly states that FotMob does not expose a distinct observation timestamp in the consumed payload. A stale sport snapshot shows its last saved time and explanatory status. The market panel displays each market's actual trading-session date separately from snapshot fetch time; these may differ because of weekends, holidays or source availability.
 
 ## At a glance
 
@@ -73,7 +73,7 @@ The main page starts the required edition load as soon as the reader profile is 
 | Världsläget i siffror | Latest available market observations and macro indicators including central-bank rates and GDP. Each market item displays its own observation date; Brent is explicitly marked if it lags behind the other market dates. If the world snapshot is stale, the panel warns that it is using the last working snapshot instead of silently presenting a partial refresh as current. | `WorldSnapshotPanel`, `lib/dailySnapshots.ts`, `lib/supplementalCache.ts` |
 | Senaste filmrecensionerna | Recent film reviews from DN. | `CultureSnapshotPanel`, `lib/dailySnapshots.ts` |
 | Senaste skivrecensionerna | Recent album reviews from DN. | `CultureSnapshotPanel`, `lib/dailySnapshots.ts` |
-| Sportdygn | Finished matches from yesterday, selected major matches today, chosen-league standings, top-three scorers and an explanation of the league-table markers. Shows a configuration message when sport data is not connected. | `SportDayPanel.tsx`, `lib/sportDay.ts`, `lib/leagueZones.ts` |
+| Sportdygn | Finished matches from yesterday, selected major matches today, chosen-league standings, top-three scorers and an explanation of the league-table markers. Shows a configuration message when sport data is not connected, source retrieval time for the table, the missing source observation-time limitation, and last-good snapshot status when stale. | `SportDayPanel.tsx`, `lib/sportDay.ts`, `lib/leagueZones.ts`, `lib/supplementalCache.ts` |
 | Börsen igår | Stockholm, DAX, S&P 500 and Nasdaq index values/change versus the previous completed trading session. Closed-market data can be correct without representing today's movement. | `MarketDayPanel.tsx`, `lib/marketDay.ts` |
 
 Do not collapse these into one provider-fetching component. Keep visual panels in components and source parsing, cache and last-good-snapshot logic in the existing `lib/` modules.
