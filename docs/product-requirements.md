@@ -14,6 +14,7 @@ Läs alltid denna kravspecifikation först. Läs därefter bara de detaljerade d
 | Källa | Vad den ansvarar för |
 | --- | --- |
 | **[Produktkrav — detta dokument](product-requirements.md)** | Samlade krav-ID:n, produktavsikt, aktuell status, kända avvikelser och vad ändringar måste bevara. |
+| [Agilt förbättringsarbete](improvement-process.md) | Arbetsflöde för användarrapporterade buggar, prioritering, små ändringar, verifiering och nästa fokus. Samlingsärende #52 håller den levande statusen. |
 | [UI- och funktionsguide](ui-feature-guide.md) | Synliga sidor, paneler, navigation, knappar, tomma lägen, felmeddelanden och interaktioner. |
 | [Arkitektur](architecture.md) | Modulkarta, dataflöden, lagring, prestandakontrakt och hur man säkert ändrar systemet. |
 | [Data-refresh-inventering](data-refresh-inventory.md) | Aktiva datakällor, cachetider, scheman, lokala tidsgränser, autentisering och reservdata. |
@@ -374,3 +375,15 @@ Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och
 **Sporttabellens begränsning:** FotMob-payloaden som används för tabellraderna exponerar inte en separat observationstid. Sportpanelen anger därför hämtningstid och säger uttryckligen att den inte är källans observationstid. När snapshoten markeras stale visas dess senast sparade tid och varning. Detta förbättrar transparensen men ersätter inte en framtida verifiering mot en oberoende tabellkälla.
 
 Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
+
+
+## 12. Agilt förbättringsarbete och kontinuerlig prioritering
+
+Glenn News förbättras stegvis utifrån verklig användning. Arbetsflödet är definierat i [improvement-process.md](improvement-process.md), och den levande prioriteringen finns i [GitHub issue #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52).
+
+- Ta emot rapporter som signaler om användarupplevelsen; verifiera orsak i kod, loggar och tester innan slutsatser dras.
+- Ha ett tydligt aktivt fokus och en kort prioriterad kö. Använd P0–P3 enligt förbättringsprocessen och prioritera användarpåverkan och korrekt data före kosmetik och nya funktioner.
+- Arbeta med en avgränsad ändring i taget, skydda beteendet med regressionstester och uppdatera dokumentation tillsammans med koden.
+- Följ kostnads- och driftsinvarianterna i detta dokument och AGENTS.md. Undvik onödiga Blob-operationer och upprepade deployar.
+- Redovisa separat vad som är åtgärdat i kod, driftsatt och verifierat i produktion. Lämna okontrollerade livebeteenden markerade som väntande.
+- När Glenn frågar efter nästa förbättring ska agenter läsa issue #52 och aktuell dokumentation, granska senaste feedback och verifierad produktionstatus och sedan välja nästa mest värdefulla steg.
