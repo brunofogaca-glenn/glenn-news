@@ -6,6 +6,22 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
+const ts = require("typescript");
+require.extensions[".ts"] = (module, filename) => {
+  const source = fs.readFileSync(filename, "utf8");
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      moduleResolution: ts.ModuleResolutionKind.Node10,
+      esModuleInterop: true,
+    },
+    fileName: filename,
+  });
+  module._compile(output.outputText, filename);
+};
+const { parseFtBrentHistory } = require("../lib/brentHistoryParser.ts");
+
 test("supplemental Vercel cron and manual recovery use scoped authentication", () => {
   const config = JSON.parse(read("vercel.json"));
   const supplementalCrons = config.crons.filter((cron) => cron.path === "/api/cron/refresh-data");
@@ -329,6 +345,14 @@ test("Borås local events prioritize reader interests and keep Borås Stad event
   assert.match(marketPanel, /refreshMeta\?\.lastSuccessAt/);
 
   const worldSnapshots = read("lib/dailySnapshots.ts");
+  assert.match(worldSnapshots, /const latestOtherMarketDate = output/);
+  assert.match(worldSnapshots, /parseFtBrentHistory\(await response\.text\(\), cutoff\)/);
+  assert.match(worldSnapshots, /Brentolja: senaste observationen/);
+  const worldPanel = read("app/components/DailySnapshotPanels.tsx");
+  assert.match(worldPanel, /data\.refreshMeta\?\.status === "stale"/);
+  assert.match(worldPanel, /Observationsdatum släpar/);
+
+  const worldSnapshots = read("lib/dailySnapshots.ts");
   assert.match(worldSnapshots, /const latestOtherMarketDate = markets/);
   assert.match(worldSnapshots, /Brentolja: senaste observationen/);
   const worldPanel = read("app/components/DailySnapshotPanels.tsx");
@@ -400,6 +424,22 @@ test("Borås events are captured with a real browser and loaded from private cac
   assert.ok(snapshots.includes("scrapedEvents.length >= 6"));
 });
 
+test("FT Brent parser selects the latest completed close and ignores the current date", () => {
+  const html = `
+    <table>
+      <tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr>
+      <tr><td>Thursday, October 29, 2026</td><td>115.20</td><td>116.00</td><td>114.00</td><td>114.38</td><td>10,000</td></tr>
+      <tr><td>Wednesday, October 28, 2026</td><td>114.11</td><td>116.06</td><td>114.11</td><td>115.90</td><td>12,554</td></tr>
+      <tr><td>Tuesday, October 27, 2026</td><td>114.00</td><td>116.00</td><td>113.00</td><td>113.88</td><td>8,000</td></tr>
+    </table>`;
+  const parsed = parseFtBrentHistory(html, "2026-10-29");
+  assert.equal(parsed.date, "2026-10-28");
+  assert.equal(parsed.value, 115.9);
+  assert.ok(Math.abs(parsed.changePct - ((115.9 / 113.88 - 1) * 100)) < 0.000001);
+  assert.equal(parseFtBrentHistory(html, "2026-10-28").date, "2026-10-27");
+  assert.equal(parseFtBrentHistory("<table><tr><td>No market data</td></tr></table>", "2026-10-29"), null);
+});
+
 test("Fotbollskanalen articles use a rendered-browser feed and validated private ingestion", () => {
   const workflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
   assert.ok(workflow.includes('cron: "17 0,1,2,3 * * *"'));
@@ -409,6 +449,10 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
   assert.ok(workflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
   assert.ok(workflow.includes("VERCEL_AUTOMATION_BYPASS_SECRET"));
   assert.ok(!workflow.includes("/api/cron/refresh-articles"));
+  assert.ok(workflow.includes("id: snapshot_check"));
+  assert.ok(workflow.includes("Check whether today's snapshot already exists"));
+  assert.ok(workflow.includes("steps.snapshot_check.outputs.should_refresh == 'true'"));
+  assert.ok(workflow.includes("STATUS_URL: https://glenn-news.vercel.app/api/cron/ingest-fotbollskanalen-articles"));
   assert.ok(workflow.includes("id: snapshot_check"));
   assert.ok(workflow.includes("Check whether today's snapshot already exists"));
   assert.ok(workflow.includes("steps.snapshot_check.outputs.should_refresh == 'true'"));
@@ -431,6 +475,10 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
 
   const ingest = read("app/api/cron/ingest-fotbollskanalen-articles/route.ts");
   assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "fotbollskanalenArticles")'));
+  assert.ok(ingest.includes("export async function GET(request: Request)"));
+  assert.ok(ingest.includes("getBrowserScrapedFotbollskanalenArticles()"));
+  assert.ok(ingest.includes("shouldRefresh: !savedToday"));
+  assert.ok(ingest.includes("Fotbollskanalen preflight is only allowed from 01:00"));
   assert.ok(ingest.includes("export async function GET(request: Request)"));
   assert.ok(ingest.includes("getBrowserScrapedFotbollskanalenArticles()"));
   assert.ok(ingest.includes("shouldRefresh: !savedToday"));
