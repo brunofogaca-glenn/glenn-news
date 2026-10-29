@@ -8,7 +8,7 @@
  */
 
 import { unstable_cache } from "next/cache";
-import { withLastGoodSnapshot } from "./supplementalCache";
+import { withLastGoodSnapshot, type SupplementalRefreshMeta } from "./supplementalCache";
 import { getBrowserScrapedBorasEvents } from "./borasEventStore";
 
 const TIME_ZONE = "Europe/Stockholm";
@@ -76,6 +76,7 @@ export type WorldSnapshot = {
   gdp: WorldGdp[];
   updatedAt: string;
   warnings: string[];
+  refreshMeta?: SupplementalRefreshMeta;
 };
 
 export type CultureSnapshot = {
@@ -1045,6 +1046,21 @@ async function getWorldSnapshotInternal(): Promise<WorldSnapshot> {
       warnings.push(labels[index] + ": " + (result.reason instanceof Error ? result.reason.message : "data kunde inte hämtas"));
     }
   });
+
+  // A successful HTTP response must not make an old Brent observation look
+  // fresh when the other market symbols have advanced to a newer session.
+  const brent = markets.find(item => item.symbol === "BZ=F");
+  const latestOtherMarketDate = markets
+    .filter(item => item.symbol !== "BZ=F")
+    .map(item => item.date)
+    .sort()
+    .at(-1);
+  if (brent && latestOtherMarketDate && brent.date < latestOtherMarketDate) {
+    warnings.push(
+      "Brentolja: senaste observationen (" + brent.date +
+      ") släpar efter övriga marknadsdata (" + latestOtherMarketDate + ")."
+    );
+  }
 
   return {
     markets,
