@@ -150,7 +150,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | OPS-01 | Källstatus ska summera hälsolägen och visa källa, URL, kategori, svarstid, antal artiklar senaste 24 timmarna och ålder på senaste daterade artikel. | Implementerat | `app/health/page.tsx`, `lib/feedHealth.ts` |
 | OPS-02 | En källa är stale när senaste daterade artikel är minst 72 timmar gammal. Svarstid ≥2 500 ms ska markeras långsam men inte automatiskt omklassificera en frisk källa som trasig. | Implementerat + testskyddat | `lib/feedHealthMetrics.ts`, ranker-regressionstest |
 | OPS-03 | Visa sparad status för morgonhämtning och nattlig kompletteringskörning utan att själva statusvisningen startar nya leverantörsanrop. | Implementerat + testskyddat | `lib/articleRefreshStatus.ts`, `lib/supplementalRefreshRun.ts`, `app/health/page.tsx` |
-| OPS-04 | Diagnostikvyn ska filtrera 24 timmar/sju dagar och fel/varningar, tillåta omladdning och kopiering samt visa begripliga laddnings-/tom-/felstatusar. Högst 80 poster visas. | Implementerat; direkt testning delvis | `app/components/HealthLogPanel.tsx`, `app/health/page.tsx` |
+| OPS-04 | När diagnostikhistorik är tillgänglig ska vyn kunna filtrera 24 timmar/sju dagar och fel/varningar, tillåta omladdning och kopiering samt visa begriplig status. När historiken är avstängd ska UI förklara detta och inte visa tom lista som bevis på felfri drift. Högst 80 poster visas. | Implementerat + regressionstest | `app/components/HealthLogPanel.tsx`, `app/health/page.tsx`, diagnostiktester |
 | OPS-05 | Loggar ska maskera vanliga hemligheter/tokens och URL-frågeparametrar, begränsa kontextfält och deduplicera upprepade fel. Persistenta Blob-skrivningar för varje diagnostikhändelse ska undvikas. | Implementerat + testskyddat | `lib/diagnosticLog.ts`, diagnostiktester |
 | OPS-06 | Kompletterande faktapaneler uppdateras via två Vercel Cron-fönster före 06.00 svensk tid. Källspecifika TTL:er styr när cache tvingas uppdateras; missade nattfönster rapporteras som fel, inte som framgångsrika överhoppningar. | Implementerat + testskyddat | `vercel.json`, `app/api/cron/refresh-data/route.ts`, `tests/data-refresh-regression.test.cjs` |
 
@@ -350,6 +350,16 @@ För snabb orientering:
 **Åtgärd:** Flytta obligatorisk schemaläggning till två Vercel Cron-fönster före 06.00 Stockholmstid; behåll GitHub Actions som manuell OIDC-säkrad reservväg. Använd källspecifika TTL:er, beständig last-good-snapshot även för börsdata och HTTP 503 om ett jobb startar utanför nattfönstret. Faktapanelernas tidsstämplar ska visa datum och tid. Regressionstester skyddar dessa invariants.
 
 **Begränsning:** Ingen schemaläggare eller extern datakälla kan garanteras vara tillgänglig. De två Vercel-körningarna minskar beroendet av en enda schemalagd körning, men om båda misslyckas ska **Nattlig uppdatering** och Vercels Runtime Logs kontrolleras. Browser-scraping av Borås.com och Fotbollskanalen är fortsatt beroende av GitHub Actions, men ett missat tidsfönster ska nu bli ett synligt fel.
+
+### RECON-08 — Health diagnostic panel implied persistent Blob log history (observed 29 October 2026)
+
+**Observed:** `lib/diagnosticLog.ts` intentionally returns `available: false` and no historical entries to avoid costly persistent Blob operations, while the UI and guide described logs as stored privately in Blob and could render an empty list/counters in a way that looked like no incidents had occurred.
+
+**Resolution:** Keep persistent Blob diagnostic history disabled. The Health panel explains that diagnostics go to Vercel Runtime Logs, hides historical filters/counters when history is unavailable, clarifies that an empty local list is not proof of error-free production, and links to the Vercel project. Regression tests and the UI guide cover the behavior.
+
+**Invariant:** Do not reintroduce Blob history or add reads/writes per page view/click to improve observability. Use Vercel Runtime Logs and GitHub Actions Issues for error handling; assess any paid log integration separately.
+
+Tracked in [issue #56](https://github.com/brunofogaca-glenn/glenn-news/issues/56).
 
 ### Underhåll av avvikelselistan
 
