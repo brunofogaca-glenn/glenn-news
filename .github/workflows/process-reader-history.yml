@@ -6,8 +6,9 @@ on:
     paths:
       - ".github/run-reader-history-migration"
   schedule:
-    # Run after overnight source refreshes and well before the 06:30 edition.
-    - cron: "15 2 * * *"
+    # GitHub schedules can be delayed; provide two low-cost opportunities inside the local window.
+    # 01:15/02:15 UTC map to 02:15/03:15 CET and 03:15/04:15 CEST in Europe/Stockholm.
+    - cron: "15 1,2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -24,8 +25,9 @@ jobs:
         shell: bash
         run: |
           allowed=false
-          # Pushes can trigger this workflow only when the migration marker path changes.
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$GITHUB_EVENT_NAME" == "push" ]]; then
+          # Only the restricted migration-marker push may override the normal window.
+          # Scheduled and manually dispatched recovery runs must stay inside the window.
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
             allowed=true
           else
             hour="$(TZ=Europe/Stockholm date +%H)"
@@ -33,7 +35,7 @@ jobs:
             if (( hour_num >= 1 && hour_num < 6 )); then
               allowed=true
             else
-              echo "::error::Scheduled reader-history job started outside 01:00–05:59 Europe/Stockholm. Failing visibly instead of reporting a successful skip."
+              echo "::error::Reader-history scheduled/manual run started outside 01:00–05:59 Europe/Stockholm. Failing visibly instead of reporting a successful skip."
               exit 1
             fi
           fi
@@ -66,7 +68,8 @@ jobs:
           oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
 
           request_url="$REFRESH_URL"
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || "$GITHUB_EVENT_NAME" == "push" ]]; then
+          # The workflow only receives this push when the one-time migration marker changes.
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
             request_url="${REFRESH_URL}?manual=1"
           fi
 
