@@ -313,6 +313,7 @@ export function WorldSnapshotPanel({ data }: { data: WorldSnapshot }) {
                   </div>
                 ) : null}
                 <div className="mt-1 text-[9px] text-slate-400">{item.date}</div>
+                <div className="mt-0.5 text-[9px] text-slate-400">{item.source}</div>
                 {brentLagging ? (
                   <div className="mt-1 text-[9px] font-bold text-amber-800">Observationsdatum släpar</div>
                 ) : null}
