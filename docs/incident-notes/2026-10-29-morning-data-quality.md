@@ -38,3 +38,11 @@ After the next nightly run, check:
 5. Sport data: results/table retrieval timestamp advances; remember that the table's actual observation date is not independently supplied by this provider.
 
 The daytime refresh guard and last-good snapshot protection are intentional invariants. Do not trigger protected scrape or Blob writes outside 01:00–05:59 Stockholm time. See [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49) for the closeout trail.
+
+
+## Reader-history workflow delay — afternoon follow-up, 29 October 2026
+
+- GitHub Actions [reader-history run #5](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40841894385) started at 09:24 Stockholm and failed at the local-time guard. The job log confirms that the processing step was skipped; it did not reach the ledger/profile writer, so this run did not produce a Blob write.
+- The root cause evidenced by the log is schedule delay, not a confirmed reader-history processor defect. The workflow and endpoint retain the `01:00–05:59 Europe/Stockholm` write guard.
+- Recovery follow-up is tracked in [issue #54](https://github.com/brunofogaca-glenn/glenn-news/issues/54). The proposed code change adds a second in-window schedule opportunity, reserves `manual=1` for the restricted migration-marker push, verifies that the endpoint did not return a skipped response, and prevents repeated snapshot writes when the stored profile matches the ledger marker.
+- This change is not considered production-verified until a valid scheduled run completes and the saved ledger/profile are checked.
