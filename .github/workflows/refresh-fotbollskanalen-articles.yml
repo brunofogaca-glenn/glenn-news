@@ -12,6 +12,12 @@ permissions:
   contents: read
   id-token: write
 
+# Prevent overlapping browser scrapes and let the pending run preflight the
+# snapshot after the running job finishes.
+concurrency:
+  group: refresh-fotbollskanalen-articles-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   scrape-fotbollskanalen-articles:
     runs-on: ubuntu-latest
