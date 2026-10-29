@@ -1,8 +1,8 @@
 /**
  * Authenticated nightly reader-history maintenance endpoint.
  *
- * GitHub Actions OIDC authorization is required before the manual=1 time-window bypass
- * is considered. The job consolidates batches, safely updates the reader-profile snapshot,
+ * GitHub Actions OIDC authorization is required. Only the restricted migration-marker push
+ * may use manual=1 outside the normal window. The job consolidates batches, safely updates the reader-profile snapshot,
  * retries reading-status writes, and precomputes Week Focus only on Saturday.
  */
 
