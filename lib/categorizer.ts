@@ -25,6 +25,27 @@ export function detectCategory(
     return "elfsborg";
   }
 
+  // FOTBOLL
+
+  if (
+    text.includes("champions league") ||
+    text.includes("premier league") ||
+    text.includes("conference league") ||
+    text.includes("europa league") ||
+    text.includes("allsvenskan") ||
+    text.includes("landslaget") ||
+    text.includes("fotboll") ||
+    text.includes("olof lundh") ||
+    text.includes("graham potter") ||
+    text.includes("noa bachner") ||
+    text.includes("bayern munchen") ||
+    text.includes("manchester united") ||
+    text.includes("serie a")
+  ) {
+    return "fotboll";
+  }
+
+
   // ECONOMY signals precede lifestyle so financial stories from broad RSS
   // feeds cannot leak into Culture, Food & Lifestyle due to words like "mat".
   if (
@@ -72,8 +93,8 @@ export function detectCategory(
     text.includes("matlagning") ||
     text.includes("matkultur") ||
     text.includes("bakning") ||
-    text.includes("vin") ||
-    text.includes("öl")
+    /(?:^|[^\\p{L}])vin(?:$|[^\\p{L}])/u.test(text) ||
+    /(?:^|[^\\p{L}])öl(?:$|[^\\p{L}])/u.test(text)
   ) {
     return "livsstil";
   }
@@ -128,26 +149,6 @@ export function detectCategory(
     text.includes("shelton")
   ) {
     return "tennis";
-  }
-
-  // FOTBOLL
-
-  if (
-    text.includes("champions league") ||
-    text.includes("premier league") ||
-    text.includes("conference league") ||
-    text.includes("europa league") ||
-    text.includes("allsvenskan") ||
-    text.includes("landslaget") ||
-    text.includes("fotboll") ||
-    text.includes("olof lundh") ||
-    text.includes("graham potter") ||
-    text.includes("noa bachner") ||
-    text.includes("bayern munchen") ||
-    text.includes("manchester united") ||
-    text.includes("serie a")
-  ) {
-    return "fotboll";
   }
 
   // VÄRLDEN
