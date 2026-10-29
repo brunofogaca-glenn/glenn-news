@@ -66,7 +66,7 @@ jobs:
             --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
             --header "Accept: application/json" \
             "$STATUS_URL")"
-          printf '%s\n' "$status" | jq '{ok, shouldRefresh, snapshotSavedAt, articleCount, localTime}'
+          printf '%s\n' "$status" | jq '{ok, shouldRefresh, snapshotSavedAt, articleCount, newestArticleAt, latestArticleAgeHours, localTime}'
           should_refresh="$(printf '%s' "$status" | jq -er '.shouldRefresh')"
           echo "should_refresh=$should_refresh" >> "$GITHUB_OUTPUT"
           if [[ "$should_refresh" != "true" ]]; then
