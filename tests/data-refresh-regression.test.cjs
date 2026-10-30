@@ -140,11 +140,24 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.equal(config.crons.length, 6);
 
   const boras = read(".github/workflows/refresh-boras-events.yml");
-  assert.match(boras, /cron: "13 0 \* \* \*"/);
+  assert.match(boras, /cron: "13 0-3 \* \* \*"/);
+  assert.match(boras, /group: refresh-boras-events-\$\{\{ github\.ref \}\}[\s\S]*queue: max/);
+  assert.match(boras, /Check whether today's Borås events snapshot already exists/);
+  assert.match(boras, /snapshot_check\.outputs\.should_refresh == 'true'/);
   assert.match(boras, /hour_num >= 1 && hour_num < 6/);
   assert.match(boras, /::error::Scheduled browser refresh started outside/);
+  const borasIngest = read("app/api/cron/ingest-boras-events/route.ts");
+  assert.match(borasIngest, /export async function GET\(request: Request\)/);
+  assert.match(borasIngest, /authorizeGitHubActionsRefresh\(request, "borasEvents"\)/);
+  assert.match(borasIngest, /hasFreshSnapshotForToday/);
+  assert.match(borasIngest, /shouldRefresh: !hasFreshSnapshotForToday\(snapshot, now\)/);
+  assert.match(borasIngest, /clock\.hour < 1 \|\| clock\.hour >= 6/);
+
   const fotbollskanalen = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
   assert.match(fotbollskanalen, /cron: "17,47 0,1,2,3 \* \* \*"/);
+  assert.match(fotbollskanalen, /group: refresh-fotbollskanalen-articles-\$\{\{ github\.ref \}\}[\s\S]*queue: max/);
+  assert.match(fotbollskanalen, /Check whether today's snapshot already exists/);
+  assert.match(fotbollskanalen, /snapshot_check\.outputs\.should_refresh == 'true'/);
   assert.match(fotbollskanalen, /hour_num >= 1 && hour_num < 6/);
   assert.match(fotbollskanalen, /::error::Scheduled browser refresh started outside/);
   const readerHistory = read(".github/workflows/process-reader-history.yml");
