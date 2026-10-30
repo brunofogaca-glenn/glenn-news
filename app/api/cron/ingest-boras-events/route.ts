@@ -17,8 +17,8 @@ function isDate(value: unknown): value is string {
   const date = new Date(value + "T12:00:00Z");
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
-function todayInStockholm() {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+function todayInStockholm(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
   return (parts.find(p => p.type === "year")?.value ?? "2000") + "-" +
     (parts.find(p => p.type === "month")?.value ?? "01") + "-" +
     (parts.find(p => p.type === "day")?.value ?? "01");
@@ -33,6 +33,53 @@ function safeImage(value: unknown) {
     const url = new URL(value);
     return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
   } catch { return undefined; }
+}
+
+function hasFreshSnapshotForToday(
+  snapshot: { savedAt: string; events: BrowserScrapedBorasEvent[] } | null,
+  now = new Date()
+) {
+  if (!snapshot || todayInStockholm(new Date(snapshot.savedAt)) !== todayInStockholm(now)) return false;
+  const today = todayInStockholm(now);
+  const cutoff = addDays(today, 60);
+  const upcomingCount = snapshot.events.filter(event =>
+    isDate(event.date) && event.date <= cutoff && (isDate(event.endDate) ? event.endDate : event.date) >= today
+  ).length;
+  return upcomingCount >= 6;
+}
+
+/**
+ * Read-only preflight for retrying scheduled runs. It avoids another browser
+ * scrape and Blob overwrite once today's validated snapshot is already stored.
+ */
+export async function GET(request: Request) {
+  if (!(await authorizeGitHubActionsRefresh(request, "borasEvents"))) {
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  const clock = getStockholmClock();
+  if (clock.hour < 1 || clock.hour >= 6) {
+    return Response.json({
+      ok: false,
+      error: "Borås events preflight is only allowed from 01:00–05:59 Europe/Stockholm",
+    }, { status: 503 });
+  }
+
+  const snapshot = await getBrowserScrapedBorasEvents();
+  const now = new Date();
+  const today = todayInStockholm(now);
+  const cutoff = addDays(today, 60);
+  const upcomingEventCount = snapshot?.events.filter(event =>
+    isDate(event.date) && event.date <= cutoff && (isDate(event.endDate) ? event.endDate : event.date) >= today
+  ).length ?? 0;
+
+  return Response.json({
+    ok: true,
+    shouldRefresh: !hasFreshSnapshotForToday(snapshot, now),
+    snapshotSavedAt: snapshot?.savedAt ?? null,
+    eventCount: snapshot?.events.length ?? 0,
+    upcomingEventCount,
+    localTime: String(clock.hour).padStart(2, "0") + ":" + String(clock.minute).padStart(2, "0"),
+  });
 }
 
 export async function POST(request: Request) {
