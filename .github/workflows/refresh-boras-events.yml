@@ -2,13 +2,19 @@ name: Refresh Borås events
 
 on:
   schedule:
-    # Run well before publication; late starts are skipped by the workflow and endpoint.
-    - cron: "13 0 * * *"
+    # Four attempts at :13 UTC avoid the top-of-hour load and stay inside
+    # 01:00–05:59 Europe/Stockholm in both CET and CEST.
+    - cron: "13 0-3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
+
+# Serialize browser refreshes and preserve every retry opportunity.
+concurrency:
+  group: refresh-boras-events-${{ github.ref }}
+  queue: max
 
 jobs:
   scrape-boras-events:
@@ -28,37 +34,72 @@ jobs:
             exit 1
           fi
 
-      - name: Check out repository
+      - name: Check whether today's Borås events snapshot already exists
+        id: snapshot_check
         if: steps.nightly_window.outputs.allowed == 'true'
+        env:
+          STATUS_URL: https://glenn-news.vercel.app/api/cron/ingest-boras-events
+          OIDC_AUDIENCE: https://glenn-news.vercel.app
+          VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+            echo "::error::GitHub Actions did not provide OIDC credentials. Ensure id-token: write is enabled."
+            exit 1
+          fi
+          if [[ -z "$VERCEL_BYPASS_SECRET" ]]; then
+            echo "::error::Add VERCEL_AUTOMATION_BYPASS_SECRET to GitHub Actions secrets."
+            exit 1
+          fi
+          oidc_response="$(curl --fail-with-body --silent --show-error --max-time 20 \
+            --get --data-urlencode "audience=$OIDC_AUDIENCE" \
+            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL")"
+          oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
+          status="$(curl --fail-with-body --silent --show-error --max-time 30 \
+            --header "Authorization: Bearer $oidc_token" \
+            --header "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET" \
+            --header "Accept: application/json" \
+            "$STATUS_URL")"
+          printf '%s\n' "$status" | jq '{ok, shouldRefresh, snapshotSavedAt, eventCount, upcomingEventCount, localTime}'
+          should_refresh="$(printf '%s' "$status" | jq -er '.shouldRefresh')"
+          echo "should_refresh=$should_refresh" >> "$GITHUB_OUTPUT"
+          if [[ "$should_refresh" != "true" ]]; then
+            echo "Today's Borås events snapshot is already stored; skipping browser install, scrape and Blob write."
+          fi
+
+      - name: Check out repository
+        if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
-        if: steps.nightly_window.outputs.allowed == 'true'
+        if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Cache Playwright Chromium
-        if: steps.nightly_window.outputs.allowed == 'true'
+        if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ubuntu-playwright-1.56.0-chromium
 
       - name: Install Playwright
-        if: steps.nightly_window.outputs.allowed == 'true'
+        if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
         run: npm install --no-save --package-lock=false playwright@1.56.0
 
       - name: Install browser
-        if: steps.nightly_window.outputs.allowed == 'true'
+        if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Read Borås.com event cards in a real browser
-        if: steps.nightly_window.outputs.allowed == 'true'
+        if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
         run: node scripts/scrape-boras-events.mjs
 
       - name: Upload rendered events and invalidate the local snapshot cache
-        if: steps.nightly_window.outputs.allowed == 'true'
+        if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
         env:
           INGEST_URL: https://glenn-news.vercel.app/api/cron/ingest-boras-events
           OIDC_AUDIENCE: https://glenn-news.vercel.app
