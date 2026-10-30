@@ -2,7 +2,7 @@ import { revalidateTag } from "next/cache";
 import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
 import { getCachedLocalSnapshot } from "@/lib/dailySnapshots";
 import { getStockholmClock } from "@/lib/updateSchedule";
-import { saveBrowserScrapedBorasEvents, type BrowserScrapedBorasEvent } from "@/lib/borasEventStore";
+import { getBrowserScrapedBorasEvents, saveBrowserScrapedBorasEvents, type BrowserScrapedBorasEvent } from "@/lib/borasEventStore";
 
 export const dynamic = "force-dynamic";
 
