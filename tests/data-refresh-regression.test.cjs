@@ -407,7 +407,7 @@ test("Borås events use an explicit public-event fallback when Borås.com has no
 
 test("Borås events are captured with a real browser and loaded from private cached snapshots", () => {
   const workflow = read(".github/workflows/refresh-boras-events.yml");
-  assert.ok(workflow.includes('cron: "13 0 * * *"'));
+  assert.ok(workflow.includes('cron: "13 0-3 * * *"'));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-boras-events.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-boras-events"));
