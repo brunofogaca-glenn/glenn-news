@@ -46,3 +46,12 @@ The daytime refresh guard and last-good snapshot protection are intentional inva
 - The root cause evidenced by the log is schedule delay, not a confirmed reader-history processor defect. The workflow and endpoint retain the `01:00–05:59 Europe/Stockholm` write guard.
 - Recovery follow-up is tracked in [issue #54](https://github.com/brunofogaca-glenn/glenn-news/issues/54). The proposed code change adds a second in-window schedule opportunity, reserves `manual=1` for the restricted migration-marker push, verifies that the endpoint did not return a skipped response, and prevents repeated snapshot writes when the stored profile matches the ledger marker.
 - This change is not considered production-verified until a valid scheduled run completes and the saved ledger/profile are checked.
+
+
+## Browser-scraping schedule hardening — 30 October 2026
+
+The 30 October follow-up confirmed that the Borås.com and Fotbollskanalen scheduled jobs did not reach Playwright or ingestion: both stopped at the 01:00–05:59 Europe/Stockholm guard after starting at 06:40 and 06:51 respectively. The last real Borås.com import was 27 October (12 events); the last real Fotbollskanalen import was 26 October (65 articles). This was a scheduling/recovery failure, not evidence that either website changed its markup.
+
+Tracked in [issue #66](https://github.com/brunofogaca-glenn/glenn-news/issues/66). The implementation adds four Borås attempts at :13 UTC during hours 00–03, an authenticated read-only same-day preflight to avoid repeat scraping/Blob writes, and `queue: max` serialization. Fotbollskanalen retains its eight :17/:47 attempts and now also uses `queue: max` so pending retries are preserved. Both retain the existing OIDC authorization and write-time guard.
+
+Do not mark this incident resolved until the new workflows have run in production during a valid window and the saved snapshots have been checked: Borås.com must return at least six upcoming events; Fotbollskanalen must save at least six valid articles with a newest article no older than 72 hours. The schedule changes do not relax source validation or authorize daytime writes.
