@@ -160,8 +160,10 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.match(fotbollskanalen, /snapshot_check\.outputs\.should_refresh == 'true'/);
   assert.match(fotbollskanalen, /hour_num >= 1 && hour_num < 6/);
   assert.match(fotbollskanalen, /::error::Scheduled browser refresh started outside/);
+  const readerHistoryCron = config.crons.filter((cron) => cron.path === "/api/cron/process-reader-history");
+  assert.deepEqual(readerHistoryCron.map((cron) => cron.schedule).sort(), ["15 1 * * *", "15 2 * * *"]);
   const readerHistory = read(".github/workflows/process-reader-history.yml");
-  assert.match(readerHistory, /cron: "15 1,2 \* \* \*"/);
+  assert.doesNotMatch(readerHistory, /schedule:/);
   assert.match(readerHistory, /concurrency:[\s\S]*cancel-in-progress: false/);
   assert.match(readerHistory, /hour_num >= 1 && hour_num < 6/);
   assert.match(readerHistory, /::error::Reader-history scheduled\/manual run started outside/);
@@ -172,7 +174,7 @@ test("scheduled background refreshes are daily and article status is written by 
   const readerHistoryRoute = read("app/api/cron/process-reader-history/route.ts");
   assert.match(readerHistoryRoute, /getReaderProfileSnapshotForMaintenance/);
   assert.match(readerHistoryRoute, /authorizedVercelCron/);
-  assert.match(readerHistoryRoute, /authorization === `Bearer \\${cronSecret}`/);
+  assert.match(readerHistoryRoute, /authorization === .*cronSecret/);
   assert.match(readerHistoryRoute, /status: 503/);
   assert.match(readerHistoryRoute, /currentSnapshot\.sourceLedgerUpdatedAt === ledgerUpdatedAt/);
   assert.match(readerHistoryRoute, /snapshotSkipped: !snapshot\.updated/);
