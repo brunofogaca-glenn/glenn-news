@@ -386,19 +386,27 @@ Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och
 
 Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
 
-### RECON-07 — GitHub Actions reader-history schedule can miss its local window (observed 29 October 2026)
+### RECON-07 — Nattliga jobb kan missa skrivfönstret (observerat 29–31 oktober 2026)
 
-**Observed:** The scheduled reader-history job ran at 09:24 Stockholm on 29 October and stopped at its time guard before processing or writing. GitHub Actions had delayed the scheduled invocation beyond the permitted `01:00–05:59 Europe/Stockholm` window. A scheduled run can also cross the boundary between the workflow guard and the production endpoint.
+**Observerat:** GitHub Actions kunde starta reader-history och browser-scraping långt efter 06:00 svensk tid. Dessa körningar stoppades av skrivfönstrets guard innan behandling, skrapning eller Blob-skrivning. Det visade ett schemaläggningsproblem, inte i sig ett fel i källornas markup.
 
-**Change in the recovery workflow:** Schedule two attempts at `01:15` and `02:15 UTC`, both within the local maintenance window across CET/CEST. Manual recovery dispatches are also required to be inside the window. The `manual=1` bypass is reserved for the restricted one-time migration-marker push and is enforced against the GitHub OIDC event claim. The workflow checks the API response so `ok: true, skipped: true` cannot be mistaken for successful processing.
+**Nuvarande implementation — migrering till Vercel Cron/Sandbox den 31 oktober:**
+- Reader-history körs av Vercel Cron vid `15 1,2 * * *` UTC. GitHub Actions är kvar som manuell OIDC-säkrad återställning och för den begränsade migration-marker-pushen.
+- Borås.com och Fotbollskanalen körs av en gemensam Vercel Cron-route vid `13 2,3 * * *` UTC. Den kontrollerar båda fasta Blob-snapshot-patharna först och startar ingen Sandbox om båda snapshotarna redan är aktuella för dagens Stockholm-datum.
+- När en källa behöver uppdateras startas en kortlivad Vercel Sandbox med Node 22 och Playwright 1.64.1/Chromium. Bara de skrapare som behöver uppdatering körs. Befintliga ingestion-rutter validerar payloaden och bevarar senaste giltiga snapshot vid fel.
+- Automatiska GitHub Actions-scheman för de tre jobben är borttagna. Manuella OIDC-säkrade återställningsflöden finns kvar.
+- Vercel Cron använder `CRON_SECRET`. `manual=1` för reader-history avvisas när anropet autentiseras med Cron-hemligheten; bypass kräver fortfarande den begränsade OIDC-auktoriserade migration-marker-pushen. Anrop utanför `01:00–05:59 Europe/Stockholm` ska returnera HTTP 503, inte en grön skip.
 
-**Cost and idempotency:** The workflow serializes overlapping maintenance runs. The profile snapshot records the update timestamp of its source ledger. Retries reuse the snapshot when that marker still matches, avoiding a redundant Blob write. If the ledger changes or the marker does not match (including when the ledger save succeeded but snapshot save failed), rebuild the snapshot. Weekly read marks and Saturday Week Focus precomputation remain retryable.
+**Kostnads- och idempotenskontrakt:**
+- Använd fasta privata Blob-paths och `get()`; lägg inte till `list()` för att hitta de två kända browser-snapshotarna.
+- Preflight ska undvika Sandbox, skrapning och Blob-skrivningar när snapshotarna redan är aktuella.
+- En normal lyckad dag ska kräva högst en browser-snapshot-`put()` per källa. Borås kan därutöver uppdatera den befintliga sammanslagna lokalsnapshoten; följ den operationen separat i kostnadsmätningen.
+- Inga lock-/indexblobbar utan mätning och ett separat designbeslut. Reader-history behåller sin befintliga listning för att hitta väntande batchar; ingen ny listning har lagts till.
+- Ledgerns `sourceLedgerUpdatedAt` fortsätter skydda profilsnapshoten mot redundanta skrivningar. Senaste giltiga data får inte ersättas med tom eller felaktig payload.
 
-**Limitation:** GitHub Actions can delay or drop both schedule opportunities. This is a risk reduction, not a guarantee. After release, verify that an in-window run reached the API and that the ledger/profile state is correct. Do not relax authorization, idempotency, last-good data or the local write guard to make the workflow green.
+**Verifiering och status:** Migreringen är mergad till `main` och driftsatt. CI passerade för både migreringen och den efterföljande reader-history-säkerhetshärdningen; senaste produktionsdeployment `b6fc04b0fcbc549b5ed2e4cc8d25888a69f0c008` är READY. Den första nattliga produktionskörningen har ännu inte verifierats. Den ska bekräfta reader ledger/profilmarkören, minst sex giltiga kommande Borås-evenemang, minst sex giltiga Fotbollskanalen-artiklar med senaste artikel högst 72 timmar gammal, beständig sammanslagen lokalsnapshot, Sandbox-start/cleanup och no-op-beteendet vid andra Cron-fönstret. Mät Blob Advanced Operations innan beslut om att ta bort någon källa.
 
-See [reader-history recovery issue #54](https://github.com/brunofogaca-glenn/glenn-news/issues/54).
-
-
+Se [reader-history recovery issue #54](https://github.com/brunofogaca-glenn/glenn-news/issues/54), [browser scraping issue #66](https://github.com/brunofogaca-glenn/glenn-news/issues/66), [migration tracking issue #69](https://github.com/brunofogaca-glenn/glenn-news/issues/69) och [backlog #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52).
 
 ## 12. Agilt förbättringsarbete och kontinuerlig prioritering
 
