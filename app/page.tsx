@@ -200,17 +200,36 @@ function buildMixedHomepageFeed(
   return feed;
 }
 
-function buildOverviewSummary(sections: EditorialSection[]) {
-  // Use the existing AI-written editorial summaries, but present them as one
-  // continuous overview instead of repeating a summary beneath each category.
+function buildOverviewHighlights(sections: EditorialSection[], dateKey: string) {
   return sections
     .map(section => {
-      const summary = section.summary?.replace(/\\s+/g, " ").trim() ?? "";
-      if (!summary) return "";
-      return summary.match(/^.*?[.!?](?=\\s|$)/)?.[0] ?? summary;
+      const summary = section.summary?.replace(/\s+/g, " ").trim() ?? "";
+      if (!summary) return null;
+
+      // Use the first complete thought from the already generated AI summary.
+      const firstSentence = summary.match(/^.*?[.!?](?=\s|$)/)?.[0]?.trim() ?? summary;
+      const words = firstSentence.split(/\s+/);
+      const text = words.length > 24
+        ? words.slice(0, 23).join(" ").replace(/[,:;–-]?$/, "") + "…"
+        : firstSentence;
+
+      const lead = section.stories[0] ?? section.allArticles?.[0];
+      const priority =
+        (lead?.newsScore ?? lead?.score ?? 0) * 0.55 +
+        (lead?.readingScore ?? 0) * 0.3 +
+        (lead?.publicImportanceScore ?? 0) * 0.15 +
+        (lead?.personalizationScore ?? 0) * 0.05;
+
+      return {
+        text,
+        priority,
+        tieBreak: feedOrderHash(dateKey + ":" + section.key),
+      };
     })
-    .filter(Boolean)
-    .join(" ");
+    .filter((item): item is { text: string; priority: number; tieBreak: number } => Boolean(item))
+    .sort((a, b) => b.priority - a.priority || a.tieBreak - b.tieBreak)
+    .slice(0, 3)
+    .map(item => item.text);
 }
 
 
@@ -325,7 +344,7 @@ export default async function Home() {
     sections.every(section => section.stories.length === 0);
 
   const mixedStories = buildMixedHomepageFeed(sections, edition.dateKey);
-  const overviewSummary = buildOverviewSummary(sections);
+  const overviewHighlights = buildOverviewHighlights(sections, edition.dateKey);
   const factPanelAfter = Array.from({ length: 6 }, (_, index) =>
     Math.max(0, Math.floor(((index + 1) * mixedStories.length) / 7) - 1)
   );
@@ -524,19 +543,32 @@ export default async function Home() {
 
         <section className="editorial-overview mt-7 border-y-2 border-slate-950 py-5 md:mt-9 md:py-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-800">Glenn News · Dagens överblick</div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Redaktionell sammanfattning</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-800">Glenn News · Överblick på 30 sekunder</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Redaktionens tre viktigaste punkter</div>
           </div>
           <h2 className="mt-3 max-w-5xl font-serif text-3xl font-black leading-[1.08] tracking-[-0.025em] md:text-5xl">
-            Dagens viktigaste – samlat på ett ställe.
+            Det här är viktigast idag.
           </h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.65fr)_minmax(220px,0.7fr)] md:items-start">
-            <div className="font-serif text-base leading-7 text-slate-700 md:text-lg md:leading-8">
-{overviewSummary || "Dagens viktigaste nyheter och läsvärda fördjupningar, samlade i ett enda redaktionellt flöde."}
+          <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1.7fr)_minmax(190px,0.55fr)] md:items-start">
+            <div className="editorial-highlights grid gap-4 sm:grid-cols-3 sm:gap-5">
+              {overviewHighlights.length > 0 ? overviewHighlights.map((highlight, index) => (
+                <div key={index} className="border-t-2 border-slate-900 pt-2.5">
+                  <div className="text-[9px] font-black uppercase tracking-[0.18em] text-orange-800">
+                    0{index + 1} · I korthet
+                  </div>
+                  <p className="mt-2 font-serif text-sm leading-6 text-slate-700 md:text-[15px] md:leading-6">
+                    {highlight}
+                  </p>
+                </div>
+              )) : (
+                <p className="font-serif text-sm leading-6 text-slate-600">
+                  Dagens viktigaste nyheter och läsvärda fördjupningar, samlade i ett enda redaktionellt flöde.
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3 border-t border-slate-300 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-              <div><div className="font-serif text-3xl font-black tabular-nums">{totalArticles}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Artiklar i nyhetsunderlaget</div></div>
-              <div><div className="font-serif text-3xl font-black tabular-nums">{sections.length}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Nyhetsområden</div></div>
+              <div><div className="font-serif text-3xl font-black tabular-nums">{totalArticles}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Artiklar i underlaget</div></div>
+              <div><div className="font-serif text-3xl font-black tabular-nums">{sections.length}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Bevakningsområden</div></div>
             </div>
           </div>
         </section>
