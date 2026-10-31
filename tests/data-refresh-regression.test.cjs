@@ -155,6 +155,9 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.ok(auth.includes("jwtVerify"));
   const readerRoute = read("app/api/cron/process-reader-history/route.ts");
   assert.ok(readerRoute.includes("processPendingReaderBatches(100)"));
+  assert.ok(readerRoute.includes("if (manualRun && isVercelCron)"));
+  assert.ok(readerRoute.includes('error: "Reader-history maintenance is only allowed from 01:00 to 05:59 Europe/Stockholm"'));
+  assert.ok(readerRoute.includes("}, { status: 503 });"));
   const browserRoute = read("app/api/cron/refresh-browser-sources/route.ts");
   assert.ok(browserRoute.includes("Sandbox.create"));
   assert.ok(browserRoute.includes("getBorasSnapshotStatus"));
