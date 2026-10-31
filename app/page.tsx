@@ -203,17 +203,20 @@ function buildMixedHomepageFeed(
 function buildOverviewHighlights(sections: EditorialSection[], dateKey: string) {
   return sections
     .map(section => {
-      const summary = section.summary?.replace(/\s+/g, " ").trim() ?? "";
+      const lead = section.stories[0] ?? section.allArticles?.[0];
+      // Prefer the short AI summary attached to the leading story. The section
+      // summary is only a fallback, because it is intentionally more expansive.
+      const summary = (lead?.aiSummary || section.summary || "")
+        .replace(/\s+/g, " ")
+        .trim();
       if (!summary) return null;
 
-      // Use the first complete thought from the already generated AI summary.
       const firstSentence = summary.match(/^.*?[.!?](?=\s|$)/)?.[0]?.trim() ?? summary;
       const words = firstSentence.split(/\s+/);
       const text = words.length > 24
         ? words.slice(0, 23).join(" ").replace(/[,:;–-]?$/, "") + "…"
         : firstSentence;
 
-      const lead = section.stories[0] ?? section.allArticles?.[0];
       const priority =
         (lead?.newsScore ?? lead?.score ?? 0) * 0.55 +
         (lead?.readingScore ?? 0) * 0.3 +
