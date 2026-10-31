@@ -55,7 +55,7 @@ Visible sections, interactions, responsive navigation and empty/error states are
 | Editorial ranking and generation | `lib/ranker.ts`, `lib/editorV2.ts`, `lib/dailyEdition.ts` |
 | Personalization and history | `lib/readerProfile.ts`, `lib/weeklyRead.ts`, `lib/weekFocus*.ts` |
 | Supplemental snapshots and fallbacks | `lib/dailySnapshots.ts`, `lib/supplementalCache.ts`, source-specific `*Cache.ts` modules |
-| Job orchestration and authorization | `.github/workflows/`, `lib/githubActionsAuth.ts`, `app/api/cron/` |
+| Job orchestration and authorization | `vercel.json`, `app/api/cron/`, `.github/workflows/` (manual recovery), `lib/githubActionsAuth.ts` |
 | Regression protection | `tests/ranker-regression.test.cjs`, `tests/data-refresh-regression.test.cjs`, `tests/diagnostic-log-regression.test.cjs` |
 
 ## How to make common changes
@@ -71,7 +71,7 @@ Visible sections, interactions, responsive navigation and empty/error states are
 - `vercel.json` uses `scripts/vercel-ignore-build.mjs` to skip Vercel builds only when the full change set consists of Markdown files in `docs/` or the root documentation files. Code, assets, configuration, tests, scripts, workflows, and lockfiles keep the normal build.
 - The ignore script uses Vercel's previous-successful-deployment SHA and current commit SHA. If either SHA or the diff is unavailable, it fails closed by allowing the build.
 - Vercel Pro Cron schedules do not guarantee the exact minute within the UTC hour; morning publication and supplemental refresh use redundant scheduled entries and local Stockholm time guards. Routes use `CRON_SECRET` for Vercel Cron and never trust a spoofable `User-Agent`.
-- GitHub Actions scheduled workflows can be delayed or dropped. Browser-ingestion and reader-history guards must fail visibly if a run misses its nightly window, rather than return a green no-op.
+- GitHub Actions scheduled workflows can be delayed or dropped, so Borås.com, Fotbollskanalen and reader-history no longer use automatic GitHub schedules. Vercel Cron owns those jobs; GitHub Actions is manual OIDC-protected recovery only. The same Stockholm write-window guards remain and missed/failed work must fail visibly.
 - GitHub Actions runs regression suites for application/test changes, while Vercel owns Next.js compilation. Markdown-only changes skip both workflows. Local `npm run build` remains the full test-and-build command.
 - Recent and weekly reader-activity queries read the consolidated ledger first. Legacy per-click payloads are downloaded only when their timestamps could change the visible top-N; a legacy-list failure preserves ledger-backed activity instead of turning the view empty.
 

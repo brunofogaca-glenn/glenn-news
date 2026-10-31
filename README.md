@@ -42,7 +42,7 @@ npm run lint
 
 ## Operational notes
 
-- Times and date keys use `Europe/Stockholm`; GitHub cron schedules are configured in UTC.
+- Times and date keys use `Europe/Stockholm`; automatic schedules are configured as Vercel Cron expressions in UTC. GitHub Actions workflows for browser refresh and reader history are manual recovery only.
 - Editorial feeds are gated until 06:00. Supplemental and reader-history work runs in its scheduled background windows.
 - Do not add Blob writes to every click or move expensive source fetching into React page/components. Prefer existing cache-aware helpers and batch/background processing.
 - The initial reader-history migration marker at `.github/run-reader-history-migration` is an operational trigger. Do not edit it unless intentionally re-running that migration.
