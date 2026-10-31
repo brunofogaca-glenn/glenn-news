@@ -38,7 +38,7 @@ Läs alltid denna kravspecifikation först. Läs därefter bara de detaljerade d
 - **Produktavsikt / ej kodregel** — det är ett mål eller användningsmönster, inte ett hårt krav som aktuell kod upprätthåller.
 - **Behöver synkas** — det finns en känd motsägelse eller oklarhet som inte ska döljas.
 
-Statusen avser senast granskad kod den 29 oktober 2026; den är inte ett påstående om att varje extern datakälla eller den första nattliga körningen efter utrullning redan har verifierats.
+Statusen avser senast granskad kod den 31 oktober 2026; den är inte ett påstående om att varje extern datakälla eller den första nattliga körningen efter utrullning redan har verifierats.
 
 ## 2. Produktdefinition och designprinciper
 
@@ -53,6 +53,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 - **Låg och förutsägbar driftkostnad.** Undvik upprepade Blob-skrivningar, externa anrop och AI-anrop för varje klick eller sidrendering.
 - **Spårbarhet.** För synliga beteenden och viktiga dataflöden ska det gå att hitta ägande kod, relevant regressionstest och dokumentation.
 - **Ärlighet om data.** Skilj på aktuell, inaktuell, partiell, tom och felaktig data. Gissa inte saknade fakta.
+- **Upptäckande framför kategoriblock.** Startsidan ska kännas som ett enda redaktionellt flöde: artiklar från olika ämnen blandas visuellt, medan kategori bara är en diskret etikett. Variation ska skapa överraskning utan att ändra urval, ranking eller artikelmängd.
 
 ## 3. Kravregister
 
@@ -65,6 +66,8 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | UI-03 | Mobilnavigeringen ska ha de fyra destinationerna, markera aktuell sida och inte skymma sidinnehåll. | Implementerat | `app/components/MobileNav.tsx`, [UI-guiden](ui-feature-guide.md) |
 | UI-04 | Asynkrona kontroller ska visa begripliga fel-/statuslägen, korrekta disabled-lägen och tillgängliga etiketter/roller. Hemliga värden får aldrig exponeras i felmeddelanden. | Implementerat; generell testning | [UI-guiden](ui-feature-guide.md), berörda sid- och komponentfiler |
 | UI-05 | Alla ändringar av routes, navigation, paneler, knappar, responsivitet eller tomma/felaktiga lägen ska dokumenteras i UI-guiden. | Agentregel | [AGENTS.md](../AGENTS.md), [UI-guiden](ui-feature-guide.md) |
+| UI-06 | Startsidan presenterar de sju redaktionella områdena som ett blandat flöde, inte separata kategorisektioner. Kategorin finns kvar som artikelmetadata; alla valda artiklar och Elfsborgs fulla bevakning ska finnas kvar. | Implementerat + testskyddat | `app/page.tsx`, `tests/ranker-regression.test.cjs`, [UI-guiden](ui-feature-guide.md) |
+| UI-07 | Överblicken högst upp ska vara kort och lätt att skanna: högst tre numrerade punkter byggda av befintliga korta AI-sammanfattningar, utan extra AI-anrop. | Implementerat + testskyddat | `app/page.tsx`, `tests/ranker-regression.test.cjs` |
 
 ### B. Morgonutgåva och publicering
 

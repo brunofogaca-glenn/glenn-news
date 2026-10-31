@@ -10,6 +10,8 @@ This is the quick map for making a targeted change without needing to rediscover
 2. Editorial selection, validation, duplicate prevention, and dated publication live in `lib/dailyEdition.ts`, `lib/editorV2.ts`, and `lib/ranker.ts`.
 3. `app/page.tsx` composes the saved morning edition with cached supplemental panels. Keep provider parsing and live fetching out of the page component.
 
+4. Homepage presentation is deliberately separate from editorial selection: `buildMixedHomepageFeed` interleaves the seven saved category buckets using the edition date as a stable seed, preserving each bucket's ranking and Elfsborg's full-coverage pool. The overview reuses existing lead-story AI summaries. Fact panels are inserted as presentation interstitials; no source fetch, AI call, Blob write or article selection is performed by the layout mapping.
+
 **Key files:** `app/page.tsx`, `lib/dailyEdition.ts`, `lib/rss.ts`, `lib/webSources.ts`, `lib/editorV2.ts`, `lib/ranker.ts`.
 
 Visible sections, interactions, responsive navigation and empty/error states are documented in [UI and feature guide](ui-feature-guide.md).
