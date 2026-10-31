@@ -1,6 +1,6 @@
 # Glenn News — produktkrav och agentkontrakt
 
-**Status för denna sammanställning:** uppdaterad mot produktionskod och den aktuella datakvalitetskompletteringen den 29 oktober 2026.  
+**Status för denna sammanställning:** uppdaterad mot produktionskod och den aktuella datakvalitetskompletteringen den 31 oktober 2026.  
 **Syfte:** vara den obligatoriska, gemensamma startpunkten för alla framtida agenter och kodändringar i Glenn News.
 
 > **Regel för alla framtida agenter:** Läs detta dokument först vid varje uppgift. Identifiera berörda krav-ID:n och deras status innan du ändrar kod. Följ sedan den relevanta detaljdokumentationen och inspektera den faktiska implementationen och testerna. Uppdatera detta dokument när krav, produktbeteende, status, datakontrakt eller viktiga tekniska invariants ändras.
@@ -77,7 +77,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | ED-05 | Dubbletter ska filtreras med normaliserade länkar och rubriker. Dagens urval ska undvika artiklar från de föregående sju dagsutgåvorna, inte bara gårdagen. | Implementerat; skyddet är delvis testat | `lib/dailyEdition.ts`, `lib/editorV2.ts`, `lib/rss.ts` |
 | ED-06 | Spara högst en giltig utgåva per datum i normal drift. Återförsök ska återanvända en redan publicerad giltig utgåva när publiceringsreglerna säger att den är tillräckligt färsk. | Implementerat; tidsdetalj behöver synkas | `lib/dailyEdition.ts`, `app/api/cron/refresh-news/route.ts`, avsnitt 14 |
 | ED-07 | Om dagens utgåva misslyckas får en tidigare utgåva bara visas med tydlig etikett `Reservedition · inte dagens nyhetsurval` och sitt datum. Om ingen giltig reserv finns ska ett tydligt otillgängligt läge visas med en återförsöksväg. | Implementerat + testskyddat | `lib/dailyEdition.ts`, `app/page.tsx`, refresh-tester |
-| ED-08 | Morgonutgåvan ska vara avsedd att vara klar omkring 06.30 svensk tid. Vercel Hobby kan starta schemalagda jobb när som helst inom cron-timmen; den exakta startminuten är inte garanterad. | Behöver synkas mellan avsikt och schemaläggningsbeteende | `vercel.json`, `app/api/cron/refresh-news/route.ts`, `lib/dailyEdition.ts`, avsnitt 14 |
+| ED-08 | Morgonutgåvan ska vara avsedd att vara klar omkring 06.30 svensk tid. Vercel Pro Cron kan ha variation i faktisk start-/leveranstid och garanterar inte att en viss minut alltid nås. | Behöver synkas mellan publiceringsmål och schemaläggningsbeteende | `vercel.json`, `app/api/cron/refresh-news/route.ts`, `lib/dailyEdition.ts`, avsnitt 14 |
 | ED-09 | En manuell källuppdatering får inte skriva om dagens sparade morgonutgåva. Återskapande av saknad utgåva är en separat, uttrycklig återförsöksfunktion. | Implementerat + testskyddat | `app/actions.ts`, `app/components/RetryMorningEditionButton.tsx`, refresh-tester |
 | ED-10 | Bildberikning ska vara begränsad i parallellism och tid, och får inte stoppa hela publiceringen om en bildhämtning blir långsam eller misslyckas. | Implementerat | `lib/editorV2.ts` |
 
@@ -105,8 +105,8 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | READ-01 | Artikelklick i tidningen och Veckofokus ska köas i webbläsarens `sessionStorage`; en klickhändelse uppdaterar en lokal räknare men är inte bevis på att serverprofilen redan är sparad. | Implementerat | `app/components/TrackableLink.tsx`, `WeeklyStoryLink.tsx`, `readerQueue.ts` |
 | READ-02 | Användaren ska uttryckligen kunna spara läsningen efteråt. Varje batch får innehålla högst 50 händelser. En större kö skickas över flera sparningar. | Implementerat + testskyddat | `SaveReadingHistoryButton.tsx`, `app/api/events/batch/route.ts`, refresh-/diagnostiktester |
 | READ-03 | Misslyckad batch ska kunna återförsökas utan att osparade klick försvinner. Validering ska avvisa felaktiga batchar, URL:er, tidsstämplar eller orimligt långa fält. | Implementerat | `readerQueue.ts`, `app/api/events/batch/route.ts` |
-| READ-04 | Händelser ska först lagras som batchar och konsolideras av nattjobbet till en gemensam historik-ledger. Samma händelse eller batch får inte dubbelräknas vid återförsök. | Implementerat + testskyddat | `lib/readerProfile.ts`, `app/api/cron/process-reader-history/route.ts`, diagnostik-/refresh-tester |
-| READ-05 | Klick ska inte utlösa en Blob-skrivning eller individuell AI-klassificering per artikel. Profilaggregering och eventuell historikunderhåll sker i bakgrundsjobbet. | Implementerat + testskyddat | `lib/readerProfile.ts`, batch-API, nattworkflow |
+| READ-04 | Händelser ska först lagras som batchar och konsolideras av Vercel Cron till en gemensam historik-ledger. Samma händelse eller batch får inte dubbelräknas vid återförsök. | Implementerat + testskyddat | `lib/readerProfile.ts`, `app/api/cron/process-reader-history/route.ts`, diagnostik-/refresh-tester |
+| READ-05 | Klick ska inte utlösa en Blob-skrivning eller individuell AI-klassificering per artikel. Profilaggregering och eventuell historikunderhåll sker i Vercel Cron-bakgrundsjobbet. | Implementerat + testskyddat | `lib/readerProfile.ts`, batch-API, Vercel Cron-route |
 | READ-06 | Om historik eller profil inte kan läsas på ett tillförlitligt sätt får giltiga tidigare data inte ersättas med tom historik. Behåll ledger/snapshot och använd säker reservväg där sådan finns. | Implementerat; regressionstestning delvis | `lib/readerProfile.ts`, `AGENTS.md`, diagnostik-/refresh-tester |
 | READ-07 | Profilen ska bygga på kategori, artikeltyp, källa, ämne samt semantiska ämnen, taggar, personer/lag/organisationer och geografi när klassificerade signaler finns. | Implementerat | `lib/readerProfile.ts`, `app/profil/page.tsx` |
 | READ-08 | Profilvyn ska visa läsaktivitet och intressetendenser, inklusive 7-/30-dagarsaktivitet, läsrytm, favoritkällor och upp till 20 senaste registrerade aktiviteter. Svaga signaler ska inte presenteras som säkra preferenser. | Implementerat | `app/profil/page.tsx`, UI-guiden |
@@ -152,7 +152,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | OPS-03 | Visa sparad status för morgonhämtning och nattlig kompletteringskörning utan att själva statusvisningen startar nya leverantörsanrop. | Implementerat + testskyddat | `lib/articleRefreshStatus.ts`, `lib/supplementalRefreshRun.ts`, `app/health/page.tsx` |
 | OPS-04 | När diagnostikhistorik är tillgänglig ska vyn kunna filtrera 24 timmar/sju dagar och fel/varningar, tillåta omladdning och kopiering samt visa begriplig status. När historiken är avstängd ska UI förklara detta och inte visa tom lista som bevis på felfri drift. Högst 80 poster visas. | Implementerat + regressionstest | `app/components/HealthLogPanel.tsx`, `app/health/page.tsx`, diagnostiktester |
 | OPS-05 | Loggar ska maskera vanliga hemligheter/tokens och URL-frågeparametrar, begränsa kontextfält och deduplicera upprepade fel. Persistenta Blob-skrivningar för varje diagnostikhändelse ska undvikas. | Implementerat + testskyddat | `lib/diagnosticLog.ts`, diagnostiktester |
-| OPS-06 | Kompletterande faktapaneler uppdateras via två Vercel Cron-fönster före 06.00 svensk tid. Källspecifika TTL:er styr när cache tvingas uppdateras; missade nattfönster rapporteras som fel, inte som framgångsrika överhoppningar. | Implementerat + testskyddat | `vercel.json`, `app/api/cron/refresh-data/route.ts`, `tests/data-refresh-regression.test.cjs` |
+| OPS-06 | Kompletterande faktapaneler, läshistorik och webbläsarskrapningar schemaläggs med Vercel Cron före 06.00 svensk tid. Borås.com och Fotbollskanalen körs i en isolerad Vercel Sandbox; GitHub Actions behålls endast för manuell återställning. Idempotens, sista giltiga snapshot och Blob-kostnadsgränser ska bevaras. | Implementerat; produktionsverifiering av nya nattkörningar återstår | `vercel.json`, `app/api/cron/refresh-data/route.ts`, `app/api/cron/process-reader-history/route.ts`, `app/api/cron/refresh-browser-sources/route.ts`, refresh-tester |
 
 ## 4. Aktiva datakällor och cachetider
 
@@ -191,7 +191,7 @@ Tider uttrycks i UTC i CI/cron-konfiguration men tidsgränser i applikationskod 
 
 Viktiga invariants:
 
-- Vercel Hobby garanterar inte den exakta cron-minuten inom den valda UTC-timmen och utför inte automatiskt ett obegränsat felåterförsök.
+- Vercel Pro garanterar inte den exakta cron-minuten inom den valda UTC-timmen och utför inte automatiskt ett obegränsat felåterförsök.
 - Den andra morgonkörningen ska undvika onödigt arbete när en giltig och tillräckligt färsk utgåva finns; vid markerad källhämtning som `retry` kan ett nytt försök göras.
 - Nattjobben anropar produktionsrutter med kortlivad GitHub Actions OIDC-token. Routens autentisering ska kontrollera token-signatur, audience, repository, `main`-ref, godkänt workflow och tillåtet event.
 - Deployment-protection-bypass tillåter endast passage av Vercels yttre skydd. Den ersätter aldrig routens OIDC-kontroll.
@@ -271,7 +271,7 @@ Inför inte följande utan uttryckligt nytt produktbeslut:
 Följande intentioner har förekommit kring produkten, men får inte beskrivas som kodgarantier utan en separat verifiering och tydligt implementerat krav:
 
 - **Normal läsperiod 07.00–11.00:** användningsmönster, inte en tidsgrind. Läsklick ska fortsatt kunna registreras andra tider.
-- **Morgonupplaga vid 06.30:** publiceringsmål/färskhetsregel; Vercel Hobby kan inte garantera en exakt körminut. Se avvikelsen i avsnitt 14.
+- **Morgonupplaga vid 06.30:** publiceringsmål/färskhetsregel; Vercel Pro kan inte garantera en exakt körminut. Se avvikelsen i avsnitt 14.
 - **Ingen återpublicering från de senaste dagarna:** nuvarande kod strävar efter en starkare sju-utgåvors dubblettgräns.
 - **15 artiklar per kategori:** detta är inte nuvarande visningskontrakt. Aktuella urval är redaktionellt begränsade och kategori-/sportberoende; ändra inte antal utan produktbeslut.
 - **Att extern artikel-läsning ingår i profilen:** endast registrerade Glenn News-interaktioner räknas automatiskt.
@@ -370,9 +370,9 @@ Ta bort eller ändra ett avvikelse-ID först när koden, regressionstester och r
 
 **Observerat:** Produktionspanelen `/health` markerade Fotbollskanalen som inaktuell, med senaste daterade artikel 24 oktober 2026 kl. 14.00 svensk tid. De tidigare GitHub Actions-körningarna [#24 den 28 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40646434245) och [#25 den 29 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40833131784) startade efter kl. 06.00 och misslyckades i tidsgrinden; scraping och ingestion kördes därför inte.
 
-**Åtgärd i kod:** PR #50 lades i produktion via commit [403464d](https://github.com/brunofogaca-glenn/glenn-news/commit/403464dbec1679ab7d530dfecac2b188910c514d). Den införde fyra nattliga schemaförsök, en autentiserad read-only preflight, idempotent ingestion samt 72-timmarsvalidering. Den kompletterande uppföljningen ökar nu till åtta schematillfällen: minuter 17 och 47 under UTC-timmarna 00–03. Preflight hoppar över Playwright och Blob-skrivning när dagens sparade snapshot redan har artiklar som är högst 72 timmar gamla. Tidsgränsen 01.00–05.59 och kravet på minst sex giltiga artiklar behålls. Den stora Fotbollskanalen-HTML-reserven hämtas utan Next.js-datacache eftersom svaret överskrider gränsen för cachelagrade svar.
+**Åtgärd i kod:** PR #50 lades i produktion via commit [403464d](https://github.com/brunofogaca-glenn/glenn-news/commit/403464dbec1679ab7d530dfecac2b188910c514d). Den införde fyra nattliga schemaförsök, en autentiserad read-only preflight, idempotent ingestion samt 72-timmarsvalidering. Automatschemat är nu flyttat till två Vercel Cron-fönster per natt. En gemensam Vercel Sandbox kör endast de skrapare som behöver uppdateras; GitHub Actions har övergått till manuell återställning. Preflight hoppar över Sandbox och Blob-skrivning när dagens snapshot redan är aktuell. Tidsgränsen 01.00–05.59 och kravet på minst sex giltiga artiklar behålls. Den stora Fotbollskanalen-HTML-reserven hämtas utan Next.js-datacache eftersom svaret överskrider gränsen för cachelagrade svar.
 
-**Fortfarande att observera:** Vid denna dokumentrevision har en färsk post-release-import ännu inte bekräftats. Koden är utrullad men datakällans nästa nattkörning måste fortfarande bevisa att artiklarna har sparats och att `/health` visar nyare artikeldata. Den daterade morgonutgåvan skrivs inte om under dagen; kategorikorrigeringen syns i nästa nygenererade utgåva. Om nattkörningen inte lyckas, följ workflowloggar och `/health` och återöppna ärendet.
+**Verifiering efter migreringen:** Båda skraparna har körts framgångsrikt i en isolerad Vercel Sandbox under utvecklingstest och gav validerbara payloads. Den första schemalagda produktionskörningen måste fortfarande bekräfta att Vercel Cron startar rutten, att snapshots sparas och att `/health` visar nyare artikeldata. Den daterade morgonutgåvan skrivs inte om under dagen. Om produktionskörningen misslyckas, följ Vercel Runtime Logs och `/health` och återöppna ärendet.
 
 Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
 

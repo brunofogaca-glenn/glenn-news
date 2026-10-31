@@ -1,10 +1,7 @@
 name: Refresh Borås events
 
 on:
-  schedule:
-    # Four attempts at :13 UTC avoid the top-of-hour load and stay inside
-    # 01:00–05:59 Europe/Stockholm in both CET and CEST.
-    - cron: "13 0-3 * * *"
+  # Vercel Cron owns automatic production runs. GitHub Actions is manual recovery only.
   workflow_dispatch:
 
 permissions:
@@ -84,11 +81,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ubuntu-playwright-1.56.0-chromium
+          key: ubuntu-playwright-1.64.1-chromium
 
       - name: Install Playwright
         if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
-        run: npm install --no-save --package-lock=false playwright@1.56.0
+        run: npm install --no-save --package-lock=false playwright@1.64.1
 
       - name: Install browser
         if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'

@@ -1,6 +1,6 @@
 # Glenn News
 
-Glenn News is a personal Swedish news reader built with Next.js App Router, TypeScript, Vercel Blob, and scheduled GitHub Actions jobs. The homepage serves a prepared morning edition alongside cached supplemental panels. Reader interactions are batched so that the reader profile is updated overnight instead of being rewritten for each click.
+Glenn News is a personal Swedish news reader built with Next.js App Router, TypeScript, Vercel Blob, Vercel Cron, and Vercel Sandbox browser jobs. GitHub Actions remains available for manual recovery. The homepage serves a prepared morning edition alongside cached supplemental panels. Reader interactions are batched so that the reader profile is updated overnight instead of being rewritten for each click.
 
 ## Start here
 

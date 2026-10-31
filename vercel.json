@@ -23,6 +23,14 @@
     {
       "path": "/api/cron/refresh-data",
       "schedule": "13 1 * * *"
+    },
+    {
+      "path": "/api/cron/process-reader-history",
+      "schedule": "15 1,2 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-browser-sources",
+      "schedule": "13 2,3 * * *"
     }
   ],
   "$schema": "https://openapi.vercel.sh/vercel.json",

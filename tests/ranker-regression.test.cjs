@@ -446,6 +446,8 @@ test("production morning edition contract keeps Stockholm scheduling, validation
       ["/api/cron/refresh-news", "34 5 * * *"],
       ["/api/cron/refresh-data", "13 0 * * *"],
       ["/api/cron/refresh-data", "13 1 * * *"],
+      ["/api/cron/process-reader-history", "15 1,2 * * *"],
+      ["/api/cron/refresh-browser-sources", "13 2,3 * * *"],
     ],
     "UTC schedules cover the whole 06:00–06:59 Stockholm hour in both CET and CEST, with two possible attempts"
   );

@@ -1,11 +1,7 @@
 name: Refresh Fotbollskanalen articles
 
 on:
-  schedule:
-    # GitHub schedules can be substantially delayed. Retry twice per UTC hour
-    # inside the overnight Stockholm write window. The authenticated preflight
-    # avoids duplicate scraping and Blob writes after a successful ingestion.
-    - cron: "17,47 0,1,2,3 * * *"
+  # Vercel Cron owns automatic production runs. GitHub Actions is manual recovery only.
   workflow_dispatch:
 
 permissions:
@@ -89,11 +85,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ubuntu-playwright-1.56.0-chromium
+          key: ubuntu-playwright-1.64.1-chromium
 
       - name: Install Playwright
         if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'
-        run: npm install --no-save --package-lock=false playwright@1.56.0
+        run: npm install --no-save --package-lock=false playwright@1.64.1
 
       - name: Install browser
         if: steps.nightly_window.outputs.allowed == 'true' && steps.snapshot_check.outputs.should_refresh == 'true'

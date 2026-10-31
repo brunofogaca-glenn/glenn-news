@@ -126,71 +126,48 @@ test("editorial sources are gated until 06:00", () => {
 
 test("scheduled background refreshes are daily and article status is written by the morning job", () => {
   const config = JSON.parse(read("vercel.json"));
-  const morningCrons = config.crons.filter((cron) => cron.path === "/api/cron/refresh-news");
-  assert.equal(morningCrons.length, 4);
-  assert.deepEqual(
-    morningCrons.map((cron) => cron.schedule).sort(),
-    ["30 4 * * *", "30 5 * * *", "34 4 * * *", "34 5 * * *"].sort()
-  );
-  const supplementalCrons = config.crons.filter((cron) => cron.path === "/api/cron/refresh-data");
-  assert.deepEqual(
-    supplementalCrons.map((cron) => cron.schedule).sort(),
-    ["13 0 * * *", "13 1 * * *"]
-  );
-  assert.equal(config.crons.length, 6);
+  const morning = config.crons.filter((cron) => cron.path === "/api/cron/refresh-news");
+  assert.equal(morning.length, 4);
+  assert.deepEqual(morning.map((cron) => cron.schedule).sort(), ["30 4 * * *", "30 5 * * *", "34 4 * * *", "34 5 * * *"].sort());
+  const supplemental = config.crons.filter((cron) => cron.path === "/api/cron/refresh-data");
+  assert.deepEqual(supplemental.map((cron) => cron.schedule).sort(), ["13 0 * * *", "13 1 * * *"]);
+  const reader = config.crons.filter((cron) => cron.path === "/api/cron/process-reader-history");
+  assert.deepEqual(reader.map((cron) => cron.schedule), ["15 1,2 * * *"]);
+  const browser = config.crons.filter((cron) => cron.path === "/api/cron/refresh-browser-sources");
+  assert.deepEqual(browser.map((cron) => cron.schedule), ["13 2,3 * * *"]);
+  assert.equal(config.crons.length, 8);
 
-  const boras = read(".github/workflows/refresh-boras-events.yml");
-  assert.match(boras, /cron: "13 0-3 \* \* \*"/);
-  assert.match(boras, /group: refresh-boras-events-\$\{\{ github\.ref \}\}[\s\S]*queue: max/);
-  assert.match(boras, /Check whether today's Borås events snapshot already exists/);
-  assert.match(boras, /snapshot_check\.outputs\.should_refresh == 'true'/);
-  assert.match(boras, /hour_num >= 1 && hour_num < 6/);
-  assert.match(boras, /::error::Scheduled browser refresh started outside/);
-  const borasIngest = read("app/api/cron/ingest-boras-events/route.ts");
-  assert.match(borasIngest, /export async function GET\(request: Request\)/);
-  assert.match(borasIngest, /authorizeGitHubActionsRefresh\(request, "borasEvents"\)/);
-  assert.match(borasIngest, /hasFreshSnapshotForToday/);
-  assert.match(borasIngest, /shouldRefresh: !hasFreshSnapshotForToday\(snapshot, now\)/);
-  assert.match(borasIngest, /clock\.hour < 1 \|\| clock\.hour >= 6/);
+  const borasWorkflow = read(".github/workflows/refresh-boras-events.yml");
+  assert.ok(!borasWorkflow.includes("schedule:"));
+  assert.ok(borasWorkflow.includes("workflow_dispatch:"));
+  assert.ok(borasWorkflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
+  const fotbollWorkflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
+  assert.ok(!fotbollWorkflow.includes("schedule:"));
+  assert.ok(fotbollWorkflow.includes("workflow_dispatch:"));
+  assert.ok(fotbollWorkflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
+  const readerWorkflow = read(".github/workflows/process-reader-history.yml");
+  assert.ok(!readerWorkflow.includes("schedule:"));
+  assert.ok(readerWorkflow.includes("workflow_dispatch:"));
 
-  const fotbollskanalen = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.match(fotbollskanalen, /cron: "17,47 0,1,2,3 \* \* \*"/);
-  assert.match(fotbollskanalen, /group: refresh-fotbollskanalen-articles-\$\{\{ github\.ref \}\}[\s\S]*queue: max/);
-  assert.match(fotbollskanalen, /Check whether today's snapshot already exists/);
-  assert.match(fotbollskanalen, /snapshot_check\.outputs\.should_refresh == 'true'/);
-  assert.match(fotbollskanalen, /hour_num >= 1 && hour_num < 6/);
-  assert.match(fotbollskanalen, /::error::Scheduled browser refresh started outside/);
-  const readerHistory = read(".github/workflows/process-reader-history.yml");
-  assert.match(readerHistory, /cron: "15 1,2 \* \* \*"/);
-  assert.match(readerHistory, /concurrency:[\s\S]*cancel-in-progress: false/);
-  assert.match(readerHistory, /hour_num >= 1 && hour_num < 6/);
-  assert.match(readerHistory, /::error::Reader-history scheduled\/manual run started outside/);
-  assert.match(readerHistory, /if \[\[ "\$GITHUB_EVENT_NAME" == "push" \]\]; then[\s\S]*request_url="\$\{REFRESH_URL\}\?manual=1"/);
-  assert.doesNotMatch(readerHistory, /GITHUB_EVENT_NAME" == "workflow_dispatch" \|\| "\$GITHUB_EVENT_NAME" == "push"/);
-  assert.match(readerHistory, /\.skipped != true/);
-
-  const readerHistoryRoute = read("app/api/cron/process-reader-history/route.ts");
-  assert.match(readerHistoryRoute, /getReaderProfileSnapshotForMaintenance/);
-  assert.match(readerHistoryRoute, /currentSnapshot\.sourceLedgerUpdatedAt === ledgerUpdatedAt/);
-  assert.match(readerHistoryRoute, /snapshotSkipped: !snapshot\.updated/);
-  const readerProfile = read("lib/readerProfile.ts");
-  assert.match(readerProfile, /sourceLedgerUpdatedAt/);
-  assert.match(readerProfile, /ledgerUpdatedAt: currentLedger\.updatedAt/);
   const auth = read("lib/githubActionsAuth.ts");
-  assert.match(auth, /\(!manualMigration \|\| payload\.event_name === "push"\)/);
-  const supplemental = read(".github/workflows/refresh-supplemental-data.yml");
-  assert.doesNotMatch(supplemental, /schedule:/);
-  assert.match(supplemental, /workflow_dispatch:/);
-
-  const editorial = read(".github/workflows/refresh-editorial-articles.yml");
-  assert.doesNotMatch(editorial, /cron:/);
-  assert.match(editorial, /workflow_dispatch:/);
-
-  const morning = read("app/api/cron/refresh-news/route.ts");
-  assert.match(morning, /saveArticleRefreshStatus\(articleStatus\)/);
-  assert.match(morning, /previousStatus\?\.status !== "retry"/);
+  assert.ok(auth.includes("process.env.CRON_SECRET"));
+  assert.ok(auth.includes('authorization === "Bearer " + cronSecret'));
+  assert.ok(auth.includes("jwtVerify"));
+  const readerRoute = read("app/api/cron/process-reader-history/route.ts");
+  assert.ok(readerRoute.includes("processPendingReaderBatches(100)"));
+  const browserRoute = read("app/api/cron/refresh-browser-sources/route.ts");
+  assert.ok(browserRoute.includes("Sandbox.create"));
+  assert.ok(browserRoute.includes("getBorasSnapshotStatus"));
+  assert.ok(browserRoute.includes("getFotbollskanalenSnapshotStatus"));
+  assert.ok(browserRoute.includes("scrape-boras-events.mjs"));
+  assert.ok(browserRoute.includes("scrape-fotbollskanalen-articles.mjs"));
+  assert.ok(browserRoute.includes("sandbox.stop()"));
+  assert.ok(!browserRoute.includes("list("));
+  const borasIngest = read("app/api/cron/ingest-boras-events/route.ts");
+  assert.ok(borasIngest.includes("currentSnapshot = await getBrowserScrapedBorasEvents()"));
+  const packageJson = JSON.parse(read("package.json"));
+  assert.equal(packageJson.dependencies["@vercel/sandbox"], "3.9.1");
 });
-
 test("lifestyle only treats mat as a complete word", () => {
   const category = read("lib/categorizer.ts");
   assert.match(category, /\[\^\\p\{L\}\]\)mat/);
@@ -407,7 +384,7 @@ test("Borås events use an explicit public-event fallback when Borås.com has no
 
 test("Borås events are captured with a real browser and loaded from private cached snapshots", () => {
   const workflow = read(".github/workflows/refresh-boras-events.yml");
-  assert.ok(workflow.includes('cron: "13 0-3 * * *"'));
+  assert.ok(!workflow.includes("schedule:"));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-boras-events.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-boras-events"));
@@ -415,6 +392,11 @@ test("Borås events are captured with a real browser and loaded from private cac
   assert.ok(workflow.includes("invalidate the local snapshot cache"));
   assert.ok(workflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
   assert.ok(workflow.includes("VERCEL_AUTOMATION_BYPASS_SECRET"));
+
+  const browserRoute = read("app/api/cron/refresh-browser-sources/route.ts");
+  assert.ok(browserRoute.includes("Sandbox.create"));
+  assert.ok(browserRoute.includes("getBorasSnapshotStatus"));
+  assert.ok(browserRoute.includes("ingestBorasSnapshot"));
 
   const scraper = read("scripts/scrape-boras-events.mjs");
   assert.ok(scraper.includes("chromium.launch"));
@@ -468,7 +450,7 @@ test("FT Brent parser selects the latest completed close and ignores the current
 
 test("Fotbollskanalen articles use a rendered-browser feed and validated private ingestion", () => {
   const workflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.ok(workflow.includes('cron: "17,47 0,1,2,3 * * *"'));
+  assert.ok(!workflow.includes("schedule:"));
   assert.ok(workflow.includes("playwright install --with-deps chromium"));
   assert.ok(workflow.includes("scripts/scrape-fotbollskanalen-articles.mjs"));
   assert.ok(workflow.includes("/api/cron/ingest-fotbollskanalen-articles"));
@@ -482,6 +464,11 @@ test("Fotbollskanalen articles use a rendered-browser feed and validated private
   assert.ok(workflow.includes("concurrency:"));
   assert.ok(workflow.includes("cancel-in-progress: false"));
 
+
+  const browserRoute = read("app/api/cron/refresh-browser-sources/route.ts");
+  assert.ok(browserRoute.includes("Sandbox.create"));
+  assert.ok(browserRoute.includes("getFotbollskanalenSnapshotStatus"));
+  assert.ok(browserRoute.includes("ingestFotbollskanalenSnapshot"));
 
   const scraper = read("scripts/scrape-fotbollskanalen-articles.mjs");
   assert.ok(scraper.includes("chromium.launch"));

@@ -26,14 +26,19 @@ const ALLOWED_WORKFLOWS = {
 export type RefreshWorkflow = keyof typeof ALLOWED_WORKFLOWS;
 
 /**
- * Validate a short-lived GitHub Actions OIDC token for one specific scheduled
- * workflow. This avoids storing a reusable shared cron secret in GitHub/Vercel.
+ * Authorize Vercel Cron with the project CRON_SECRET, or manual recovery with
+ * a short-lived GitHub Actions OIDC token scoped to this repository and workflow.
  */
 export async function authorizeGitHubActionsRefresh(
   request: Request,
   workflow: RefreshWorkflow
 ): Promise<boolean> {
   const authorization = request.headers.get("authorization") ?? "";
+  const cronSecret = process.env.CRON_SECRET;
+
+  // Vercel Cron authenticates with the project secret; manual recovery below stays OIDC-scoped.
+  if (cronSecret && authorization === "Bearer " + cronSecret) return true;
+
   const match = authorization.match(/^Bearer\s+([^\s]+)$/i);
   if (!match) return false;
 

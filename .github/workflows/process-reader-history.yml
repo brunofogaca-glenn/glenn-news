@@ -5,10 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/run-reader-history-migration"
-  schedule:
-    # GitHub schedules can be delayed; provide two low-cost opportunities inside the local window.
-    # 01:15/02:15 UTC map to 02:15/03:15 CET and 03:15/04:15 CEST in Europe/Stockholm.
-    - cron: "15 1,2 * * *"
+  # Vercel Cron owns automatic production runs. GitHub Actions is manual recovery only.
   workflow_dispatch:
 
 permissions:

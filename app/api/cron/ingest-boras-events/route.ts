@@ -140,6 +140,18 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Recheck before writing so duplicate Cron deliveries do not create another put.
+    const currentSnapshot = await getBrowserScrapedBorasEvents();
+    if (hasFreshSnapshotForToday(currentSnapshot, new Date())) {
+      return Response.json({
+        ok: true,
+        skipped: true,
+        reason: "Borås-snapshoten finns redan sparad för dagens datum",
+        stored: currentSnapshot?.events.length ?? 0,
+        savedAt: currentSnapshot?.savedAt ?? null,
+      });
+    }
+
     const snapshot = await saveBrowserScrapedBorasEvents(events);
     revalidateTag("glenn-news-daily-local", { expire: 0 });
     const localSnapshot = await getCachedLocalSnapshot();
