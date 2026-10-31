@@ -1,6 +1,6 @@
 # Glenn News — produktkrav och agentkontrakt
 
-**Status för denna sammanställning:** uppdaterad mot produktionskod och den aktuella datakvalitetskompletteringen den 29 oktober 2026.  
+**Status för denna sammanställning:** uppdaterad mot aktuell kod och reader-history-schemaläggningsändringen den 31 oktober 2026. Browser-scraper-migreringen är fortfarande under arbete.  
 **Syfte:** vara den obligatoriska, gemensamma startpunkten för alla framtida agenter och kodändringar i Glenn News.
 
 > **Regel för alla framtida agenter:** Läs detta dokument först vid varje uppgift. Identifiera berörda krav-ID:n och deras status innan du ändrar kod. Följ sedan den relevanta detaljdokumentationen och inspektera den faktiska implementationen och testerna. Uppdatera detta dokument när krav, produktbeteende, status, datakontrakt eller viktiga tekniska invariants ändras.
@@ -386,17 +386,17 @@ Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och
 
 Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
 
-### RECON-07 — GitHub Actions reader-history schedule can miss its local window (observed 29 October 2026)
+### RECON-07 — Reader-history scheduling can miss its local window (observed 29–31 October 2026)
 
 **Observed:** The scheduled reader-history job ran at 09:24 Stockholm on 29 October and stopped at its time guard before processing or writing. GitHub Actions had delayed the scheduled invocation beyond the permitted `01:00–05:59 Europe/Stockholm` window. A scheduled run can also cross the boundary between the workflow guard and the production endpoint.
 
-**Change in the recovery workflow:** Schedule two attempts at `01:15` and `02:15 UTC`, both within the local maintenance window across CET/CEST. Manual recovery dispatches are also required to be inside the window. The `manual=1` bypass is reserved for the restricted one-time migration-marker push and is enforced against the GitHub OIDC event claim. The workflow checks the API response so `ok: true, skipped: true` cannot be mistaken for successful processing.
+**Current change on branch `feat/vercel-native-reader-history`:** move the two scheduled opportunities to Vercel Cron at `01:15` and `02:15 UTC`, authenticated by `CRON_SECRET`. The GitHub Actions workflow is retained for manual recovery and the restricted one-time migration-marker push; `manual=1` remains exclusive to the repository/workflow-scoped GitHub OIDC identity. Out-of-window endpoint calls return HTTP 503. This change is proposed in PR and is not yet deployed or production-verified.
 
-**Cost and idempotency:** The workflow serializes overlapping maintenance runs. The profile snapshot records the update timestamp of its source ledger. Retries reuse the snapshot when that marker still matches, avoiding a redundant Blob write. If the ledger changes or the marker does not match (including when the ledger save succeeded but snapshot save failed), rebuild the snapshot. Weekly read marks and Saturday Week Focus precomputation remain retryable.
+**Cost and idempotency:** The profile snapshot records the update timestamp of its source ledger. Retries reuse the snapshot when that marker still matches, avoiding a redundant Blob write. If the ledger changes or the marker does not match (including when the ledger save succeeded but snapshot save failed), rebuild the snapshot. Weekly read marks and Saturday Week Focus precomputation remain retryable. The Vercel schedule is one hour apart, but manual recovery can still overlap a scheduled invocation; production verification must watch for duplicate/concurrent ledger processing.
 
 **Limitation:** GitHub Actions can delay or drop both schedule opportunities. This is a risk reduction, not a guarantee. After release, verify that an in-window run reached the API and that the ledger/profile state is correct. Do not relax authorization, idempotency, last-good data or the local write guard to make the workflow green.
 
-See [reader-history recovery issue #54](https://github.com/brunofogaca-glenn/glenn-news/issues/54).
+See [reader-history recovery issue #54](https://github.com/brunofogaca-glenn/glenn-news/issues/54) and [Vercel-native migration issue #69](https://github.com/brunofogaca-glenn/glenn-news/issues/69). Browser scraping for Borås.com and Fotbollskanalen remains on GitHub Actions until a Vercel-compatible Chromium runtime is proven.
 
 
 
