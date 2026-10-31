@@ -24,13 +24,18 @@ export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization");
   const authorizedVercelCron = Boolean(cronSecret && authorization === `Bearer ${cronSecret}`);
-  if (!authorizedVercelCron && !(await authorizeGitHubActionsRefresh(request, "readerHistory"))) {
+  const authorizedGitHubActions = await authorizeGitHubActionsRefresh(request, "readerHistory");
+  if (!authorizedVercelCron && !authorizedGitHubActions) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const clock = getStockholmClock();
   // The OIDC helper permits manual=1 only for the restricted migration-marker push.
   const manualRun = new URL(request.url).searchParams.get("manual") === "1";
+  // Keep the one-time migration override exclusive to the repository/workflow-scoped OIDC identity.
+  if (manualRun && !authorizedGitHubActions) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
   if (!manualRun && (clock.hour < 1 || clock.hour >= 6)) {
     return NextResponse.json({
       ok: false,
