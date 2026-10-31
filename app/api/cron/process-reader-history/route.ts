@@ -21,7 +21,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
-  if (!(await authorizeGitHubActionsRefresh(request, "readerHistory"))) {
+  const cronSecret = process.env.CRON_SECRET;
+  const authorization = request.headers.get("authorization");
+  const authorizedVercelCron = Boolean(cronSecret && authorization === `Bearer ${cronSecret}`);
+  if (!authorizedVercelCron && !(await authorizeGitHubActionsRefresh(request, "readerHistory"))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -30,11 +33,11 @@ export async function GET(request: Request) {
   const manualRun = new URL(request.url).searchParams.get("manual") === "1";
   if (!manualRun && (clock.hour < 1 || clock.hour >= 6)) {
     return NextResponse.json({
-      ok: true,
+      ok: false,
       skipped: true,
-      reason: "Reader-history maintenance runs only from 01:00 to 05:59 Europe/Stockholm",
+      error: "Reader-history maintenance is only allowed from 01:00 to 05:59 Europe/Stockholm",
       localTime: `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`,
-    });
+    }, { status: 503 });
   }
 
   try {
