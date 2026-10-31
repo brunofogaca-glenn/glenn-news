@@ -26,8 +26,8 @@ const ALLOWED_WORKFLOWS = {
 export type RefreshWorkflow = keyof typeof ALLOWED_WORKFLOWS;
 
 /**
- * Authorize Vercel Cron with the project CRON_SECRET, or a manual recovery
- * workflow with a short-lived GitHub Actions OIDC token scoped to this repo.
+ * Authorize Vercel Cron with the project CRON_SECRET, or manual recovery with
+ * a short-lived GitHub Actions OIDC token scoped to this repository and workflow.
  */
 export async function authorizeGitHubActionsRefresh(
   request: Request,
@@ -36,5 +36,40 @@ export async function authorizeGitHubActionsRefresh(
   const authorization = request.headers.get("authorization") ?? "";
   const cronSecret = process.env.CRON_SECRET;
 
-  // Vercel Cron uses the project-level CRON_SECRET. GitHub manual recovery
-¶»§q«^
+  // Vercel Cron authenticates with the project secret; manual recovery below stays OIDC-scoped.
+  if (cronSecret && authorization === "Bearer " + cronSecret) return true;
+
+  const match = authorization.match(/^Bearer\s+([^\s]+)$/i);
+  if (!match) return false;
+
+  try {
+    const { payload } = await jwtVerify(match[1], GITHUB_ACTIONS_JWKS, {
+      issuer: GITHUB_ACTIONS_ISSUER,
+      audience: GITHUB_ACTIONS_AUDIENCE,
+      algorithms: ["RS256"],
+      clockTolerance: 5,
+    });
+
+    // The reader-history time-window bypass is limited to the repository's
+    // one-time migration-marker push; workflow_dispatch is recovery, not an override.
+    const manualMigration =
+      workflow === "readerHistory" &&
+      new URL(request.url).searchParams.get("manual") === "1";
+
+    return (
+      payload.repository === REPOSITORY &&
+      payload.repository_owner === OWNER &&
+      payload.ref === MAIN_REF &&
+      (
+        payload.event_name === "schedule" ||
+        payload.event_name === "workflow_dispatch" ||
+        ((workflow === "borasEvents" || workflow === "fotbollskanalenArticles" || workflow === "readerHistory") && payload.event_name === "push")
+      ) &&
+      (!manualMigration || payload.event_name === "push") &&
+      payload.workflow_ref === ALLOWED_WORKFLOWS[workflow]
+    );
+  } catch {
+    // Deliberately fail closed. Never log the bearer token.
+    return false;
+  }
+}
