@@ -1,99 +1,708 @@
-diff --git a/app/page.tsx b/app/page.tsx
---- a/app/page.tsx
-+++ b/app/page.tsx
-@@
--        <section className="mt-7 border-b-2 border-slate-950 pb-7 md:mt-9">
--          <div className="grid gap-6 md:grid-cols-[1.5fr_0.9fr] md:items-end">
--            <div>
--              <div className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-orange-700">
--                Morgonens redaktion
--              </div>
--              <h2 className="max-w-4xl font-serif text-3xl font-black leading-[1.03] tracking-[-0.025em] md:text-5xl">
--                Färre nyheter. Bättre läsning.
--              </h2>
--            </div>
--            <p className="font-serif text-base leading-7 text-slate-600 md:text-lg">
--              Glenn News sammanfattar nyhetsläget och väljer ut det som
--              faktiskt är värt din tid. Krönikor, analyser, intervjuer och
--              reportage väger tyngre än ännu en kort nyhetsnotis.
--            </p>
--          </div>
--        </section>
-+        <section className="editorial-overview mt-7 border-y-2 border-slate-950 py-5 md:mt-9 md:py-7">
-+          <div className="flex flex-wrap items-center justify-between gap-3">
-+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-800">Glenn News · Dagens överblick</div>
-+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Redaktionell sammanfattning</div>
-+          </div>
-+          <h2 className="mt-3 max-w-5xl font-serif text-3xl font-black leading-[1.08] tracking-[-0.025em] md:text-5xl">
-+            Dagens viktigaste – samlat på ett ställe.
-+          </h2>
-+          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.65fr)_minmax(220px,0.7fr)] md:items-start">
-+            <div className="font-serif text-base leading-7 text-slate-700 md:text-lg md:leading-8">
-+              Glenn News samlar dagens viktigaste nyheter från Borås, Sverige och världen – tillsammans med sport, ekonomi och kultur. Urvalet är oförändrat: här möts de mest relevanta nyheterna och texterna som ger sammanhang, perspektiv och något mer än bara snabba rubriker.
-+            </div>
-+            <div className="grid grid-cols-2 gap-3 border-t border-slate-300 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-+              <div><div className="font-serif text-3xl font-black tabular-nums">{totalArticles}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Utvalda artiklar</div></div>
-+              <div><div className="font-serif text-3xl font-black tabular-nums">{sections.length}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Nyhetsområden</div></div>
-+            </div>
-+          </div>
-+        </section>
-@@
--              {section.summary && (
--                <div className="grid gap-5 border-b border-slate-300 pb-6 md:grid-cols-[0.22fr_1fr]">
--                  <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
--                    Nyhetsläget
--                  </div>
--                  <p className="max-w-4xl font-serif text-lg leading-8 text-slate-800 md:text-xl">
--                    {section.summary}
--                  </p>
--                </div>
--              )}
--
-@@
--                      className="group overflow-hidden border-b border-slate-300 pb-6"
-+                      className={"news-story-card group overflow-hidden border-b border-slate-300 pb-5 " + (index === 0 ? "news-story-lead" : index % 5 === 4 ? "news-story-wide" : "news-story-standard")}
-@@
--                        {story.aiSummary && (
--                          <p className="mobile-article-summary mt-3 font-serif text-base leading-7 text-slate-600">
--                            {story.aiSummary}
--                          </p>
--                        )}
--
-diff --git a/app/globals.css b/app/globals.css
---- a/app/globals.css
-+++ b/app/globals.css
-@@
--  main .md\\:min-w-\\[520px\\] {
--    min-width: 0;
--  }
-@@
- }
-+
-+/* Newspaper-inspired homepage: varied story sizes, denser tablet reading. */
-+.editorial-overview {
-+  background: linear-gradient(105deg, rgba(255,255,255,.48), rgba(236,231,216,.52));
-+  padding-left: clamp(1rem, 2.5vw, 2rem);
-+  padding-right: clamp(1rem, 2.5vw, 2rem);
-+}
-+main .news-story-card { align-self: start; content-visibility: auto; contain-intrinsic-size: 360px; }
-+@media (min-width: 768px) {
-+  main .news-story-card.news-story-lead { grid-column: span 2; }
-+  main .news-story-lead > div:first-child { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(240px,.85fr); align-items:center; gap:1.25rem; }
-+  main .news-story-lead .mobile-article-media { aspect-ratio:16/9; }
-+  main .news-story-card.news-story-wide { grid-column:span 2; display:grid; grid-template-columns:minmax(240px,.95fr) minmax(0,1.05fr); align-items:center; gap:1.15rem; padding-bottom:1.1rem; }
-+  main .news-story-wide > div:first-child { overflow:hidden; }
-+  main .news-story-wide .mobile-article-media { aspect-ratio:16/9; }
-+}
-+@media (min-width: 640px) and (max-width: 1100px) {
-+  main .news-story-card { padding-bottom:.85rem; }
-+  main .news-story-lead > div:first-child { grid-template-columns:minmax(0,1.1fr) minmax(210px,.9fr); gap:.85rem; }
-+  main .news-story-lead .mobile-article-title { font-size:clamp(1.15rem,2vw,1.55rem); line-height:1.16; }
-+  main .news-story-wide { grid-template-columns:minmax(180px,.85fr) minmax(0,1.15fr) !important; }
-+  main .news-story-card .pt-4 { padding-top:.65rem; }
-+}
-+@media (min-width: 768px) and (max-width: 900px) {
-+  main .news-story-card.news-story-lead, main .news-story-card.news-story-wide { grid-column:span 2; }
-+  main .news-story-lead > div:first-child { grid-template-columns:minmax(0,1.1fr) minmax(190px,.9fr) !important; }
-+  main .news-story-wide { grid-template-columns:minmax(180px,.85fr) minmax(0,1.15fr) !important; }
-+}
-+@media (max-width: 639px) { main .news-story-card { padding-bottom:1rem; } }
+import { withOptionalFallback } from "@/lib/optionalData";
+import { canRefreshEditorialSourcesNow } from "@/lib/updateSchedule";
+import { ManualRefreshButton } from "./components/ManualRefreshButton";
+import { RetryMorningEditionButton } from "./components/RetryMorningEditionButton";
+import { TrackableLink } from "./components/TrackableLink";
+import { getReaderProfile } from "@/lib/readerProfile";
+import { getCachedFeedHealth } from "@/lib/feedHealthCache";
+import { getDailyHeaderInfo } from "@/lib/dailyHeader";
+import { getCachedWeather } from "@/lib/weather";
+import { getCachedSportDay } from "@/lib/sportDayCache";
+import { getCachedMarketDay } from "@/lib/marketDay";
+import { getTodayDailyEdition } from "@/lib/dailyEdition";
+import { MarketDayPanel } from "./components/MarketDayPanel";
+import { SportDayPanel } from "./components/SportDayPanel";
+import {
+  CultureSnapshotPanel,
+  LocalSnapshotPanel,
+  NationalSnapshotPanel,
+  WorldSnapshotPanel,
+} from "./components/DailySnapshotPanels";
+import {
+  getCachedCultureSnapshot,
+  getCachedLocalSnapshot,
+  getCachedNationalSnapshot,
+  getCachedWorldSnapshot,
+} from "@/lib/dailySnapshots";
+import { ReaderCount } from "./components/ReaderCount";
+
+export const dynamic = "force-dynamic";
+
+const CATEGORY_ACCENTS = {
+  elfsborg: "text-yellow-700",
+  boras: "text-orange-700",
+  sverige: "text-blue-700",
+  varlden: "text-emerald-700",
+  ekonomi: "text-amber-800",
+  fotboll: "text-slate-900",
+  sport: "text-cyan-700",
+  livsstil: "text-pink-700",
+} as const;
+
+function getStockholmDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = parts.find(part => part.type === "year")?.value ?? "0000";
+  const month = parts.find(part => part.type === "month")?.value ?? "00";
+  const day = parts.find(part => part.type === "day")?.value ?? "00";
+
+  return year + "-" + month + "-" + day;
+}
+
+function formatEditionDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatEditionTimestamp(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(timestamp));
+}
+
+function formatDate() {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+}
+
+function isWeekend() {
+  const weekday = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    weekday: "short",
+  }).format(new Date());
+
+  return weekday === "lör" || weekday === "sön";
+}
+
+function ArticleImage({
+  src,
+  alt,
+  priority = false,
+}: {
+  src?: string | null;
+  alt: string;
+  priority?: boolean;
+}) {
+  return (
+    <div className="mobile-article-media relative aspect-[16/9] w-full overflow-hidden bg-slate-200">
+      {src ? (
+        <img
+          src={src}
+          alt={alt}
+          loading={priority ? "eager" : "lazy"}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-slate-800">
+          <span className="font-serif text-3xl font-bold text-white/80">
+            Glenn News
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default async function Home() {
+  const profilePromise = withOptionalFallback("reader profile", getReaderProfile(), () => ({
+    category: {},
+    articleType: {},
+    source: {},
+    topic: {},
+    totalClicks: 0,
+    lastUpdated: null,
+  }));
+  // Start the essential edition as soon as the reader profile is ready,
+  // without waiting for slower optional panels such as weather or markets.
+  const editionPromise = profilePromise.then(profile => getTodayDailyEdition(profile));
+
+  const [
+    profile,
+    feedHealth,
+    dailyHeader,
+    weather,
+    sportDay,
+    marketDay,
+    localSnapshot,
+    nationalSnapshot,
+    worldSnapshot,
+    cultureSnapshot,
+    edition,
+  ] = await Promise.all([
+    profilePromise,
+    canRefreshEditorialSourcesNow()
+      ? withOptionalFallback("feed health", getCachedFeedHealth(), () => ({
+          checkedAt: new Date().toISOString(),
+          feeds: [{
+            kind: "Webb" as const,
+            name: "Flödesstatus kunde inte hämtas",
+            url: "/health",
+            category: "system",
+            status: "error" as const,
+            responseMs: 0,
+            articles24h: 0,
+            latestArticleAt: null,
+            latestArticleAgeHours: null,
+            detail: "Kontrollen av RSS- och webbkällor kunde inte hämtas just nu.",
+          }],
+          totals: { all: 1, healthy: 0, empty: 0, stale: 0, errors: 1 },
+        }))
+      : Promise.resolve({
+          checkedAt: new Date().toISOString(),
+          feeds: [],
+          totals: { all: 0, healthy: 0, empty: 0, stale: 0, errors: 0 },
+        }),
+    withOptionalFallback("daily header", getDailyHeaderInfo(), () => ({
+      namedays: [],
+      historicalEvent: null,
+    })),
+    withOptionalFallback("weather", getCachedWeather(), () => ({
+      location: "Borås",
+      days: [],
+      fetchedAt: new Date().toISOString(),
+    })),
+    withOptionalFallback("sport day", getCachedSportDay(), () => ({
+      results: [],
+      upcoming: [],
+      selectedLeague: null,
+      provider: { apiFootball: false, sportmonks: false },
+      fetchedAt: new Date().toISOString(),
+    })),
+    withOptionalFallback("market day", getCachedMarketDay(), () => ({
+      date: new Date().toISOString().slice(0, 10),
+      indices: [],
+      source: "Yahoo Finance · historiska stängningar" as const,
+      error: "Marknadsinformationen kunde inte hämtas just nu.",
+    })),
+    withOptionalFallback("local snapshot", getCachedLocalSnapshot(), () => ({
+      events: [],
+      meetings: [],
+      eventSource: "boras.com" as const,
+      updatedAt: new Date().toISOString(),
+      sources: [],
+    })),
+    withOptionalFallback("national snapshot", getCachedNationalSnapshot(), () => ({
+      agenda: [],
+      news: [],
+      updatedAt: new Date().toISOString(),
+      sources: [],
+    })),
+    withOptionalFallback("world snapshot", getCachedWorldSnapshot(), () => ({
+      markets: [],
+      rates: [],
+      gdp: [],
+      updatedAt: new Date().toISOString(),
+      warnings: ["Världsdata kunde inte hämtas just nu."],
+    })),
+    withOptionalFallback("culture snapshot", getCachedCultureSnapshot(), () => ({
+      filmReviews: [],
+      albumReviews: [],
+      updatedAt: new Date().toISOString(),
+      filmReviewSourceUrl: "https://www.dn.se/rss/om/filmrecensioner/",
+      albumReviewSourceUrl: "https://www.dn.se/rss/om/skivrecensioner/",
+    })),
+    editionPromise,
+  ]);
+
+  const sections = edition.sections;
+  const totalArticles = edition.totalArticles;
+  const todayDateKey = getStockholmDateKey();
+  const isFallbackEdition = edition.dateKey !== todayDateKey;
+  const isUnavailableEdition =
+    !isFallbackEdition &&
+    totalArticles <= 0 &&
+    sections.every(section => section.stories.length === 0);
+
+  const elfsborg = sections.find(section => section.key === "elfsborg");
+  const otherSections = sections.filter(section => section.key !== "elfsborg");
+
+  return (
+    <main className="min-h-screen bg-[#f4f1e8] text-slate-950">
+      <div className="mx-auto max-w-7xl px-4 pb-12 pt-5 md:px-8 md:pt-7">
+        <header className="border-y-2 border-slate-950 py-4 md:py-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="font-serif text-[11px] font-bold uppercase tracking-[0.28em] text-slate-500">
+                Personlig morgontidning
+              </div>
+              <h1 className="mt-1 font-serif text-5xl font-black tracking-[-0.04em] md:text-7xl">
+                GLENN NEWS
+              </h1>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 font-serif text-sm md:items-end md:text-right">
+              <div className="hidden items-center gap-3 md:flex">
+                <a
+                  href="/veckofokus"
+                  className="border border-slate-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-950 hover:text-slate-950"
+                >
+                  Veckofokus
+                </a>
+                <a
+                  href="/profil"
+                  className="border border-slate-400 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-950 hover:text-slate-950"
+                >
+                  Min profil
+                </a>
+                <a
+                  href="/health"
+                  className={
+                    "inline-flex items-center gap-2 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition " +
+                    (feedHealth.totals.errors > 0
+                      ? "border-red-600 bg-red-50 text-red-700 hover:border-red-800 hover:text-red-900"
+                      : "border-slate-400 text-slate-600 hover:border-slate-950 hover:text-slate-950")
+                  }
+                >
+                  {feedHealth.totals.errors > 0 && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+                  )}
+                  Flödesstatus
+                  {feedHealth.totals.errors > 0
+                    ? " · " + feedHealth.totals.errors + " fel"
+                    : ""}
+                </a>
+                <ManualRefreshButton />
+              </div>
+              <div className="md:hidden">
+                <ManualRefreshButton />
+              </div>
+              <div>
+                <div className="capitalize font-bold">{formatDate()}</div>
+                <div className="mt-1 text-slate-600">
+                  Namnsdag:{" "}
+                  <span className="font-bold">
+                    {dailyHeader.namedays.length > 0
+                      ? dailyHeader.namedays.join(", ")
+                      : "–"}
+                  </span>
+                </div>
+                {dailyHeader.historicalEvent && (
+                  <div className="mt-2 max-w-xl font-serif text-xs leading-5 text-slate-500 md:max-w-md">
+                    <span className="font-bold uppercase tracking-[0.12em] text-slate-400">
+                      Denna dag i historien · {dailyHeader.historicalEvent.year}
+                    </span>
+                    <span className="ml-1">
+                      {dailyHeader.historicalEvent.text}
+                    </span>
+                  </div>
+                )}
+                <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  {isFallbackEdition
+                    ? "Reservedition från " + formatEditionDate(edition.dateKey)
+                      + (formatEditionTimestamp(edition.generatedAt)
+                        ? " · skapad " + formatEditionTimestamp(edition.generatedAt)
+                        : "")
+                    : formatEditionTimestamp(edition.generatedAt)
+                      ? "Edition skapad " + formatEditionTimestamp(edition.generatedAt)
+                      : "Editionens skapandetid saknas"}
+                  {" · "}
+                  {totalArticles} artiklar
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {isFallbackEdition && (
+          <section
+            role="alert"
+            className="mt-4 border-2 border-amber-700 bg-amber-50 px-4 py-3 text-amber-950"
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.18em]">
+              Reservedition · inte dagens nyhetsurval
+            </div>
+            <p className="mt-1 font-serif text-sm leading-6">
+              Dagens morgonedition ({formatEditionDate(todayDateKey)}) kunde inte skapas.
+              Du läser i stället den senaste fungerande editionen från{" "}
+              <strong>{formatEditionDate(edition.dateKey)}</strong>. Artiklarna hör till
+              det datumet och ska inte tolkas som dagens nyheter.
+            </p>
+            <RetryMorningEditionButton />
+          </section>
+        )}
+
+        {isUnavailableEdition && (
+          <section
+            role="alert"
+            className="mt-4 border-2 border-red-700 bg-red-50 px-4 py-3 text-red-950"
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.18em]">
+              Morgoneditionen är inte tillgänglig
+            </div>
+            <p className="mt-1 font-serif text-sm leading-6">
+              Dagens edition kunde inte skapas, och ingen tidigare fungerande edition
+              finns att visa. Du kan försöka skapa dagens upplaga igen.
+            </p>
+            <RetryMorningEditionButton />
+          </section>
+        )}
+
+        <div className="flex items-center justify-between border-b border-slate-400 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+          <span>
+            {isFallbackEdition
+              ? "Reservedition · " + formatEditionDate(edition.dateKey)
+              : isUnavailableEdition
+                ? "Morgoneditionen saknas"
+                : "07:01 · Din edition"}
+          </span>
+          <span><ReaderCount initialCount={profile.totalClicks} /> lästa artiklar · redaktören lär sig</span>
+        </div>
+
+        {weather.days.length > 0 && (
+          <section className="mt-7 border-y border-slate-300 py-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                Väder · Borås
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 md:min-w-[520px]">
+                {weather.days.map(day => (
+                  <div
+                    key={day.date}
+                    className="flex items-center justify-between border-l-2 border-slate-950 pl-4"
+                  >
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                        {day.label}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-2xl" aria-hidden="true">
+                          {day.weatherCode === 0 || day.weatherCode === 1
+                            ? "☀"
+                            : day.weatherCode === 2
+                              ? "⛅"
+                              : day.weatherCode === 3
+                                ? "☁"
+                                : day.weatherCode >= 71 && day.weatherCode <= 77
+                                  ? "❄"
+                                  : day.weatherCode >= 95
+                                    ? "⛈"
+                                    : "🌧"}
+                        </span>
+                        <div>
+                          <div className="font-serif text-lg font-black">
+                            {day.maxTemp}° / {day.minTemp}°
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {day.description}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right text-xs leading-5 text-slate-500">
+                      <div>Regnrisk {day.precipitationProbability}%</div>
+                      <div>{day.precipitationMm} mm · {day.windKmh} km/h</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className="editorial-overview mt-7 border-y-2 border-slate-950 py-5 md:mt-9 md:py-7">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-800">Glenn News · Dagens överblick</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Redaktionell sammanfattning</div>
+          </div>
+          <h2 className="mt-3 max-w-5xl font-serif text-3xl font-black leading-[1.08] tracking-[-0.025em] md:text-5xl">
+            Dagens viktigaste – samlat på ett ställe.
+          </h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.65fr)_minmax(220px,0.7fr)] md:items-start">
+            <div className="font-serif text-base leading-7 text-slate-700 md:text-lg md:leading-8">
+              Glenn News samlar dagens viktigaste nyheter från Borås, Sverige och världen – tillsammans med sport, ekonomi och kultur. Urvalet är oförändrat: här möts de mest relevanta nyheterna och texterna som ger sammanhang, perspektiv och något mer än bara snabba rubriker.
+            </div>
+            <div className="grid grid-cols-2 gap-3 border-t border-slate-300 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+              <div><div className="font-serif text-3xl font-black tabular-nums">{totalArticles}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Utvalda artiklar</div></div>
+              <div><div className="font-serif text-3xl font-black tabular-nums">{sections.length}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Nyhetsområden</div></div>
+            </div>
+          </div>
+        </section>
+
+        {elfsborg && (
+          <section className="mt-8 border-b-2 border-slate-950 pb-9">
+            <div className="mb-5 flex items-end justify-between gap-4 border-b border-slate-300 pb-3">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-yellow-700">
+                  Full bevakning
+                </div>
+                <h2 className="font-serif text-3xl font-black md:text-4xl">
+                  {elfsborg.title}
+                </h2>
+              </div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                {elfsborg.allArticles?.length ?? 0} artiklar
+              </span>
+            </div>
+
+            {elfsborg.allArticles?.[0] && (
+              <TrackableLink
+                href={elfsborg.allArticles[0].link ?? "#"}
+                category="elfsborg"
+                articleType={elfsborg.allArticles[0].articleType}
+                source={elfsborg.allArticles[0].source ?? "Okänd källa"}
+                topic={elfsborg.allArticles[0].topic}
+                summary={elfsborg.allArticles[0].aiSummary}
+                className="group block border-b border-slate-300 pb-7"
+              >
+                <div className="grid gap-6 md:grid-cols-[1.15fr_0.85fr]">
+                  <div className="overflow-hidden bg-slate-200">
+                    <ArticleImage
+                      src={elfsborg.allArticles[0].image}
+                      alt={elfsborg.allArticles[0].title}
+                      priority
+                    />
+                  </div>
+                  <div className="flex flex-col justify-center">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-yellow-700">
+                      {elfsborg.allArticles[0].articleType} · {elfsborg.allArticles[0].source}
+                    </div>
+                    <h3 className="mobile-article-title mt-3 font-serif text-3xl font-black leading-[1.05] tracking-[-0.02em] md:text-4xl">
+                      {elfsborg.allArticles[0].title}
+                    </h3>
+                    {elfsborg.allArticles[0].aiSummary && (
+                      <p className="mt-4 font-serif text-base leading-7 text-slate-600">
+                        {elfsborg.allArticles[0].aiSummary}
+                      </p>
+                    )}
+                    <div className="mt-5 text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-700">
+                      Läs artikeln →
+                    </div>
+                  </div>
+                </div>
+              </TrackableLink>
+            )}
+
+            <div className="mt-6 grid gap-x-6 md:grid-cols-2">
+              {elfsborg.allArticles?.slice(1).map((article, index) => (
+                <TrackableLink
+                  key={String(article.link ?? "") + "-" + String(index + 1)}
+                  href={article.link ?? "#"}
+                  category="elfsborg"
+                  articleType={article.articleType}
+                  source={article.source ?? "Okänd källa"}
+                  topic={article.topic}
+                  summary={article.aiSummary}
+                  className="group flex gap-4 border-b border-slate-300 py-4"
+                >
+                  <div className="w-7 shrink-0 pt-0.5 text-sm font-bold text-yellow-700">
+                    {index + 2}
+                  </div>
+                  {article.image && (
+                    <div className="h-20 w-28 shrink-0 overflow-hidden bg-slate-200">
+                      <img
+                        src={article.image}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                      />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                      {article.articleType} · {article.source}
+                    </div>
+                    <h3 className="mobile-article-title mt-1 font-serif text-lg font-bold leading-tight group-hover:underline">
+                      {article.title}
+                    </h3>
+                  </div>
+                </TrackableLink>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="mt-9 grid gap-9">
+          {otherSections.map((section, sectionIndex) => (
+            <div key={section.key}>
+              <section
+                className="border-b-2 border-slate-950 pb-9"
+              >
+              <div className="mb-4 flex items-end justify-between gap-4 border-b border-slate-300 pb-2">
+                <div>
+                  <div
+                    className={"text-[10px] font-bold uppercase tracking-[0.22em] " + CATEGORY_ACCENTS[section.key as keyof typeof CATEGORY_ACCENTS]}
+                  >
+                    Glenn News · Redaktionen
+                  </div>
+                  <h2 className="font-serif text-3xl font-black md:text-4xl">
+                    {section.title}
+                  </h2>
+                </div>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  {section.key === "sport"
+                    ? `${section.stories.length} texter · fotboll först, övrig sport vid tillgång`
+                    : "4 texter"}
+                </span>
+              </div>
+
+              {section.key === "boras" && (
+                <div className="mb-6">
+                  <LocalSnapshotPanel data={localSnapshot} profile={profile} />
+                </div>
+              )}
+
+              {section.key === "sverige" && (
+                <div className="mb-6">
+                  <NationalSnapshotPanel data={nationalSnapshot} />
+                </div>
+              )}
+
+              {section.key === "varlden" && (
+                <div className="mb-6">
+                  <WorldSnapshotPanel data={worldSnapshot} />
+                </div>
+              )}
+
+              {section.key === "livsstil" && (
+                <div className="mb-6">
+                  <CultureSnapshotPanel data={cultureSnapshot} />
+                </div>
+              )}
+
+              {section.key === "sport" && (
+                <SportDayPanel data={sportDay} />
+              )}
+
+              {section.key === "ekonomi" && (
+                <div className="mb-6">
+                  <MarketDayPanel data={marketDay} />
+                </div>
+              )}
+
+              <div className="mt-6 grid gap-6 md:grid-cols-2">
+                {section.stories.map((story, index) => (
+                  <div
+                    key={String(story.link ?? "") + "-" + String(index)}
+                    className="contents"
+                  >
+                    {section.key === "sport" && index === Math.min(8, section.stories.length) && (
+                      <div className="col-span-full mt-3 border-y border-slate-300 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-700">
+                        Övrig sport · 2 texter
+                      </div>
+                    )}
+
+                    <TrackableLink
+                      href={story.link ?? "#"}
+                      category={section.key}
+                      articleType={story.articleType}
+                      source={story.source ?? "Okänd källa"}
+                      topic={story.topic}
+                      summary={story.aiSummary}
+                      className={"news-story-card group overflow-hidden border-b border-slate-300 pb-5 " + (index === 0 ? "news-story-lead" : index % 5 === 4 ? "news-story-wide" : "news-story-standard")}
+                    >
+                      <div className="overflow-hidden bg-slate-200">
+                        <ArticleImage
+                          src={story.image}
+                          alt={story.title}
+                        />
+                      </div>
+
+                      <div className="pt-4">
+                        <div
+                          className={"text-[10px] font-bold uppercase tracking-[0.18em] " + CATEGORY_ACCENTS[section.key as keyof typeof CATEGORY_ACCENTS]}
+                        >
+                          {section.key === "sport"
+                            ? story.sportGroup
+                            : index === 0
+                              ? "Dagens läsning"
+                              : "Också läsvärd"}{" "}
+                          · {story.articleType}
+                        </div>
+
+                        <h3 className="mobile-article-title mt-2 font-serif text-2xl font-black leading-tight tracking-[-0.015em] md:text-3xl group-hover:underline">
+                          {story.title}
+                        </h3>
+
+                        <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                          <span>{story.source}</span>
+                          <span className="group-hover:text-slate-700">
+                            Läs →
+                          </span>
+                        </div>
+                      </div>
+                    </TrackableLink>
+                  </div>
+                ))}
+              </div>
+              </section>
+            </div>
+          ))}
+        </div>
+
+        <section className="pt-1">
+          <TrackableLink
+            href="/veckofokus"
+            category="veckofokus"
+            articleType="veckofokus"
+            source="Glenn News"
+            topic="Veckofokus"
+            className={
+              "group block border-2 border-slate-950 bg-[#ece7d8] px-5 py-6 transition hover:-translate-y-0.5 hover:bg-white md:px-8 md:py-8 " +
+              (isWeekend() ? "shadow-[8px_8px_0_0_#0f172a]" : "")
+            }
+          >
+            <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-orange-700">
+                  {isWeekend() ? "Helgens läsning" : "När veckan är över"}
+                </div>
+                <h2 className="mt-2 font-serif text-3xl font-black leading-none tracking-[-0.03em] md:text-5xl">
+                  {isWeekend() ? "VECKOFOKUS" : "Veckofokus"}
+                </h2>
+                <p className="mt-3 max-w-2xl font-serif text-base leading-7 text-slate-600 md:text-lg">
+                  {isWeekend()
+                    ? "Nu har du tid för det som inte behöver läsas direkt. Här hittar du veckans viktigaste och mest läsvärda texter samlade på ett ställe."
+                    : "När du har mer tid: veckans viktigaste och mest läsvärda texter samlade på ett ställe."}
+                </p>
+              </div>
+              <div className="shrink-0 text-sm font-bold uppercase tracking-[0.16em] text-slate-500 group-hover:text-slate-950">
+                Läs veckofokus →
+              </div>
+            </div>
+          </TrackableLink>
+        </section>
+
+        <footer className="pt-6">
+          <div className="border-t-2 border-slate-950 pt-4 text-sm leading-6 text-slate-500 md:flex md:justify-between md:gap-8">
+            <p>
+              Glenn News sparar varje morgonedition så att veckofokus kan
+              bygga på det som faktiskt valdes. Din personliga lässtatus
+              sparas separat och påverkar kommande redaktionella urval.
+            </p>
+            <p className="mt-2 md:mt-0 md:text-right">
+              Din personliga morgontidning · Glenn News
+            </p>
+          </div>
+        </footer>
+      </div>
+    </main>
+  );
+}
