@@ -174,6 +174,8 @@ test("scheduled background refreshes are daily and article status is written by 
   const readerHistoryRoute = read("app/api/cron/process-reader-history/route.ts");
   assert.match(readerHistoryRoute, /getReaderProfileSnapshotForMaintenance/);
   assert.match(readerHistoryRoute, /authorizedVercelCron/);
+  assert.match(readerHistoryRoute, /authorizedGitHubActions/);
+  assert.match(readerHistoryRoute, /manualRun && !authorizedGitHubActions/);
   assert.match(readerHistoryRoute, /authorization === .*cronSecret/);
   assert.match(readerHistoryRoute, /status: 503/);
   assert.match(readerHistoryRoute, /currentSnapshot\.sourceLedgerUpdatedAt === ledgerUpdatedAt/);
