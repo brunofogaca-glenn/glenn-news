@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.6.1",
+    "@vercel/sandbox": "3.9.1",
     "@vercel/speed-insights": "^2.0.0",
     "jose": "^5.10.0",
     "next": "16.2.6",
