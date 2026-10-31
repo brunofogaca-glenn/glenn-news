@@ -519,10 +519,25 @@ test("football editorial selection follows current relevance rather than fixed l
 });
 
 
-test("sport homepage shows the actual story count and places the other-sport divider after football", () => {
+test("homepage renders all editorial areas in one mixed stream and keeps sport labels", () => {
   const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
-  assert.match(home, /section\.stories\.length.*fotboll först, övrig sport vid tillgång/);
-  assert.match(home, /section\.key === "sport" && index === Math\.min\(8, section\.stories\.length\)/);
+  assert.match(home, /function buildMixedHomepageFeed/);
+  assert.match(home, /const mixedStories = buildMixedHomepageFeed\\(sections, edition\\.dateKey\\)/);
+  assert.match(home, /section\\.key === "elfsborg" && section\\.allArticles\\?\\.length/);
+  assert.match(home, /aria-label="Dagens blandade nyhetsflöde"/);
+  assert.match(home, /category=\\{entry\\.categoryKey\\}/);
+  assert.match(home, /story\\.sportGroup \\?\\? "Sport"/);
+  assert.doesNotMatch(home, /otherSections\\.map/);
+  assert.doesNotMatch(home, /section\\.key === "sport" && index === Math\\.min/);
+});
+
+test("homepage overview uses three concise lead-story AI takeaways", () => {
+  const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
+  assert.match(home, /function buildOverviewHighlights/);
+  assert.match(home, /lead\\?\\.aiSummary \\|\\| section\\.summary/);
+  assert.match(home, /words\\.length > 24/);
+  assert.match(home, /\\.slice\\(0, 3\\)/);
+  assert.match(home, /Redaktionens tre viktigaste punkter/);
 });
 
 

@@ -54,9 +54,13 @@ Primary file: `app/page.tsx`. Editorial generation and validation: `lib/dailyEdi
 
 ### Morning edition and recovery states
 
-- The lead Elfsborg section is the featured editorial block. It presents the leading story with image, type/source metadata, summary and a link, followed by other Elfsborg articles.
-- Other edition sections render the saved selected stories with their editorial order, title, source/type, summary and image when available. Article links feed the reading queue.
-- The page includes the editorial overview (“Nyhetsläget”) and a set of curated stories.
+- The saved edition still contains seven editorial data sections (Elfsborg, Lokalt, Sverige, Världen, Ekonomi, Sport and Kultur, Mat & Livsstil), but the homepage does **not** render them as separate category blocks.
+- `buildMixedHomepageFeed` in `app/page.tsx` interleaves articles from all seven areas into one continuous, date-seeded feed. It keeps the editorial order within each category, avoids consecutive category runs where possible, and includes Elfsborg's full `allArticles` coverage pool. The daily date seed changes the cross-category order without using nondeterministic request-time randomness.
+- Category names and article types appear only as discreet article labels. The visible order is a presentation concern: do not move category selection, ranking, article quotas or edition persistence into the homepage component.
+- Cards vary between a lead story, standard cards, compact cards and periodic wide image-led stories. Images fill their defined 16:9/16:10 media frame with `object-fit: cover`; the whole lead card owns the two-column layout so the image wrapper cannot leave an empty grey column.
+- One **Överblick på 30 sekunder** sits above the feed. It shows up to three numbered takeaways from the existing short AI summaries attached to leading stories, ranked by existing editorial relevance signals and capped at 24 words each. It does not trigger a new AI request. Category-level summaries are not displayed as long paragraphs.
+- Local, national, world, sport, market and culture fact panels are inserted as full-width interstitials among the stories. Their components, source adapters, snapshots and cache behavior remain separate from the editorial feed.
+- Every article continues to use `TrackableLink` with its original category, type, source, topic and summary metadata. The mixed presentation must not drop an article, duplicate it or change what enters the reader queue.
 - If today's edition is unavailable but an older saved edition is valid, the page shows an explicit **Reservedition · inte dagens nyhetsurval** warning with the old edition's date. It does not present those stories as today's news. The user can press **Försök skapa dagens upplaga igen**.
 - If today's edition is unavailable and no older valid edition can be shown, the page displays a clear empty/unavailable state with the same recovery action.
 - `RetryMorningEditionButton` invokes the explicit server action `retryMorningEdition`. Success reloads the page; failure displays an alert. The recovery action is allowed only in the same Stockholm 06:00–06:59 hour as the Hobby cron publication window.
