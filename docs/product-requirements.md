@@ -1,6 +1,6 @@
 # Glenn News — produktkrav och agentkontrakt
 
-**Status för denna sammanställning:** uppdaterad mot produktionskod och den aktuella datakvalitetskompletteringen den 31 oktober 2026.  
+**Status för denna sammanställning:** uppdaterad mot produktionskod och den aktuella datakvalitetskompletteringen den 1 november 2026.  
 **Syfte:** vara den obligatoriska, gemensamma startpunkten för alla framtida agenter och kodändringar i Glenn News.
 
 > **Regel för alla framtida agenter:** Läs detta dokument först vid varje uppgift. Identifiera berörda krav-ID:n och deras status innan du ändrar kod. Följ sedan den relevanta detaljdokumentationen och inspektera den faktiska implementationen och testerna. Uppdatera detta dokument när krav, produktbeteende, status, datakontrakt eller viktiga tekniska invariants ändras.
@@ -38,7 +38,7 @@ Läs alltid denna kravspecifikation först. Läs därefter bara de detaljerade d
 - **Produktavsikt / ej kodregel** — det är ett mål eller användningsmönster, inte ett hårt krav som aktuell kod upprätthåller.
 - **Behöver synkas** — det finns en känd motsägelse eller oklarhet som inte ska döljas.
 
-Statusen avser senast granskad kod den 31 oktober 2026; den är inte ett påstående om att varje extern datakälla eller den första nattliga körningen efter utrullning redan har verifierats.
+Statusen avser senast granskad kod den 1 november 2026; den är inte ett påstående om att varje extern datakälla eller den första nattliga körningen efter utrullning redan har verifierats.
 
 ## 2. Produktdefinition och designprinciper
 
