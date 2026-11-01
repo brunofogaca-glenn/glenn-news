@@ -101,13 +101,8 @@ main img {
   }
 }
 
-/* Avoid narrow two-column text blocks on tablet portrait widths. */
-@media (min-width: 768px) and (max-width: 900px) {
-  main .grid {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-
-}
+/* Tablet grids are scoped to their own components. A blanket main .grid
+   override collapses the overview, stats, weather and article layouts together. */
 
 /* Phone reading: keep headlines balanced, summaries relaxed, and images consistent. */
 @media (max-width: 639px) {
@@ -382,10 +377,43 @@ main img {
     gap: 1.25rem;
   }
 
+  .editorial-overview {
+    padding: 1.1rem 1.25rem 1rem;
+  }
+
+  .editorial-overview__title {
+    margin-top: .55rem;
+    font-size: clamp(1.75rem, 3vw, 2.2rem);
+    line-height: 1.08;
+  }
+
+  .editorial-overview__body {
+    margin-top: .9rem;
+  }
+
+  .editorial-highlights {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: clamp(.6rem, 1.5vw, 1rem);
+  }
+
+  .editorial-highlights > div {
+    padding-top: .45rem;
+  }
+
+  .editorial-highlights p {
+    margin-top: .35rem;
+    max-width: none;
+    font-size: .84rem;
+    line-height: 1.42;
+  }
+
   .editorial-overview__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     border-top: 1px solid #cbd5e1;
     border-left: 0;
-    padding: .9rem 0 0;
+    padding: .7rem 0 0;
+    margin-top: .75rem;
   }
 
   .mixed-news-grid__stories {
@@ -393,24 +421,43 @@ main img {
     gap: 1.25rem 1rem;
   }
 
+  /* Keep every tablet story in one of the two columns. Wide cards spanning
+     both columns left half-rows empty when preceded by a single card. */
   .mixed-news-card--lead,
   .mixed-news-card--wide {
-    grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
-    gap: .9rem;
+    grid-column: span 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: stretch;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 1rem;
+  }
+
+  .mixed-news-card--lead .mixed-news-card__content,
+  .mixed-news-card--wide .mixed-news-card__content {
+    padding-top: .65rem;
   }
 
   .mixed-news-card--lead .mobile-article-media,
   .mixed-news-card--wide .mobile-article-media {
-    min-height: 180px;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+
+  .mixed-news-card--lead .mixed-news-card__title {
+    font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+    line-height: 1.12;
+  }
+
+  .mixed-news-card--wide .mixed-news-card__title {
+    font-size: clamp(1rem, 1.55vw, 1.25rem);
+    line-height: 1.14;
   }
 
   .mixed-news-card__title {
     font-size: 1.12rem;
-  }
-
-  .mixed-news-card--lead .mixed-news-card__title {
-    font-size: clamp(1.3rem, 2.6vw, 1.8rem);
   }
 
   .mixed-news-card__summary {

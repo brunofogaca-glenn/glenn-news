@@ -553,7 +553,7 @@ export default async function Home() {
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-orange-800">Glenn News · Överblick på 30 sekunder</div>
             <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Redaktionens tre viktigaste punkter</div>
           </div>
-          <h2 className="mt-3 max-w-5xl font-serif text-3xl font-black leading-[1.08] tracking-[-0.025em] md:text-5xl">
+          <h2 className="editorial-overview__title mt-3 max-w-5xl font-serif text-3xl font-black leading-[1.08] tracking-[-0.025em] md:text-5xl">
             Det här är viktigast idag.
           </h2>
           <div className="editorial-overview__body mt-5">

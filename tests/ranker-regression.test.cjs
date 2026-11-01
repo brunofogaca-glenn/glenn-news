@@ -544,6 +544,23 @@ test("homepage fact panels are separate full-width rows after complete story gro
   assert.match(styles, /\.mixed-news-interstitial\s*\{[\s\S]*?display: block/);
 });
 
+test("tablet homepage keeps overview and article cards in a stable two-column flow", () => {
+  const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
+  const styles = fs.readFileSync(require.resolve("../app/globals.css"), "utf8");
+  const tabletStart = styles.lastIndexOf("@media (min-width: 640px) and (max-width: 1100px)");
+  const mobileStart = styles.indexOf("@media (max-width: 639px)", tabletStart);
+  const tabletBlock = styles.slice(tabletStart, mobileStart > tabletStart ? mobileStart : undefined);
+
+  assert.ok(home.includes('className="editorial-overview__title mt-3'));
+  assert.ok(!styles.includes("main .grid {\n    grid-template-columns: minmax(0, 1fr) !important;"));
+  assert.ok(tabletBlock.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"));
+  assert.ok(tabletBlock.includes("grid-template-columns: repeat(2, minmax(0, 1fr))"));
+  assert.ok(tabletBlock.includes(".mixed-news-card--lead,\n  .mixed-news-card--wide"));
+  assert.ok(tabletBlock.includes("grid-column: span 1;"));
+  assert.ok(tabletBlock.includes("flex-direction: column;"));
+  assert.ok(tabletBlock.includes("aspect-ratio: 16 / 9;"));
+});
+
 test("homepage overview uses three concise lead-story AI takeaways", () => {
   const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
   assert.ok(home.includes("function buildOverviewHighlights"));
