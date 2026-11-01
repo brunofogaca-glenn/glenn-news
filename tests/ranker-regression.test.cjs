@@ -531,6 +531,19 @@ test("homepage renders all editorial areas in one mixed stream and keeps sport l
   assert.ok(!home.includes('section.key === "sport" && index === Math.min'));
 });
 
+test("homepage fact panels are separate full-width rows after complete story groups", () => {
+  const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
+  const styles = fs.readFileSync(require.resolve("../app/globals.css"), "utf8");
+  assert.match(home, /const storyGroups: Array<\{ stories: MixedHomepageStory\[\]; panelIndex\?: number \}> = \[\]/);
+  assert.match(home, /storyGroups\.map\(\(group, groupIndex\)/);
+  assert.match(home, /group\.stories\.map\(\(entry, localIndex\)/);
+  assert.match(home, /group\.panelIndex !== undefined/);
+  assert.match(home, /className="mixed-news-interstitial"/);
+  assert.match(styles, /\.mixed-news-group\s*\{[\s\S]*?flex-direction: column/);
+  assert.match(styles, /\.mixed-news-grid__stories\s*\{[\s\S]*?display: grid/);
+  assert.match(styles, /\.mixed-news-interstitial\s*\{[\s\S]*?display: block/);
+});
+
 test("homepage overview uses three concise lead-story AI takeaways", () => {
   const home = fs.readFileSync(require.resolve("../app/page.tsx"), "utf8");
   assert.ok(home.includes("function buildOverviewHighlights"));

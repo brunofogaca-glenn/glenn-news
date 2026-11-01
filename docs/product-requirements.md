@@ -68,6 +68,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | UI-05 | Alla ändringar av routes, navigation, paneler, knappar, responsivitet eller tomma/felaktiga lägen ska dokumenteras i UI-guiden. | Agentregel | [AGENTS.md](../AGENTS.md), [UI-guiden](ui-feature-guide.md) |
 | UI-06 | Startsidan presenterar de sju redaktionella områdena som ett blandat flöde, inte separata kategorisektioner. Kategorin finns kvar som artikelmetadata; alla valda artiklar och Elfsborgs fulla bevakning ska finnas kvar. | Implementerat + testskyddat | `app/page.tsx`, `tests/ranker-regression.test.cjs`, [UI-guiden](ui-feature-guide.md) |
 | UI-07 | Överblicken högst upp ska vara kort och lätt att skanna: högst tre numrerade punkter byggda av befintliga korta AI-sammanfattningar, utan extra AI-anrop. | Implementerat + testskyddat | `app/page.tsx`, `tests/ranker-regression.test.cjs` |
+| UI-08 | Faktapaneler på startsidan ska ligga mellan hela artikelgrupper som egna fullbreddselement. De får inte bryta upp eller förskjuta en artikelrad på surfplatta eller dator. Överblicken ska presentera tre viktiga punkter i en samlad, lättskannad layout. | Implementerat + testskyddat | `app/page.tsx`, `app/globals.css`, `tests/ranker-regression.test.cjs`, [UI-guiden](ui-feature-guide.md) |
 
 ### B. Morgonutgåva och publicering
 

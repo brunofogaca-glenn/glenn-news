@@ -170,9 +170,21 @@ main img {
 
 /* A single mixed editorial feed: category is metadata, never a section heading. */
 .editorial-overview {
-  background: linear-gradient(105deg, rgba(255,255,255,.48), rgba(236,231,216,.52));
-  padding-left: clamp(1rem, 2.5vw, 2rem);
-  padding-right: clamp(1rem, 2.5vw, 2rem);
+  background: linear-gradient(105deg, rgba(255,255,255,.58), rgba(236,231,216,.54));
+  padding: clamp(1.25rem, 2.8vw, 2.25rem) clamp(1rem, 2.5vw, 2rem);
+}
+
+.editorial-overview__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, .28fr);
+  align-items: start;
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+}
+
+.editorial-overview__stats {
+  border-top: 0;
+  border-left: 1px solid #cbd5e1;
+  padding: .15rem 0 .15rem 1.25rem;
 }
 
 
@@ -202,10 +214,24 @@ main img {
 }
 
 .mixed-news-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.65rem;
+}
+
+.mixed-news-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.mixed-news-grid__stories {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.5rem 1.25rem;
   align-items: start;
+  min-width: 0;
 }
 
 .mixed-news-card {
@@ -339,13 +365,30 @@ main img {
 }
 
 .mixed-news-interstitial {
-  grid-column: 1 / -1;
+  display: block;
   min-width: 0;
-  padding: .35rem 0 .2rem;
+  width: 100%;
+  padding: .25rem 0 .45rem;
+}
+
+.mixed-news-interstitial > * {
+  width: 100%;
+  max-width: none;
 }
 
 @media (min-width: 640px) and (max-width: 1100px) {
-  .mixed-news-grid {
+  .editorial-overview__body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  .editorial-overview__stats {
+    border-top: 1px solid #cbd5e1;
+    border-left: 0;
+    padding: .9rem 0 0;
+  }
+
+  .mixed-news-grid__stories {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.25rem 1rem;
   }
@@ -377,7 +420,18 @@ main img {
 }
 
 @media (max-width: 639px) {
-  .mixed-news-grid {
+  .editorial-overview__body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  .editorial-overview__stats {
+    border-top: 1px solid #cbd5e1;
+    border-left: 0;
+    padding: .9rem 0 0;
+  }
+
+  .mixed-news-grid__stories {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.1rem;
   }
