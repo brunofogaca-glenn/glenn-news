@@ -6,6 +6,14 @@ For data-source schedules and cache lifetime, read [Data refresh inventory](data
 
 The homepage sport panel and supplemental panel footers display the snapshot fetch date/time in the Stockholm timezone. The sport table also shows when Glenn News retrieved the table response and explicitly states that FotMob does not expose a distinct observation timestamp in the consumed payload. A stale sport snapshot shows its last saved time and explanatory status. The market panel displays each market's actual trading-session date separately from snapshot fetch time; these may differ because of weekends, holidays or source availability.
 
+## Responsiv startsida och redaktionellt flöde
+
+Startsidan visar en gemensam blandad artikelström. De tre viktigaste punkterna ligger i en samlad överblick direkt före flödet. Överblicken presenterar punkterna i tre lika tydliga kolumner när bredden tillåter det; artikelantal och antal bevakningsområden ligger i en separat, visuellt underordnad statistikrad/panel.
+
+Artiklar grupperas i avgränsade gridrader. Faktapaneler (lokalt, Sverige, världen, sport, marknad och kultur) renderas mellan artikelgrupperna som egna fullbreddselement. De får inte renderas som enskilda gridceller bredvid eller mellan kort i samma rad. Tablet använder två kolumner, desktop tre och mobil en; artikelkortens visuella varianter och blandade ämnesordning består.
+
+**Ändringskontrakt:** justeringar av presentation får inte ändra artikelurval, rankning, antal, Elfsborgs fullständiga bevakningspool, faktapanelernas datahämtning, cachning eller Blob-operationer. Lägg regressionstest för grupp-/mellanpanelstrukturen i `tests/ranker-regression.test.cjs`.
+
 ## At a glance
 
 Glenn News is a Swedish, personalized, AI-edited morning newspaper. The interface has four pages:

@@ -348,16 +348,20 @@ export default async function Home() {
 
   const mixedStories = buildMixedHomepageFeed(sections, edition.dateKey);
   const overviewHighlights = buildOverviewHighlights(sections, edition.dateKey);
-  const factPanelAfter = Array.from({ length: 6 }, (_, index) =>
-    Math.max(0, Math.floor(((index + 1) * mixedStories.length) / 7) - 1)
-  );
-  const factPanelsByPosition = new Map<number, number[]>();
-  factPanelAfter.forEach((position, panelIndex) => {
-    factPanelsByPosition.set(position, [
-      ...(factPanelsByPosition.get(position) ?? []),
-      panelIndex,
-    ]);
-  });
+  // Keep the reading order while rendering fact panels as explicit full-width
+  // rows between groups of stories. This avoids depending on CSS grid auto-flow
+  // when lead/wide cards span two columns at different breakpoints.
+  const storyGroups: Array<{ stories: MixedHomepageStory[]; panelIndex?: number }> = [];
+  const groupSize = 4;
+  const groupCount = Math.max(1, Math.ceil(mixedStories.length / groupSize));
+  let storyCursor = 0;
+  for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+    const remaining = mixedStories.length - storyCursor;
+    const groupsRemaining = groupCount - groupIndex;
+    const take = Math.ceil(remaining / groupsRemaining);
+    storyGroups.push({ stories: mixedStories.slice(storyCursor, storyCursor + take), panelIndex: groupIndex < 6 ? groupIndex : undefined });
+    storyCursor += take;
+  }
 
   return (
     <main className="min-h-screen bg-[#f4f1e8] text-slate-950">
@@ -552,7 +556,7 @@ export default async function Home() {
           <h2 className="mt-3 max-w-5xl font-serif text-3xl font-black leading-[1.08] tracking-[-0.025em] md:text-5xl">
             Det här är viktigast idag.
           </h2>
-          <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1.7fr)_minmax(190px,0.55fr)] md:items-start">
+          <div className="editorial-overview__body mt-5">
             <div className="editorial-highlights grid gap-4 sm:grid-cols-3 sm:gap-5">
               {overviewHighlights.length > 0 ? overviewHighlights.map((highlight, index) => (
                 <div key={index} className="border-t-2 border-slate-900 pt-2.5">
@@ -569,7 +573,7 @@ export default async function Home() {
                 </p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3 border-t border-slate-300 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+            <div className="editorial-overview__stats grid grid-cols-2 gap-3 border-t border-slate-300 pt-3">
               <div><div className="font-serif text-3xl font-black tabular-nums">{totalArticles}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Artiklar i underlaget</div></div>
               <div><div className="font-serif text-3xl font-black tabular-nums">{sections.length}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">Bevakningsområden</div></div>
             </div>
@@ -577,69 +581,64 @@ export default async function Home() {
         </section>
 
         <section aria-label="Dagens blandade nyhetsflöde" className="mixed-news-grid mt-8">
-          {mixedStories.map((entry, index) => {
-            const story = entry.story;
-            const categoryLabel = entry.categoryKey === "sport"
-              ? story.sportGroup ?? "Sport"
-              : entry.categoryTitle;
-            const variant = index === 0
-              ? "lead"
-              : index % 9 === 5
-                ? "wide"
-                : index % 4 === 2
-                  ? "compact"
-                  : "standard";
+          {storyGroups.map((group, groupIndex) => (
+            <div className="mixed-news-group" key={"story-group-" + groupIndex}>
+              <div className="mixed-news-grid__stories">
+                {group.stories.map((entry, localIndex) => {
+                  const index = storyGroups.slice(0, groupIndex).reduce((total, item) => total + item.stories.length, 0) + localIndex;
+                  const story = entry.story;
+                  const categoryLabel = entry.categoryKey === "sport"
+                    ? story.sportGroup ?? "Sport"
+                    : entry.categoryTitle;
+                  const variant = index === 0
+                    ? "lead"
+                    : index % 9 === 5
+                      ? "wide"
+                      : index % 4 === 2
+                        ? "compact"
+                        : "standard";
 
-            return (
-              <div key={String(story.link ?? "") + "-" + entry.categoryKey} className="contents">
-                <TrackableLink
-                  href={story.link ?? "#"}
-                  category={entry.categoryKey}
-                  articleType={story.articleType}
-                  source={story.source ?? "Okänd källa"}
-                  topic={story.topic}
-                  summary={story.aiSummary}
-                  className={"mixed-news-card mixed-news-card--" + variant + " group"}
-                >
-                  <div className="mixed-news-card__image">
-                    <ArticleImage
-                      src={story.image}
-                      alt={story.title}
-                      priority={index < 2}
-                    />
-                  </div>
-                  <div className="mixed-news-card__content">
-                    <div className={"mixed-news-card__eyebrow " + CATEGORY_ACCENTS[entry.categoryKey as keyof typeof CATEGORY_ACCENTS]}>
-                      {categoryLabel} · {story.articleType}
-                    </div>
-                    <h2 className="mixed-news-card__title font-serif font-black group-hover:underline">
-                      {story.title}
-                    </h2>
-                    {story.aiSummary && (
-                      <p className="mixed-news-card__summary">
-                        {story.aiSummary}
-                      </p>
-                    )}
-                    <div className="mixed-news-card__meta">
-                      <span>{story.source ?? "Okänd källa"}</span>
-                      <span className="group-hover:text-slate-800">Läs →</span>
-                    </div>
-                  </div>
-                </TrackableLink>
-
-                {(factPanelsByPosition.get(index) ?? []).map(panelIndex => (
-                  <div className="mixed-news-interstitial" key={"fact-panel-" + panelIndex}>
-                    {panelIndex === 0 && <LocalSnapshotPanel data={localSnapshot} profile={profile} />}
-                    {panelIndex === 1 && <NationalSnapshotPanel data={nationalSnapshot} />}
-                    {panelIndex === 2 && <WorldSnapshotPanel data={worldSnapshot} />}
-                    {panelIndex === 3 && <SportDayPanel data={sportDay} />}
-                    {panelIndex === 4 && <MarketDayPanel data={marketDay} />}
-                    {panelIndex === 5 && <CultureSnapshotPanel data={cultureSnapshot} />}
-                  </div>
-                ))}
+                  return (
+                    <TrackableLink
+                      key={String(story.link ?? "") + "-" + entry.categoryKey}
+                      href={story.link ?? "#"}
+                      category={entry.categoryKey}
+                      articleType={story.articleType}
+                      source={story.source ?? "Okänd källa"}
+                      topic={story.topic}
+                      summary={story.aiSummary}
+                      className={"mixed-news-card mixed-news-card--" + variant + " group"}
+                    >
+                      <div className="mixed-news-card__image">
+                        <ArticleImage src={story.image} alt={story.title} priority={index < 2} />
+                      </div>
+                      <div className="mixed-news-card__content">
+                        <div className={"mixed-news-card__eyebrow " + CATEGORY_ACCENTS[entry.categoryKey as keyof typeof CATEGORY_ACCENTS]}>
+                          {categoryLabel} · {story.articleType}
+                        </div>
+                        <h2 className="mixed-news-card__title font-serif font-black group-hover:underline">{story.title}</h2>
+                        {story.aiSummary && <p className="mixed-news-card__summary">{story.aiSummary}</p>}
+                        <div className="mixed-news-card__meta">
+                          <span>{story.source ?? "Okänd källa"}</span>
+                          <span className="group-hover:text-slate-800">Läs →</span>
+                        </div>
+                      </div>
+                    </TrackableLink>
+                  );
+                })}
               </div>
-            );
-          })}
+              {group.panelIndex !== undefined && (
+                <div className="mixed-news-interstitial" key={"fact-panel-" + group.panelIndex}>
+                  {group.panelIndex === 0 && <LocalSnapshotPanel data={localSnapshot} profile={profile} />}
+                  {group.panelIndex === 1 && <NationalSnapshotPanel data={nationalSnapshot} />}
+                  {group.panelIndex === 2 && <WorldSnapshotPanel data={worldSnapshot} />}
+                  {group.panelIndex === 3 && <SportDayPanel data={sportDay} />}
+                  {group.panelIndex === 4 && <MarketDayPanel data={marketDay} />}
+                  {group.panelIndex === 5 && <CultureSnapshotPanel data={cultureSnapshot} />}
+                </div>
+              )}
+            </div>
+          ))}
         </section>
 
         <section className="pt-1">
