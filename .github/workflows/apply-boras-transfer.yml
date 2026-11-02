@@ -1,0 +1,42 @@
+name: Apply one-time Boras implementation transfer
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-boras-transfer-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply tested implementation and remove transfer files
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          test -s .boras-transfer/implementation.patch.gz
+          gzip -dc .boras-transfer/implementation.patch.gz > /tmp/boras-implementation.patch
+          git apply --check /tmp/boras-implementation.patch
+          git apply --index /tmp/boras-implementation.patch
+          rm -f .boras-transfer/implementation.patch.gz
+          rm -f .github/workflows/apply-boras-transfer.yml
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "feat: build long-lived Boras event catalog"
+          git push origin "HEAD:${HEAD_BRANCH}"
