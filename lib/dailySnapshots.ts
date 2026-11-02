@@ -415,7 +415,12 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
   const browserSnapshot = browserEventsResult.status === "fulfilled" ? browserEventsResult.value : null;
   const scrapedEvents = browserSnapshot
     ? browserSnapshot.events
-      .filter(item => item.date <= eventCutoff && (item.endDate ?? item.date) >= today)
+      .filter(item =>
+        item.status !== "unlisted" &&
+        item.status !== "cancelled" &&
+        item.date <= eventCutoff &&
+        (item.endDate ?? item.date) >= today
+      )
       .map(item => ({
         title: item.title,
         url: item.url,

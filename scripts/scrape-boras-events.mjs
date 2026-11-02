@@ -166,6 +166,10 @@ async function main() {
           .map(p => (p.innerText || "").replace(/\s+/g, " ").trim())
           .filter(t => t.length > 25);
         const imageNode = card.querySelector("img");
+        const cardText = (card.innerText || anchor.innerText || "").replace(/\s+/g, " ").trim();
+        const status = /\b(inställd|inställt|inställda|avbokad|avbokat|cancelled|canceled)\b/i.test(cardText)
+          ? "cancelled"
+          : "active";
         const venueNode = card.querySelector("[class*='venue'], [class*='location'], [class*='organizer']");
         return {
           title,
@@ -176,6 +180,7 @@ async function main() {
           venue: (venueNode?.innerText || "").replace(/\s+/g, " ").trim(),
           description: paragraphs[0] || "",
           image: imageNode?.currentSrc || imageNode?.src || imageNode?.getAttribute("data-src") || "",
+          status,
           debugText: (combinedDateText || diagnosticText).slice(0, 360),
         };
       });

@@ -129,6 +129,8 @@ export async function POST(request: Request) {
       venue: validText(raw.venue, 160) ? raw.venue.trim().slice(0, 160) : undefined,
       description: typeof raw.description === "string" ? raw.description.trim().slice(0, 700) || undefined : undefined,
       image: safeImage(raw.image),
+      status: raw.status === "cancelled" ? "cancelled" : "active",
+      missingCompleteScrapes: 0,
     };
     unique.set(item.url, item);
   }

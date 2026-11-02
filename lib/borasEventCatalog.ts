@@ -75,8 +75,20 @@ function normalizedEvent(event: BrowserScrapedBorasEvent): BrowserScrapedBorasEv
 }
 
 function contentFingerprint(events: BrowserScrapedBorasEvent[]) {
+  // Missing-scrape counters are operational metadata. They must not cause a
+  // homepage cache rebuild every day while visible event content is unchanged.
   return JSON.stringify(
-    [...events].map(normalizedEvent).sort((a, b) => a.url.localeCompare(b.url))
+    [...events].map(event => ({
+      title: event.title,
+      url: normalizeBorasEventUrl(event.url),
+      date: event.date,
+      endDate: event.endDate,
+      time: event.time,
+      venue: event.venue,
+      description: event.description,
+      image: event.image,
+      status: event.status ?? "active",
+    })).sort((a, b) => String(a.url).localeCompare(String(b.url)))
   );
 }
 
@@ -87,45 +99,63 @@ export function mergeBorasEventCatalog(
     today?: string;
     complete?: boolean;
     expectedMinimum?: number;
-    previousCount?: number;
   } = {}
 ): BorasEventCatalogMerge {
   const today = options.today ?? stockholmDateKey();
   const expectedMinimum = options.expectedMinimum ?? 6;
   const validExisting = existingEvents.filter(event => isUsableBorasEvent(event, today));
-  const previousCount = options.previousCount ?? validExisting.length;
 
   const uniqueIncoming = new Map<string, BrowserScrapedBorasEvent>();
   for (const event of incomingEvents) {
     if (!isUsableBorasEvent(event, today)) continue;
-    const normalized = normalizedEvent(event);
+    const normalized = normalizedEvent({
+      ...event,
+      status: event.status === "cancelled" ? "cancelled" : "active",
+      missingCompleteScrapes: 0,
+    });
     uniqueIncoming.set(normalized.url, normalized);
   }
 
-  // Incomplete pagination, low counts, and sudden large drops must never
-  // replace or prune the last known-good catalogue.
-  if (
-    options.complete !== true ||
-    uniqueIncoming.size < expectedMinimum ||
-    (previousCount >= expectedMinimum && uniqueIncoming.size <= Math.ceil(previousCount * 0.5))
-  ) {
+  // A failed/partial scrape or a low-quality result never updates the catalog.
+  // A short but complete listing is handled conservatively below: absent future
+  // events remain active until three consecutive complete listings omit them.
+  if (options.complete !== true || uniqueIncoming.size < expectedMinimum) {
     const reason = options.complete !== true
       ? "Scrape was not marked complete"
-      : uniqueIncoming.size < expectedMinimum
-        ? "Too few validated events"
-        : "Incoming scrape is substantially smaller than the previous catalogue";
+      : "Too few validated events";
     return { events: existingEvents, contentChanged: false, complete: false, reason };
   }
 
   const merged = new Map<string, BrowserScrapedBorasEvent>();
   for (const event of validExisting) {
     const normalized = normalizedEvent(event);
-    merged.set(normalized.url, normalized);
-  }
-  // Upsert current source entries. Future events missing from this one complete
-  // listing remain until their event/end date is outside the retention window.
-  for (const [url, event] of uniqueIncoming) merged.set(url, event);
+    const current = uniqueIncoming.get(normalized.url);
+    if (current) {
+      // A returned event becomes active again and its absence counter resets.
+      merged.set(normalized.url, current);
+      continue;
+    }
 
+    const missingCompleteScrapes = Math.min(100, Math.max(0, event.missingCompleteScrapes ?? 0) + 1);
+    const status = event.status === "cancelled"
+      ? "cancelled"
+      : missingCompleteScrapes >= 3
+        ? "unlisted"
+        : "active";
+    merged.set(normalized.url, {
+      ...normalized,
+      status,
+      missingCompleteScrapes,
+    });
+  }
+
+  // New entries are inserted and current source entries overwrite old content.
+  for (const [url, event] of uniqueIncoming) {
+    if (!merged.has(url)) merged.set(url, event);
+  }
+
+  // Unlisted/cancelled events remain in the private catalog as a short archive
+  // until their end/event date is more than 30 days in the past.
   const events = [...merged.values()].sort((a, b) =>
     a.date.localeCompare(b.date) ||
     (a.time ?? "99:99").localeCompare(b.time ?? "99:99") ||

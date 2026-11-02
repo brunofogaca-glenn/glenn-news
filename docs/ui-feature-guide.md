@@ -6,7 +6,7 @@ For data-source schedules and cache lifetime, read [Data refresh inventory](data
 
 The homepage sport panel and supplemental panel footers display the snapshot fetch date/time in the Stockholm timezone. The sport table also shows when Glenn News retrieved the table response and explicitly states that FotMob does not expose a distinct observation timestamp in the consumed payload. A stale sport snapshot shows its last saved time and explanatory status. The market panel displays each market's actual trading-session date separately from snapshot fetch time; these may differ because of weekends, holidays or source availability.
 
-The local Borås calendar reads from the long-lived Borås.com catalog when at least six upcoming entries are available. It keeps the existing interest ranking and separate municipality-meeting list. If the last-good catalog has not been checked for more than 72 hours, the panel explicitly says it is showing saved data and displays the last check date; the municipality remains the fallback when no usable browser snapshot is available.
+The local Borås calendar reads active entries from the long-lived Borås.com catalog when at least six upcoming entries are available. It keeps the existing interest ranking and separate municipality-meeting list. Explicitly cancelled events are removed from the visible selection immediately; events absent from three consecutive complete scrapes are marked unlisted and hidden but retained in the short archive. If the last-good catalog has not been checked for more than 72 hours, the panel explicitly says it is showing saved data and displays the last check date; the municipality remains the fallback when no usable browser snapshot is available.
 
 ## Responsiv startsida och redaktionellt flöde
 

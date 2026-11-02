@@ -704,11 +704,43 @@ test("Borås event catalogue refuses incomplete, undersized and sharply reduced 
   assert.equal(tooSmall.complete, false);
   assert.equal(tooSmall.events, previous);
 
-  const sharplyReduced = mergeBorasEventCatalog(previous, previous.slice(0, 6), {
-    today, complete: true, previousCount: previous.length,
-  });
-  assert.equal(sharplyReduced.complete, false);
-  assert.equal(sharplyReduced.events, previous);
+  const firstShortListing = mergeBorasEventCatalog(previous, previous.slice(0, 6), { today, complete: true });
+  assert.equal(firstShortListing.complete, true);
+  assert.equal(firstShortListing.contentChanged, false);
+  assert.equal(firstShortListing.events.length, previous.length);
+  assert.equal(firstShortListing.events.find(item => item.url.endsWith("/event-12/")).status, "active");
+  assert.equal(firstShortListing.events.find(item => item.url.endsWith("/event-12/")).missingCompleteScrapes, 1);
+
+  const secondShortListing = mergeBorasEventCatalog(firstShortListing.events, previous.slice(0, 6), { today, complete: true });
+  assert.equal(secondShortListing.contentChanged, false);
+  assert.equal(secondShortListing.events.find(item => item.url.endsWith("/event-12/")).status, "active");
+  assert.equal(secondShortListing.events.find(item => item.url.endsWith("/event-12/")).missingCompleteScrapes, 2);
+
+  const thirdShortListing = mergeBorasEventCatalog(secondShortListing.events, previous.slice(0, 6), { today, complete: true });
+  assert.equal(thirdShortListing.contentChanged, true);
+  assert.equal(thirdShortListing.events.length, previous.length);
+  assert.equal(thirdShortListing.events.find(item => item.url.endsWith("/event-12/")).status, "unlisted");
+  assert.equal(thirdShortListing.events.find(item => item.url.endsWith("/event-12/")).missingCompleteScrapes, 3);
+
+  const returnedEvent = mergeBorasEventCatalog(thirdShortListing.events, previous, { today, complete: true });
+  assert.equal(returnedEvent.contentChanged, true);
+  assert.equal(returnedEvent.events.find(item => item.url.endsWith("/event-12/")).status, "active");
+  assert.equal(returnedEvent.events.find(item => item.url.endsWith("/event-12/")).missingCompleteScrapes, 0);
+});
+
+test("Borås catalogue applies explicit cancellations immediately and keeps them in the short archive", () => {
+  const existing = Array.from({ length: 6 }, (_, i) => ({
+    title: "Event " + i,
+    url: "https://www.boras.com/evenemang/event-" + i + "/",
+    date: "2026-12-" + String(i + 1).padStart(2, "0"),
+    status: "active",
+  }));
+  const incoming = existing.map((item, index) => ({ ...item, status: index === 0 ? "cancelled" : "active" }));
+  const result = mergeBorasEventCatalog(existing, incoming, { today: "2026-11-02", complete: true });
+  assert.equal(result.complete, true);
+  assert.equal(result.contentChanged, true);
+  assert.equal(result.events.find(item => item.url.endsWith("/event-0/")).status, "cancelled");
+  assert.equal(result.events.length, 6);
 });
 
 test("Borås catalogue expires only ended events after the documented retention window", () => {
@@ -759,6 +791,7 @@ test("Borås browser refresh requires full pagination metadata and revalidates o
   assert.match(scraper, /moreAvailableAfterScroll/);
   assert.match(scraper, /refusing to mark the scrape complete/);
   assert.match(scraper, /complete: true/);
+  assert.match(scraper, /inställd\|inställt\|inställda/);
   assert.match(scraper, /expectedHorizonDays: EVENT_HORIZON_DAYS/);
 
   const ingest = read("app/api/cron/ingest-boras-events/route.ts");
@@ -775,6 +808,7 @@ test("Borås browser refresh requires full pagination metadata and revalidates o
   const snapshots = read("lib/dailySnapshots.ts");
   assert.match(snapshots, /eventCutoff = addCalendarDays\(today, BORAS_EVENT_HORIZON_DAYS\)/);
   assert.match(snapshots, /eventCatalogStale/);
+  assert.match(snapshots, /item.status !== "unlisted"/);
 
   const store = read("lib/borasEventStore.ts");
   assert.match(store, /value.version !== 1 && value.version !== 2/);

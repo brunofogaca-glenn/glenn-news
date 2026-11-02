@@ -13,6 +13,8 @@ export type BrowserScrapedBorasEvent = {
   venue?: string;
   description?: string;
   image?: string;
+  status?: "active" | "unlisted" | "cancelled";
+  missingCompleteScrapes?: number;
 };
 
 export type BrowserScrapedBorasSnapshot = {
@@ -130,10 +132,19 @@ export async function getBrowserScrapedBorasEvents(): Promise<BrowserScrapedBora
         Boolean(normalizeBorasEventUrl(item.url)) &&
         isValidDate(item.date) &&
         (item.endDate === undefined || isValidDate(item.endDate));
-    }).map(event => ({
-      ...event,
-      url: normalizeBorasEventUrl(event.url)!,
-    }));
+    }).map(event => {
+      const item = event as BrowserScrapedBorasEvent;
+      const status: BrowserScrapedBorasEvent["status"] =
+        item.status === "cancelled" || item.status === "unlisted" ? item.status : "active";
+      return {
+        ...item,
+        url: normalizeBorasEventUrl(item.url)!,
+        status,
+        missingCompleteScrapes: Number.isSafeInteger(item.missingCompleteScrapes)
+          ? Math.max(0, Math.min(100, item.missingCompleteScrapes ?? 0))
+          : 0,
+      };
+    });
 
     if (events.length < 6) return null;
     return {
