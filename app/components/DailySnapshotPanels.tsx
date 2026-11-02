@@ -184,7 +184,9 @@ export function LocalSnapshotPanel({ data, profile }: { data: LocalSnapshot; pro
           <p className="mt-1 text-xs text-slate-500">
             {data.eventSource === "boras-stad-fallback"
               ? "Borås.com-listan gick inte att läsa just nu. Tillfälligt reservurval från Borås Stads evenemang, prioriterat efter dina intressen."
-              : "Evenemang från Borås.com, prioriterade efter dina läsintressen."} Kommunala sammanträden visas separat.
+              : data.eventCatalogStale
+                ? "Visar senast sparade Borås.com-lista. Senast kontrollerad " + (data.eventCatalogCheckedAt?.slice(0, 10) ?? "tidigare") + "; hämtningen är äldre än 72 timmar."
+                : "Evenemang från Borås.com, prioriterade efter dina läsintressen."} Kommunala sammanträden visas separat.
           </p>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
