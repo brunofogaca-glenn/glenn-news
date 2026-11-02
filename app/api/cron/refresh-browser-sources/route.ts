@@ -8,6 +8,7 @@ import {
   POST as ingestFotbollskanalenSnapshot,
 } from "../ingest-fotbollskanalen-articles/route";
 import { getStockholmClock } from "@/lib/updateSchedule";
+import { BORAS_EVENT_HORIZON_DAYS } from "@/lib/borasEventCatalog";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -56,7 +57,8 @@ async function readJson(response: Response): Promise<JsonRecord> {
 }
 
 async function runBrowserCommand(sandbox: Sandbox, scriptName: string, outputName: string) {
-  const result = await sandbox.runCommand("bash", ["-lc", "cd " + WORKSPACE + " && node " + scriptName]);
+  const horizonPrefix = scriptName === "scrape-boras-events.mjs" ? "BORAS_EVENTS_HORIZON_DAYS=" + BORAS_EVENT_HORIZON_DAYS + " " : "";
+  const result = await sandbox.runCommand("bash", ["-lc", "cd " + WORKSPACE + " && " + horizonPrefix + "node " + scriptName]);
   if (result.exitCode !== 0) {
     const stderr = (await result.stderr()).trim().slice(-1500);
     throw new Error(stderr || scriptName + " exited with code " + String(result.exitCode ?? "unknown") + ".");
@@ -192,7 +194,11 @@ export async function GET(request: Request) {
     if (borasPayload) {
       try {
         const stored = await readJson(await ingestBorasSnapshot(internalRequest(
-          "/api/cron/ingest-boras-events", "POST", { events: borasPayload.events }
+          "/api/cron/ingest-boras-events", "POST", {
+            events: borasPayload.events,
+            complete: borasPayload.complete,
+            expectedHorizonDays: borasPayload.expectedHorizonDays,
+          }
         )));
         results.boras = {
           status: stored.skipped === true ? "current" : "updated",

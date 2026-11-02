@@ -21,6 +21,7 @@ require.extensions[".ts"] = (module, filename) => {
   module._compile(output.outputText, filename);
 };
 const { parseFtBrentHistory } = require("../lib/brentHistoryParser.ts");
+const { mergeBorasEventCatalog, normalizeBorasEventUrl, BORAS_EVENT_HORIZON_DAYS } = require("../lib/borasEventCatalog.ts");
 
 test("supplemental Vercel cron and manual recovery use scoped authentication", () => {
   const config = JSON.parse(read("vercel.json"));
@@ -640,4 +641,177 @@ test("Hobby morning cron accepts the entire local 06 hour and requires a secret"
   assert.match(morning, /Outside the 06:00-06:59 Stockholm publication hour/);
   assert.doesNotMatch(morning, /localClock\.minute < 30|localClock\.minute > 39/);
   assert.match(morning, /if \(await hasFreshMorningEditionForToday\(\)\)[\s\S]*?previousStatus\?\.status !== "retry"/);
+});
+
+test("Borås event catalogue keeps a 180-day horizon and merges without dropping future events", () => {
+  const today = "2026-11-02";
+  const event = (slug, date, extra = {}) => ({
+    title: slug,
+    url: "https://www.boras.com/evenemang/" + slug + "/",
+    date,
+    ...extra,
+  });
+
+  assert.equal(BORAS_EVENT_HORIZON_DAYS, 180);
+  assert.equal(normalizeBorasEventUrl("https://boras.com/evenemang/test/?utm_source=x#top"),
+    "https://www.boras.com/evenemang/test/");
+
+  const existing = [
+    event("one", "2026-11-10"),
+    event("future-not-in-one-page", "2027-04-15"),
+  ];
+  const incoming = [
+    event("one", "2026-11-11", { title: "one updated" }),
+    event("two", "2026-12-01"),
+    event("three", "2027-01-01"),
+    event("four", "2027-02-01"),
+    event("five", "2027-03-01"),
+    event("six", "2027-04-01"),
+    event("at-horizon", "2027-05-01"),
+    event("outside-horizon", "2027-05-10"),
+  ];
+  const result = mergeBorasEventCatalog(existing, incoming, {
+    today, complete: true, expectedMinimum: 6,
+  });
+  assert.equal(result.complete, true);
+  assert.equal(result.contentChanged, true);
+  assert.ok(result.events.some(item => item.url.endsWith("/future-not-in-one-page/")));
+  assert.equal(result.events.find(item => item.url.endsWith("/one/")).title, "one updated");
+  assert.ok(result.events.some(item => item.url.endsWith("/at-horizon/")));
+  assert.ok(!result.events.some(item => item.url.endsWith("/outside-horizon/")));
+  assert.equal(result.events.length, 8);
+});
+
+test("Borås event catalogue refuses incomplete, undersized and sharply reduced scrapes", () => {
+  const today = "2026-11-02";
+  const event = n => ({
+    title: "Event " + n,
+    url: "https://www.boras.com/evenemang/event-" + n + "/",
+    date: "2026-12-" + String(n).padStart(2, "0"),
+  });
+  const previous = Array.from({ length: 12 }, (_, i) => event(i + 1));
+
+  const incomplete = mergeBorasEventCatalog(previous, previous.slice(0, 9), {
+    today, complete: false, previousCount: previous.length,
+  });
+  assert.equal(incomplete.complete, false);
+  assert.equal(incomplete.contentChanged, false);
+  assert.equal(incomplete.events, previous);
+
+  const tooSmall = mergeBorasEventCatalog(previous, previous.slice(0, 5), {
+    today, complete: true, previousCount: previous.length,
+  });
+  assert.equal(tooSmall.complete, false);
+  assert.equal(tooSmall.events, previous);
+
+  const firstShortListing = mergeBorasEventCatalog(previous, previous.slice(0, 6), { today, complete: true });
+  assert.equal(firstShortListing.complete, true);
+  assert.equal(firstShortListing.contentChanged, false);
+  assert.equal(firstShortListing.events.length, previous.length);
+  assert.equal(firstShortListing.events.find(item => item.url.endsWith("/event-12/")).status, "active");
+  assert.equal(firstShortListing.events.find(item => item.url.endsWith("/event-12/")).missingCompleteScrapes, 1);
+
+  const secondShortListing = mergeBorasEventCatalog(firstShortListing.events, previous.slice(0, 6), { today, complete: true });
+  assert.equal(secondShortListing.contentChanged, false);
+  assert.equal(secondShortListing.events.find(item => item.url.endsWith("/event-12/")).status, "active");
+  assert.equal(secondShortListing.events.find(item => item.url.endsWith("/event-12/")).missingCompleteScrapes, 2);
+
+  const thirdShortListing = mergeBorasEventCatalog(secondShortListing.events, previous.slice(0, 6), { today, complete: true });
+  assert.equal(thirdShortListing.contentChanged, true);
+  assert.equal(thirdShortListing.events.length, previous.length);
+  assert.equal(thirdShortListing.events.find(item => item.url.endsWith("/event-12/")).status, "unlisted");
+  assert.equal(thirdShortListing.events.find(item => item.url.endsWith("/event-12/")).missingCompleteScrapes, 3);
+
+  const returnedEvent = mergeBorasEventCatalog(thirdShortListing.events, previous, { today, complete: true });
+  assert.equal(returnedEvent.contentChanged, true);
+  assert.equal(returnedEvent.events.find(item => item.url.endsWith("/event-12/")).status, "active");
+  assert.equal(returnedEvent.events.find(item => item.url.endsWith("/event-12/")).missingCompleteScrapes, 0);
+});
+
+test("Borås catalogue applies explicit cancellations immediately and keeps them in the short archive", () => {
+  const existing = Array.from({ length: 6 }, (_, i) => ({
+    title: "Event " + i,
+    url: "https://www.boras.com/evenemang/event-" + i + "/",
+    date: "2026-12-" + String(i + 1).padStart(2, "0"),
+    status: "active",
+  }));
+  const incoming = existing.map((item, index) => ({ ...item, status: index === 0 ? "cancelled" : "active" }));
+  const result = mergeBorasEventCatalog(existing, incoming, { today: "2026-11-02", complete: true });
+  assert.equal(result.complete, true);
+  assert.equal(result.contentChanged, true);
+  assert.equal(result.events.find(item => item.url.endsWith("/event-0/")).status, "cancelled");
+  assert.equal(result.events.length, 6);
+});
+
+test("Borås catalogue expires only ended events after the documented retention window", () => {
+  const today = "2026-11-02";
+  const event = (slug, date, endDate) => ({
+    title: slug,
+    url: "https://www.boras.com/evenemang/" + slug + "/",
+    date,
+    endDate,
+  });
+  const existing = [
+    event("recently-ended", "2026-10-10", "2026-10-10"),
+    event("too-old", "2026-10-01", "2026-10-01"),
+    event("still-running", "2026-10-01", "2026-11-05"),
+  ];
+  const incoming = Array.from({ length: 6 }, (_, i) => ({
+    title: "Current " + i,
+    url: "https://www.boras.com/evenemang/current-" + i + "/",
+    date: "2026-12-" + String(i + 1).padStart(2, "0"),
+  }));
+  const result = mergeBorasEventCatalog(existing, incoming, {
+    today, complete: true, previousCount: 3,
+  });
+  assert.ok(result.events.some(item => item.url.endsWith("/recently-ended/")));
+  assert.ok(!result.events.some(item => item.url.endsWith("/too-old/")));
+  assert.ok(result.events.some(item => item.url.endsWith("/still-running/")));
+});
+
+test("Borås event catalogue detects unchanged content regardless of source URL query parameters", () => {
+  const existing = Array.from({ length: 6 }, (_, i) => ({
+    title: "Event " + i,
+    url: "https://www.boras.com/evenemang/event-" + i + "/",
+    date: "2026-12-" + String(i + 1).padStart(2, "0"),
+  }));
+  const incoming = existing.map(item => ({ ...item, url: item.url + "?utm_campaign=night" }));
+  const result = mergeBorasEventCatalog(existing, incoming, {
+    today: "2026-11-02", complete: true, previousCount: existing.length,
+  });
+  assert.equal(result.complete, true);
+  assert.equal(result.contentChanged, false);
+  assert.equal(result.events.length, 6);
+});
+
+test("Borås browser refresh requires full pagination metadata and revalidates only changed content", () => {
+  const scraper = read("scripts/scrape-boras-events.mjs");
+  assert.match(scraper, /BORAS_EVENTS_HORIZON_DAYS/);
+  assert.match(scraper, /listingComplete/);
+  assert.match(scraper, /moreAvailableAfterScroll/);
+  assert.match(scraper, /refusing to mark the scrape complete/);
+  assert.match(scraper, /complete: true/);
+  assert.match(scraper, /inställd\|inställt\|inställda/);
+  assert.match(scraper, /expectedHorizonDays: EVENT_HORIZON_DAYS/);
+
+  const ingest = read("app/api/cron/ingest-boras-events/route.ts");
+  assert.match(ingest, /payload.complete !== true/);
+  assert.match(ingest, /payload.expectedHorizonDays !== BORAS_EVENT_HORIZON_DAYS/);
+  assert.match(ingest, /if \(snapshot.contentChanged\)/);
+  assert.match(ingest, /addCalendarDays\(today, BORAS_EVENT_HORIZON_DAYS\)/);
+
+  const browser = read("app/api/cron/refresh-browser-sources/route.ts");
+  assert.match(browser, /borasPayload.complete/);
+  assert.match(browser, /borasPayload.expectedHorizonDays/);
+  assert.match(browser, /BORAS_EVENTS_HORIZON_DAYS=/);
+
+  const snapshots = read("lib/dailySnapshots.ts");
+  assert.match(snapshots, /eventCutoff = addCalendarDays\(today, BORAS_EVENT_HORIZON_DAYS\)/);
+  assert.match(snapshots, /eventCatalogStale/);
+  assert.match(snapshots, /item.status !== "unlisted"/);
+
+  const store = read("lib/borasEventStore.ts");
+  assert.match(store, /value.version !== 1 && value.version !== 2/);
+  assert.match(store, /STALE_AFTER_MS = 72/);
+  assert.match(store, /MAX_AGE_MS = 365/);
 });

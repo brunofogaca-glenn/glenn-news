@@ -3,6 +3,10 @@ import { writeFile } from "node:fs/promises";
 
 const SOURCE_URL = "https://www.boras.com/evenemang/";
 const OUTPUT_PATH = process.env.BORAS_EVENTS_OUTPUT ?? "boras-events-scrape.json";
+const EVENT_HORIZON_DAYS = Number(process.env.BORAS_EVENTS_HORIZON_DAYS ?? 180);
+if (!Number.isInteger(EVENT_HORIZON_DAYS) || EVENT_HORIZON_DAYS < 60 || EVENT_HORIZON_DAYS > 365) {
+  throw new Error("BORAS_EVENTS_HORIZON_DAYS must be an integer from 60 to 365");
+}
 
 function stockholmDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -30,18 +34,36 @@ async function main() {
 
     let previousCount = -1;
     let stableRounds = 0;
-    for (let round = 0; round < 50 && stableRounds < 5; round++) {
+    let listingComplete = false;
+    for (let round = 0; round < 50; round++) {
       const showMore = page.getByRole("button", { name: /visa (?:fler|\d+ evenemang)|ladda fler/i }).last();
-      if (await showMore.count() && await showMore.isVisible().catch(() => false)) {
-        await showMore.click({ timeout: 2_000 }).catch(() => {});
-        await page.waitForTimeout(300);
+      const canLoadMore = await showMore.count() > 0 &&
+        await showMore.isVisible().catch(() => false) &&
+        await showMore.isEnabled().catch(() => false);
+      if (canLoadMore) {
+        // A visible, enabled pagination control must succeed. A failed click
+        // is not evidence that the source listing has been fully consumed.
+        await showMore.click({ timeout: 2_000 });
+        await page.waitForTimeout(450);
       }
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForTimeout(350);
+      await page.waitForTimeout(400);
       const count = await page.locator('a[href*="/evenemang/"]').count();
+      if (count > 1_500) {
+        throw new Error("Borås event listing exceeded the 1,500-link safety limit; refusing to mark the scrape complete.");
+      }
       if (count === previousCount) stableRounds++; else stableRounds = 0;
       previousCount = count;
-      if (count > 1_500) break;
+      const moreAvailableAfterScroll = await showMore.count() > 0 &&
+        await showMore.isVisible().catch(() => false) &&
+        await showMore.isEnabled().catch(() => false);
+      if (stableRounds >= 5 && !moreAvailableAfterScroll) {
+        listingComplete = true;
+        break;
+      }
+    }
+    if (!listingComplete) {
+      throw new Error("Borås event listing did not reach five stable rounds with no enabled pagination control; refusing to mark the scrape complete.");
     }
 
     const rawEvents = await page.locator('a[href*="/evenemang/"]').evaluateAll(anchors => {
@@ -144,6 +166,10 @@ async function main() {
           .map(p => (p.innerText || "").replace(/\s+/g, " ").trim())
           .filter(t => t.length > 25);
         const imageNode = card.querySelector("img");
+        const cardText = (card.innerText || anchor.innerText || "").replace(/\s+/g, " ").trim();
+        const status = /\b(inställd|inställt|inställda|avbokad|avbokat|cancelled|canceled)\b/i.test(cardText)
+          ? "cancelled"
+          : "active";
         const venueNode = card.querySelector("[class*='venue'], [class*='location'], [class*='organizer']");
         return {
           title,
@@ -154,13 +180,14 @@ async function main() {
           venue: (venueNode?.innerText || "").replace(/\s+/g, " ").trim(),
           description: paragraphs[0] || "",
           image: imageNode?.currentSrc || imageNode?.src || imageNode?.getAttribute("data-src") || "",
+          status,
           debugText: (combinedDateText || diagnosticText).slice(0, 360),
         };
       });
     });
 
     const today = stockholmDateKey();
-    const cutoff = addDays(today, 60);
+    const cutoff = addDays(today, EVENT_HORIZON_DAYS);
     const unique = new Map();
     for (const item of rawEvents) {
       if (!item || !item.title || !item.date || !/^20\d{2}-\d{2}-\d{2}$/.test(item.date)) continue;
@@ -179,7 +206,8 @@ async function main() {
       console.error("Borås event extraction diagnostics:", JSON.stringify(sample));
       throw new Error("Only " + events.length + " upcoming event cards extracted. Refusing to replace the last good snapshot. Rendered event links: " + rawEvents.filter(Boolean).length);
     }
-    await writeFile(OUTPUT_PATH, JSON.stringify({ sourceUrl: SOURCE_URL, scrapedAt: new Date().toISOString(), events }), "utf8");
+    if (events.length > 500) throw new Error("Borås event list exceeded the 500-event ingestion limit; refusing to write a partial payload.");
+    await writeFile(OUTPUT_PATH, JSON.stringify({ sourceUrl: SOURCE_URL, scrapedAt: new Date().toISOString(), complete: true, expectedHorizonDays: EVENT_HORIZON_DAYS, events }), "utf8");
     console.log("Borås.com rendered event cards extracted:", events.length);
     console.log("Output written to:", OUTPUT_PATH);
   } finally {

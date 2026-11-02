@@ -11,6 +11,7 @@ import { unstable_cache } from "next/cache";
 import { withLastGoodSnapshot, type SupplementalRefreshMeta } from "./supplementalCache";
 import { parseFtBrentHistory } from "./brentHistoryParser";
 import { getBrowserScrapedBorasEvents } from "./borasEventStore";
+import { addCalendarDays, BORAS_EVENT_HORIZON_DAYS } from "./borasEventCatalog";
 
 const TIME_ZONE = "Europe/Stockholm";
 
@@ -31,6 +32,8 @@ export type LocalSnapshot = {
   events: SnapshotLink[];
   meetings: SnapshotLink[];
   eventSource: "boras.com" | "boras-stad-fallback";
+  eventCatalogStale?: boolean;
+  eventCatalogCheckedAt?: string;
   updatedAt: string;
   sources: Array<{ title: string; url: string }>;
   warnings?: string[];
@@ -408,10 +411,16 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
   ]);
 
   const today = todayInStockholm();
-  const eventCutoff = addDays(today, 60);
-  const scrapedEvents = browserEventsResult.status === "fulfilled" && browserEventsResult.value
-    ? browserEventsResult.value.events
-      .filter(item => item.date <= eventCutoff && (item.endDate ?? item.date) >= today)
+  const eventCutoff = addCalendarDays(today, BORAS_EVENT_HORIZON_DAYS);
+  const browserSnapshot = browserEventsResult.status === "fulfilled" ? browserEventsResult.value : null;
+  const scrapedEvents = browserSnapshot
+    ? browserSnapshot.events
+      .filter(item =>
+        item.status !== "unlisted" &&
+        item.status !== "cancelled" &&
+        item.date <= eventCutoff &&
+        (item.endDate ?? item.date) >= today
+      )
       .map(item => ({
         title: item.title,
         url: item.url,
@@ -470,6 +479,8 @@ async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
       (a.time ?? "99:99").localeCompare(b.time ?? "")
     ),
     eventSource,
+    eventCatalogStale: hasBrowserEvents ? browserSnapshot?.stale ?? false : false,
+    eventCatalogCheckedAt: browserSnapshot?.checkedAt,
     meetings,
     updatedAt: new Date().toISOString(),
     // If events were loaded, a failed optional HTML source must not make this snapshot stale.
