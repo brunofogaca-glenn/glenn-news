@@ -1,5 +1,4 @@
 import { canRefreshEditorialSourcesNow } from "./updateSchedule";
-import { getBrowserScrapedFotbollskanalenArticles } from "./fotbollskanalenArticleStore";
 
 type WebArticle = {
   title: string;
@@ -29,24 +28,6 @@ export type WebSourceConfig = {
 };
 
 export const WEB_SOURCES: WebSourceConfig[] = [
-  {
-    url: "https://www.fotbollskanalen.se/",
-    domain: "www.fotbollskanalen.se",
-    category: "fotboll",
-    source: "Fotbollskanalen – Senaste",
-  },
-  {
-    url: "https://www.fotbollskanalen.se/lag/if-elfsborg-herr",
-    domain: "www.fotbollskanalen.se",
-    category: "elfsborg",
-    source: "Fotbollskanalen",
-  },
-  {
-    url: "https://www.fotbollskanalen.se/skribent/olof-lundh",
-    domain: "www.fotbollskanalen.se",
-    category: "fotboll",
-    source: "Fotbollskanalen",
-  },
   {
     url: "https://www.aftonbladet.se/av/daniel-suhonen",
     domain: "www.aftonbladet.se",
@@ -115,13 +96,6 @@ function isArticleUrl(url: string, source: WebSourceConfig) {
 
     if (parsed.hostname !== source.domain) {
       return false;
-    }
-
-    if (source.domain === "www.fotbollskanalen.se") {
-      return (
-        parsed.pathname.includes("/artiklar/") ||
-        parsed.pathname.includes("/bloggar/")
-      );
     }
 
     if (source.domain === "www.aftonbladet.se") {
@@ -273,13 +247,6 @@ export async function fetchWebSource(source: WebSourceConfig) {
     throw new Error("Hämtning av artikelwebbkällor är spärrad före 06.00 Europe/Stockholm.");
   }
 
-  // Fotbollskanalen's HTML is larger than Next.js's 2 MB data-cache limit.
-  // Do not request a cache write for that fallback; other publishers keep the
-  // short revalidation window. The normal Fotbollskanalen path uses the
-  // validated browser snapshot and avoids downloading this page entirely.
-  const cacheOptions = source.domain === "www.fotbollskanalen.se"
-    ? { cache: "no-store" as const }
-    : { next: { revalidate: 900 } };
   const response = await fetch(source.url, {
     signal: AbortSignal.timeout(10000),
     headers: {
@@ -287,7 +254,7 @@ export async function fetchWebSource(source: WebSourceConfig) {
         "Mozilla/5.0 (compatible; Glenn News/1.0)",
       Accept: "text/html,application/xhtml+xml",
     },
-    ...cacheOptions,
+    next: { revalidate: 900 },
   });
 
   if (!response.ok) {
@@ -313,62 +280,14 @@ export async function getWebArticles() {
     livsstil: [] as WebArticle[],
   };
 
-  const fotbollskanalenSources = WEB_SOURCES.filter(
-    source => source.domain === "www.fotbollskanalen.se"
-  );
-  const otherSources = WEB_SOURCES.filter(
-    source => source.domain !== "www.fotbollskanalen.se"
-  );
-
-  const [fetched, browserSnapshot] = await Promise.all([
-    Promise.allSettled(otherSources.map(fetchWebSource)),
-    getBrowserScrapedFotbollskanalenArticles(),
-  ]);
-
+  const fetched = await Promise.allSettled(WEB_SOURCES.map(fetchWebSource));
   fetched.forEach((result, index) => {
     if (result.status !== "fulfilled") {
-      console.error(
-        "Webbkälla misslyckades:",
-        otherSources[index].url,
-        result.reason
-      );
+      console.error("Webbkälla misslyckades:", WEB_SOURCES[index].url, result.reason);
       return;
     }
-
-    results[otherSources[index].category].push(...result.value);
+    results[WEB_SOURCES[index].category].push(...result.value);
   });
-
-  if (browserSnapshot) {
-    for (const article of browserSnapshot.articles) {
-      results[article.category].push({
-        title: article.title,
-        description: article.description ?? "",
-        link: article.url,
-        date: article.date,
-        source: "Fotbollskanalen",
-        image: article.image ?? null,
-        articleType: article.articleType,
-      });
-    }
-  } else {
-    // Compatibility fallback until the first successful browser import, or if
-    // the saved browser snapshot expires. The normal path uses rendered pages.
-    const legacyResults = await Promise.allSettled(
-      fotbollskanalenSources.map(fetchWebSource)
-    );
-    legacyResults.forEach((result, index) => {
-      if (result.status !== "fulfilled") {
-        console.error(
-          "Fotbollskanalen fallback misslyckades:",
-          fotbollskanalenSources[index].url,
-          result.reason
-        );
-        return;
-      }
-
-      results[fotbollskanalenSources[index].category].push(...result.value);
-    });
-  }
 
   return results;
 }

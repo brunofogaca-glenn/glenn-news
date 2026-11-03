@@ -17,8 +17,6 @@ const ALLOWED_WORKFLOWS = {
     `${REPOSITORY}/.github/workflows/refresh-editorial-articles.yml@${MAIN_REF}`,
   borasEvents:
     `${REPOSITORY}/.github/workflows/refresh-boras-events.yml@${MAIN_REF}`,
-  fotbollskanalenArticles:
-    `${REPOSITORY}/.github/workflows/refresh-fotbollskanalen-articles.yml@${MAIN_REF}`,
   readerHistory:
     `${REPOSITORY}/.github/workflows/process-reader-history.yml@${MAIN_REF}`,
 } as const;
@@ -63,7 +61,7 @@ export async function authorizeGitHubActionsRefresh(
       (
         payload.event_name === "schedule" ||
         payload.event_name === "workflow_dispatch" ||
-        ((workflow === "borasEvents" || workflow === "fotbollskanalenArticles" || workflow === "readerHistory") && payload.event_name === "push")
+        ((workflow === "borasEvents" || workflow === "readerHistory") && payload.event_name === "push")
       ) &&
       (!manualMigration || payload.event_name === "push") &&
       payload.workflow_ref === ALLOWED_WORKFLOWS[workflow]

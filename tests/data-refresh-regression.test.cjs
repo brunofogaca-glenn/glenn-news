@@ -142,10 +142,7 @@ test("scheduled background refreshes are daily and article status is written by 
   assert.ok(!borasWorkflow.includes("schedule:"));
   assert.ok(borasWorkflow.includes("workflow_dispatch:"));
   assert.ok(borasWorkflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
-  const fotbollWorkflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.ok(!fotbollWorkflow.includes("schedule:"));
-  assert.ok(fotbollWorkflow.includes("workflow_dispatch:"));
-  assert.ok(fotbollWorkflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
+  assert.equal(fs.existsSync(path.join(root, ".github/workflows/refresh-fotbollskanalen-articles.yml")), false);
   const readerWorkflow = read(".github/workflows/process-reader-history.yml");
   assert.ok(!readerWorkflow.includes("schedule:"));
   assert.ok(readerWorkflow.includes("workflow_dispatch:"));
@@ -162,9 +159,7 @@ test("scheduled background refreshes are daily and article status is written by 
   const browserRoute = read("app/api/cron/refresh-browser-sources/route.ts");
   assert.ok(browserRoute.includes("Sandbox.create"));
   assert.ok(browserRoute.includes("getBorasSnapshotStatus"));
-  assert.ok(browserRoute.includes("getFotbollskanalenSnapshotStatus"));
   assert.ok(browserRoute.includes("scrape-boras-events.mjs"));
-  assert.ok(browserRoute.includes("scrape-fotbollskanalen-articles.mjs"));
   assert.ok(browserRoute.includes("sandbox.stop()"));
   assert.ok(!browserRoute.includes("list("));
   const borasIngest = read("app/api/cron/ingest-boras-events/route.ts");
@@ -452,77 +447,30 @@ test("FT Brent parser selects the latest completed close and ignores the current
   assert.equal(parseFtBrentHistory("<table><tr><td>No market data</td></tr></table>", "2026-10-29"), null);
 });
 
-test("Fotbollskanalen articles use a rendered-browser feed and validated private ingestion", () => {
-  const workflow = read(".github/workflows/refresh-fotbollskanalen-articles.yml");
-  assert.ok(!workflow.includes("schedule:"));
-  assert.ok(workflow.includes("playwright install --with-deps chromium"));
-  assert.ok(workflow.includes("scripts/scrape-fotbollskanalen-articles.mjs"));
-  assert.ok(workflow.includes("/api/cron/ingest-fotbollskanalen-articles"));
-  assert.ok(workflow.includes("ACTIONS_ID_TOKEN_REQUEST_URL"));
-  assert.ok(workflow.includes("VERCEL_AUTOMATION_BYPASS_SECRET"));
-  assert.ok(!workflow.includes("/api/cron/refresh-articles"));
-  assert.ok(workflow.includes("id: snapshot_check"));
-  assert.ok(workflow.includes("Check whether today's snapshot already exists"));
-  assert.ok(workflow.includes("steps.snapshot_check.outputs.should_refresh == 'true'"));
-  assert.ok(workflow.includes("STATUS_URL: https://glenn-news.vercel.app/api/cron/ingest-fotbollskanalen-articles"));
-  assert.ok(workflow.includes("concurrency:"));
-  assert.ok(workflow.includes("cancel-in-progress: false"));
-
-
+test("Fotbollskanalen has been fully retired and Borås is the only browser source", () => {
   const browserRoute = read("app/api/cron/refresh-browser-sources/route.ts");
-  assert.ok(browserRoute.includes("Sandbox.create"));
-  assert.ok(browserRoute.includes("getFotbollskanalenSnapshotStatus"));
-  assert.ok(browserRoute.includes("ingestFotbollskanalenSnapshot"));
+  assert.ok(browserRoute.includes("getBorasSnapshotStatus"));
+  assert.ok(browserRoute.includes("ingestBorasSnapshot"));
+  assert.ok(browserRoute.includes("scrape-boras-events.mjs"));
+  assert.doesNotMatch(browserRoute, /fotbollskanalen/i);
 
-  const scraper = read("scripts/scrape-fotbollskanalen-articles.mjs");
-  assert.ok(scraper.includes("chromium.launch"));
-  assert.ok(scraper.includes("https://www.fotbollskanalen.se/"));
-  assert.ok(scraper.includes("https://www.fotbollskanalen.se/lag/if-elfsborg-herr"));
-  assert.ok(scraper.includes("https://www.fotbollskanalen.se/skribent/olof-lundh"));
-  assert.ok(scraper.includes('a[href*="/artiklar/"],a[href*="/bloggar/"]'));
-  assert.ok(scraper.includes("parsePublishedDate"));
-  assert.ok(scraper.includes("refusing to replace the previous snapshot"));
-  assert.ok(scraper.includes("MAX_ARTICLE_STALENESS_MS"));
-  assert.ok(scraper.includes("Newest valid Fotbollskanalen article is older than 72 hours"));
-
-  const store = read("lib/fotbollskanalenArticleStore.ts");
-  assert.ok(store.includes('access: "private"'));
-  assert.ok(store.includes("MAX_AGE_MS"));
-  assert.ok(store.includes("browser-articles.json"));
-  assert.ok(store.includes("sourcePages"));
-
-  const ingest = read("app/api/cron/ingest-fotbollskanalen-articles/route.ts");
-  assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "fotbollskanalenArticles")'));
-  assert.ok(ingest.includes("export async function GET(request: Request)"));
-  assert.ok(ingest.includes("getBrowserScrapedFotbollskanalenArticles()"));
-  assert.ok(ingest.includes("shouldRefresh: !savedFreshSnapshotToday"));
-  assert.ok(ingest.includes("MAX_ARTICLE_STALENESS_MS"));
-  assert.ok(ingest.includes("latestArticleAgeHours"));
-  assert.ok(ingest.includes("Senaste giltiga Fotbollskanalen-artikeln är äldre än 72 timmar"));
-  assert.ok(ingest.includes("Today's fresh Fotbollskanalen snapshot is already stored"));
-  assert.ok(ingest.includes("Fotbollskanalen preflight is only allowed from 01:00"));
-  assert.ok(ingest.includes("clock.hour < 1 || clock.hour >= 6"));
-  assert.ok(ingest.includes("status: 503"));
-  assert.ok(ingest.includes("Färre än sex giltiga Fotbollskanalen-artiklar"));
-  assert.ok(ingest.includes('revalidateTag("glenn-news-articles"'));
-  assert.ok(ingest.includes('revalidateTag("glenn-news-feed-health"'));
-
-  const auth = read("lib/githubActionsAuth.ts");
-  assert.ok(auth.includes("refresh-fotbollskanalen-articles.yml"));
-  assert.ok(auth.includes('(workflow === "borasEvents" || workflow === "fotbollskanalenArticles" || workflow === "readerHistory") && payload.event_name === "push"'));
-
-  const source = read("lib/webSources.ts");
-  assert.ok(source.includes("getBrowserScrapedFotbollskanalenArticles"));
-  assert.match(source, /source\.domain === "www\.fotbollskanalen\.se"[\s\S]*?cache: "no-store" as const/);
-  assert.match(source, /next: \{ revalidate: 900 \}/);
-  assert.ok(source.includes('source: "Fotbollskanalen – Senaste"'));
-  assert.ok(source.includes("browserSnapshot.articles"));
-
+  const webSources = read("lib/webSources.ts");
+  assert.doesNotMatch(webSources, /fotbollskanalen/i);
+  assert.ok(webSources.includes("Promise.allSettled(WEB_SOURCES.map(fetchWebSource))"));
   const feedHealth = read("lib/feedHealth.ts");
-  assert.ok(feedHealth.includes("getBrowserScrapedFotbollskanalenArticles"));
-  assert.ok(feedHealth.includes("article.sourcePages.includes(source.url)"));
-});
+  assert.doesNotMatch(feedHealth, /fotbollskanalen/i);
+  const auth = read("lib/githubActionsAuth.ts");
+  assert.doesNotMatch(auth, /fotbollskanalenArticles|refresh-fotbollskanalen/i);
 
+  for (const file of [
+    ".github/workflows/refresh-fotbollskanalen-articles.yml",
+    "scripts/scrape-fotbollskanalen-articles.mjs",
+    "lib/fotbollskanalenArticleStore.ts",
+    "app/api/cron/ingest-fotbollskanalen-articles/route.ts",
+  ]) {
+    assert.equal(fs.existsSync(path.join(root, file)), false, file + " should remain removed");
+  }
+});
 
 test("culture source inventory matches active DN review feeds", () => {
   const inventory = read("docs/data-refresh-inventory.md");
