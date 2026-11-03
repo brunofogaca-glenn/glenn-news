@@ -749,8 +749,8 @@ test("Borås browser refresh requires full pagination metadata and revalidates o
   assert.match(ingest, /addCalendarDays\(today, BORAS_EVENT_HORIZON_DAYS\)/);
 
   const browser = read("app/api/cron/refresh-browser-sources/route.ts");
-  assert.match(browser, /borasPayload.complete/);
-  assert.match(browser, /borasPayload.expectedHorizonDays/);
+  assert.match(browser, /complete: payload.complete/);
+  assert.match(browser, /expectedHorizonDays: payload.expectedHorizonDays/);
   assert.match(browser, /BORAS_EVENTS_HORIZON_DAYS=/);
 
   const snapshots = read("lib/dailySnapshots.ts");
