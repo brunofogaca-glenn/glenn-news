@@ -1,6 +1,6 @@
 # Glenn News — produktkrav och agentkontrakt
 
-**Status för denna sammanställning:** uppdaterad mot produktionskod och den aktuella datakvalitetskompletteringen den 1 november 2026.  
+**Status för denna sammanställning:** uppdaterad mot produktionskod och den aktuella kod- och driftsgranskningen den 3 november 2026.  
 **Syfte:** vara den obligatoriska, gemensamma startpunkten för alla framtida agenter och kodändringar i Glenn News.
 
 > **Regel för alla framtida agenter:** Läs detta dokument först vid varje uppgift. Identifiera berörda krav-ID:n och deras status innan du ändrar kod. Följ sedan den relevanta detaljdokumentationen och inspektera den faktiska implementationen och testerna. Uppdatera detta dokument när krav, produktbeteende, status, datakontrakt eller viktiga tekniska invariants ändras.
@@ -38,7 +38,7 @@ Läs alltid denna kravspecifikation först. Läs därefter bara de detaljerade d
 - **Produktavsikt / ej kodregel** — det är ett mål eller användningsmönster, inte ett hårt krav som aktuell kod upprätthåller.
 - **Behöver synkas** — det finns en känd motsägelse eller oklarhet som inte ska döljas.
 
-Statusen avser senast granskad kod den 1 november 2026; den är inte ett påstående om att varje extern datakälla eller den första nattliga körningen efter utrullning redan har verifierats.
+Statusen avser senast granskad kod den 3 november 2026. Den är inte ett påstående om att varje extern datakälla eller den första nattliga körningen efter den senaste utrullningen redan har verifierats.
 
 ## 2. Produktdefinition och designprinciper
 
@@ -369,9 +369,9 @@ Tracked in [issue #56](https://github.com/brunofogaca-glenn/glenn-news/issues/56
 Ta bort eller ändra ett avvikelse-ID först när koden, regressionstester och relevanta dokument är synkade. Lägg till nya avvikelser med observerad kod, konsekvens och vägledning till framtida agenter; håll denna lista kort och handlingsorienterad.
 
 
-### RECON-05 — retired external football publisher source (3 November 2026)
+### RECON-05 — borttagen extern fotbollskälla (3 november 2026)
 
-The browser-scraped publisher integration described in this historical incident has been removed. Borås.com remains the only browser-scraped publisher source; no active route, workflow, scraper, store, or editorial source configuration remains.
+Den tidigare browser-scrapade publisher-integrationen har tagits bort helt. Borås.com är den enda kvarvarande browser-scrapade publisher-källan. Ingen aktiv route, workflow, scraper, store eller redaktionell källkonfiguration för den borttagna integrationen finns kvar.
 
 ### RECON-06 — refresh-status bevisar inte att underliggande marknads- eller sportobservationer är aktuella (observerat 29 oktober 2026)
 
@@ -401,9 +401,21 @@ Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och
 - Inga lock-/indexblobbar utan mätning och ett separat designbeslut. Reader-history behåller sin befintliga listning för att hitta väntande batchar; ingen ny listning har lagts till.
 - Ledgerns `sourceLedgerUpdatedAt` fortsätter skydda profilsnapshoten mot redundanta skrivningar. Senaste giltiga data får inte ersättas med tom eller felaktig payload.
 
-**Verifiering och status:** Migreringen är mergad till `main` och driftsatt. CI passerade för både migreringen och den efterföljande reader-history-säkerhetshärdningen; senaste produktionsdeployment `b6fc04b0fcbc549b5ed2e4cc8d25888a69f0c008` är READY. Den första nattliga produktionskörningen har ännu inte verifierats. Den ska bekräfta reader ledger/profilmarkören, minst sex giltiga kommande Borås-evenemang, beständig sammanslagen lokalsnapshot, Sandbox-start/cleanup och no-op-beteendet vid andra Cron-fönstret. Mät Blob Advanced Operations innan beslut om att ta bort någon källa.
+**Verifiering och status — 3 november 2026:** PR #101 tog bort Fotbollskanalen-integrationen och förenklade browser-refresh till Borås.com. Ändringen är mergad till `main` i commit `efbfba1ee7fe037568761224600798ad3a03765f`. Produktionsdeployment `dpl_AkujjaNsLHb3YfxfbYqSyJKL88zB` är READY och har produktionsaliaset `https://glenn-news.vercel.app`. GitHub Actions huvud-CI passerade; refresh-/diagnostiksamlingen hade 44 godkända tester.
+
+Vercel Runtime Logs visar en isolerad HTTP 503 från RSS-källan `guliganerna.se` vid morgonens publiceringsförsök den 3 november kl. 06.30 svensk tid. Logghändelserna tillhörde föregående deployment `dpl_Aytw3f5AXpJhTpwZDFMx9GSwkV5G`, alltså före utrullningen av committen ovan. Koden hanterar enskilda RSS-fel via `Promise.allSettled` och källhälsokontrollen registrerar felet per källa; loggen är därför inte i sig bevis för att hela publiceringsjobbet avbröts. Den visar däremot att just Guliganernas flöde inte kunde hämtas vid kontrollen. Det finns ännu inget verifierat svar från den nya deploymentens första schemalagda morgonkörning.
+
+**Kvar för produktionsverifiering:** Nästa schemalagda körning den 4 november ska följas upp för reader-history ledger/profilmarkör, minst sex giltiga kommande Borås-evenemang, den sammanslagna lokalsnapshoten, Sandbox-start/cleanup och no-op-beteendet vid andra Cron-fönstret. Faktapanelernas faktiska innehåll och användarens sparflöde måste också verifieras i gränssnittet. Ingen manuell Cron eller extra Blob-skrivning har utförts under denna kontroll. Mät Blob Advanced Operations innan någon kostnadsrelaterad källändring.
 
 Se [reader-history recovery issue #54](https://github.com/brunofogaca-glenn/glenn-news/issues/54), [browser scraping issue #66](https://github.com/brunofogaca-glenn/glenn-news/issues/66), [migration tracking issue #69](https://github.com/brunofogaca-glenn/glenn-news/issues/69) och [backlog #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52).
+
+### RECON-09 — en enskild RSS-källa kan vara otillgänglig utan att stoppa övriga källor (observerat 3 november 2026)
+
+**Observerat:** Vercel Runtime Logs registrerade HTTP 503 från `http://guliganerna.se/feed/` vid morgonens refresh och en senare kontroll av källhälsan. Händelserna tillhörde deploymenten som föregick den senaste utrullningen.
+
+**Verifierad felgräns i kod:** `lib/rss.ts` hämtar varje RSS-flöde via `Promise.allSettled`; ett avvisat flöde loggas och hoppas över medan övriga flöden behandlas. `lib/feedHealth.ts` fångar fel per RSS-/webbkälla och redovisar källan som `error`. `lib/webSources.ts` isolerar på motsvarande sätt sina webbkälla-anrop. Morgonrutten har dessutom en separat tröskel för när den samlade källhälsan ska begära ett nytt försök.
+
+**Tolkning och uppföljning:** 503-felet visar en tillfällig otillgänglighet hos Guliganernas RSS, inte i sig ett totalfel i Glenn News. Källan ska fortsätta synas som felaktig i källstatus och får inte blockera andra flöden. Om felet återkommer bör URL/protokoll och källans tillgänglighet undersökas innan källan tas bort. Felisolering för hela jobbkedjan följs i [issue #102](https://github.com/brunofogaca-glenn/glenn-news/issues/102); faktapaneler och läshistorik följs i [#77](https://github.com/brunofogaca-glenn/glenn-news/issues/77) och [#54](https://github.com/brunofogaca-glenn/glenn-news/issues/54).
 
 ## 12. Agilt förbättringsarbete och kontinuerlig prioritering
 
