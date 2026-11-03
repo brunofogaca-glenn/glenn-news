@@ -2,6 +2,10 @@
 
 This is the quick map for making a targeted change without needing to rediscover the whole repository. Keep it in sync when a data flow or cross-module contract changes. **Before any task, start with the canonical [product requirements](product-requirements.md)** and identify the relevant requirement IDs. For the complete inventory of visible UI and interactions, see [UI and feature guide](ui-feature-guide.md).
 
+## Quality and regression testing
+
+The behavior-first test strategy is documented in [test-strategy.md](test-strategy.md). Critical storage and source flows should be tested with controlled failures and must preserve last-known-good data.
+
 ## Request and data flows
 
 ### Morning homepage
