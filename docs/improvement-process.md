@@ -84,7 +84,7 @@ Markera inte produktionsverifiering enbart utifrån att en PR slagits samman, Ve
 
 Det första aktiva fokuset är **att verifiera morgonflödets datakvalitet efter de senaste produktionsfixarna**. Kontrollera vid nästa tillåtna nattkörning:
 
-1. Fotbollskanalen: minst sex giltiga artiklar enligt den aktuella kontrollen, lyckad import, nyare artikelunderlag och aktuell källhälsostatus.
+1. Borås.com: minst sex giltiga kommande evenemang, lyckad import, aktuell snapshot och korrekt uppdaterad lokal faktapanel.
 2. Marknadsdata/Brent: att observationsdatum och värde har uppdaterats, eller att inaktuell status fortfarande visas tydligt.
 3. Kategorisering: fotbollsanalys ska inte hamna under Kultur, Mat & Livsstil.
 4. Sportpanel: hämtningstid får inte framstå som bevis för ett okänt observationsdatum.
