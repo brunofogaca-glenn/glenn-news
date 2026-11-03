@@ -8,11 +8,11 @@ For iterative product work, user-reported bugs, or requests for the next improve
 
 1. **Always start with [docs/product-requirements.md](docs/product-requirements.md).** Identify the relevant requirement IDs and read their status and known discrepancies before touching code. It is the canonical product-level starting point for every task, not an optional reference.
 2. Read the relevant section of [docs/architecture.md](docs/architecture.md). For user-facing pages, components, navigation, buttons or visible states, also consult [docs/ui-feature-guide.md](docs/ui-feature-guide.md). Read [docs/data-refresh-inventory.md](docs/data-refresh-inventory.md) when touching feeds, snapshots, caches or schedules.
-2. Use the architecture map to find the owning route/module and its closest regression test. Inspect those files first. Do not recursively inventory the entire repo unless the task is explicitly architectural.
-3. Search for an existing helper before inventing another one. Make one complete, tightly scoped patch rather than a sequence of speculative micro-fixes.
-4. For local code validation, run `npm run build` once; it combines regression suites with `next build`. In CI, GitHub Actions runs regression tests and Vercel owns Next.js compilation, so do not add another duplicate production build to the workflow. Run `npm run lint` when TypeScript/React/source files change. Do not repeat successful checks without a new failure or a relevant new edit.
-5. Review only the changed diff and the specific checks relevant to it. Avoid broad log dumps; pull the failing section when diagnosing an error.
-6. Prefer a single branch and one pull request per coherent task. Do not push directly to `main` unless explicitly requested; each production-branch commit can trigger another Vercel build. Avoid creating a deployment for every intermediate fix.
+3. Use the architecture map to find the owning route/module and its closest regression test. Inspect those files first. Do not recursively inventory the entire repo unless the task is explicitly architectural.
+4. Search for an existing helper before inventing another one. Make one complete, tightly scoped patch rather than a sequence of speculative micro-fixes.
+5. For local code validation, run `npm run build` once; it combines regression suites with `next build`. In CI, GitHub Actions runs regression tests and Vercel owns Next.js compilation, so do not add another duplicate production build to the workflow. Run `npm run lint` when TypeScript/React/source files change. Do not repeat successful checks without a new failure or a relevant new edit.
+6. Review only the changed diff and the specific checks relevant to it. Avoid broad log dumps; pull the failing section when diagnosing an error.
+7. Prefer a single branch and one pull request per coherent task. Do not push directly to `main` unless explicitly requested; each production-branch commit can trigger another Vercel build. Avoid creating a deployment for every intermediate fix.
 
 ## Production invariants
 
