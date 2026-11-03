@@ -80,13 +80,30 @@ Markera inte produktionsverifiering enbart utifrån att en PR slagits samman, Ve
 - Undvik flera parallella experimentella fixar, repetitiva produktionsbyggen och direkta pushar till main.
 - Dokumentera endast det som är sant och verifierat; kalla inte intention för garanti.
 
-## Startläge — 29 oktober 2026
+## Kontrolläge — 3 november 2026
 
-Det första aktiva fokuset är **att verifiera morgonflödets datakvalitet efter de senaste produktionsfixarna**. Kontrollera vid nästa tillåtna nattkörning:
+### Genomfört och driftsatt
 
-1. Borås.com: minst sex giltiga kommande evenemang, lyckad import, aktuell snapshot och korrekt uppdaterad lokal faktapanel.
-2. Marknadsdata/Brent: att observationsdatum och värde har uppdaterats, eller att inaktuell status fortfarande visas tydligt.
-3. Kategorisering: fotbollsanalys ska inte hamna under Kultur, Mat & Livsstil.
-4. Sportpanel: hämtningstid får inte framstå som bevis för ett okänt observationsdatum.
+- PR [#101](https://github.com/brunofogaca-glenn/glenn-news/pull/101) är mergad till `main` i commit `efbfba1ee7fe037568761224600798ad3a03765f`.
+- Fotbollskanalen-integrationen är borttagen. Borås.com är enda browser-scrapade publisher-källan.
+- Borås-refresh använder fortsatt Vercel Cron, read-only snapshot-preflight och en kortlivad Vercel Sandbox endast när en ny scrape behövs.
+- Huvud-CI passerade och refresh-/diagnostiksamlingen hade 44 godkända tester.
+- Produktionsdeployment `dpl_AkujjaNsLHb3YfxfbYqSyJKL88zB` är READY och har aliaset `https://glenn-news.vercel.app`.
 
-Den här kontrollen är **väntande liveverifiering**, inte ett påstående om att dessa förhållanden redan är bekräftade i produktion. Följ nattfönstret och återställningsreglerna i data-refresh-inventeringen och incidentanteckningarna. Se [samlingsärende #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52) för aktuell status.
+### Produktionsobservationer och begränsningar
+
+- Vercel Runtime Logs registrerade HTTP 503 från Guliganernas RSS den 3 november kl. 06.30 svensk tid. Händelsen tillhörde deploymenten före den senaste utrullningen. Koden isolerar enskilda RSS-fel med `Promise.allSettled`; övriga källor ska därför kunna fortsätta, men 503:an betyder att just den källan inte levererade data vid försöket.
+- Den nya deploymenten kom efter morgonens publiceringsförsök. Dess första schemalagda morgonkörning är därför ännu inte verifierad.
+- Borås.com-katalogen, sammanslagna lokalsnapshoten och faktapanelen har ännu inte verifierats tillsammans med en verklig produktionskörning.
+- Läshistorikens batch-POST, ledger, weekly read-state och profilsnapshot har ännu inte verifierats end-to-end i produktion.
+- Ingen manuell Cron-körning eller extra Blob-skrivning användes för denna kontroll.
+
+### Aktuellt P1-fokus
+
+1. [#77 — Borås.com-faktarutor: snapshot → cache → startsida](https://github.com/brunofogaca-glenn/glenn-news/issues/77).
+2. [#54 — läshistorik: browser-kö → batch → ledger → profil](https://github.com/brunofogaca-glenn/glenn-news/issues/54).
+3. [#102 — oberoende felgränser för nattjobb](https://github.com/brunofogaca-glenn/glenn-news/issues/102).
+4. [#66 — verifiera Borås.com scraping i produktion](https://github.com/brunofogaca-glenn/glenn-news/issues/66).
+5. [#69 — verifiera nattlig Vercel Cron för Borås och läshistorik](https://github.com/brunofogaca-glenn/glenn-news/issues/69).
+
+Nästa schemalagda körning den 4 november är första tillfället att verifiera den nya deploymentens natt- och morgonkedja. Kontrollera separat **Nattlig uppdatering**, Borås snapshot-/evenemangsantal, läshistorikens ledger- och profilmarkör, samt UI-beteendet. Stäng inte P1-ärendena baserat på grön CI eller READY-deployment ensam. Uppdatera den levande kön i [issue #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52) när ny evidens finns.
