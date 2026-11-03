@@ -1,6 +1,5 @@
 import { FEEDS, parseFeed } from "./rss";
 import { WEB_SOURCES, fetchWebSource } from "./webSources";
-import { getBrowserScrapedFotbollskanalenArticles } from "./fotbollskanalenArticleStore";
 import { canRefreshEditorialSourcesNow } from "./updateSchedule";
 import { recordDiagnostic } from "./diagnosticLog";
 
@@ -136,14 +135,7 @@ async function checkWebSource(source: (typeof WEB_SOURCES)[number]): Promise<Fee
   const started = Date.now();
 
   try {
-    const browserSnapshot = source.domain === "www.fotbollskanalen.se"
-      ? await getBrowserScrapedFotbollskanalenArticles()
-      : null;
-    const articles = browserSnapshot
-      ? browserSnapshot.articles
-        .filter(article => article.sourcePages.includes(source.url))
-        .map(article => ({ date: article.date }))
-      : await fetchWebSource(source);
+    const articles = await fetchWebSource(source);
     const articles24h = countLast24Hours(articles);
     const latestArticleTimestamp = getLatestArticleTimestamp(articles);
     const latestArticleAt = latestArticleTimestamp === null

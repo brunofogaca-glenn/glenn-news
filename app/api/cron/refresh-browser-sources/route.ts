@@ -3,10 +3,6 @@ import {
   GET as getBorasSnapshotStatus,
   POST as ingestBorasSnapshot,
 } from "../ingest-boras-events/route";
-import {
-  GET as getFotbollskanalenSnapshotStatus,
-  POST as ingestFotbollskanalenSnapshot,
-} from "../ingest-fotbollskanalen-articles/route";
 import { getStockholmClock } from "@/lib/updateSchedule";
 import { BORAS_EVENT_HORIZON_DAYS } from "@/lib/borasEventCatalog";
 
@@ -16,10 +12,9 @@ export const maxDuration = 300;
 const REPOSITORY_URL = "https://github.com/brunofogaca-glenn/glenn-news";
 const PROJECT_ID = "prj_mZabEDP074jUlH246TPxJNSrTbXt";
 const PLAYWRIGHT_VERSION = "1.64.1";
-const WORKSPACE = "/tmp/glenn-news-browser-refresh";
+const WORKSPACE = "/tmp/glenn-news-boras-refresh";
 
 type JsonRecord = Record<string, unknown>;
-type RefreshResult = { status: "updated" | "current" | "failed"; detail?: string; count?: number };
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -28,7 +23,7 @@ function isAuthorized(request: Request) {
 
 function internalRequest(path: string, method: "GET" | "POST", body?: unknown) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) throw new Error("CRON_SECRET saknas; intern ingestion kan inte autentiseras.");
+  if (!secret) throw new Error("CRON_SECRET saknas; intern Borås-ingestion kan inte autentiseras.");
   return new Request("https://glenn-news.internal" + path, {
     method,
     headers: {
@@ -44,10 +39,10 @@ async function readJson(response: Response): Promise<JsonRecord> {
   try {
     value = await response.json();
   } catch {
-    throw new Error("Ingestion returned a non-JSON response (HTTP " + response.status + ").");
+    throw new Error("Borås-ingestion returned a non-JSON response (HTTP " + response.status + ").");
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Ingestion returned an invalid response (HTTP " + response.status + ").");
+    throw new Error("Borås-ingestion returned an invalid response (HTTP " + response.status + ").");
   }
   const record = value as JsonRecord;
   if (!response.ok || record.ok !== true) {
@@ -56,26 +51,11 @@ async function readJson(response: Response): Promise<JsonRecord> {
   return record;
 }
 
-async function runBrowserCommand(sandbox: Sandbox, scriptName: string, outputName: string) {
-  const horizonPrefix = scriptName === "scrape-boras-events.mjs" ? "BORAS_EVENTS_HORIZON_DAYS=" + BORAS_EVENT_HORIZON_DAYS + " " : "";
-  const result = await sandbox.runCommand("bash", ["-lc", "cd " + WORKSPACE + " && " + horizonPrefix + "node " + scriptName]);
-  if (result.exitCode !== 0) {
-    const stderr = (await result.stderr()).trim().slice(-1500);
-    throw new Error(stderr || scriptName + " exited with code " + String(result.exitCode ?? "unknown") + ".");
-  }
-  const output = await sandbox.readFileToBuffer({ path: WORKSPACE + "/" + outputName });
-  if (!output) throw new Error(scriptName + " did not create " + outputName + ".");
-  const parsed: unknown = JSON.parse(output.toString("utf8"));
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected a JSON object from " + scriptName + ".");
-  return parsed as JsonRecord;
-}
-
 async function prepareSandbox(sandbox: Sandbox) {
   const commands = [
     "set -euo pipefail",
     "mkdir -p " + WORKSPACE,
     "cp /vercel/glenn-news/scripts/scrape-boras-events.mjs " + WORKSPACE + "/",
-    "cp /vercel/glenn-news/scripts/scrape-fotbollskanalen-articles.mjs " + WORKSPACE + "/",
     "cd " + WORKSPACE,
     "npm init -y >/dev/null",
     "npm install --no-audit --no-fund --save-exact playwright@" + PLAYWRIGHT_VERSION,
@@ -84,8 +64,24 @@ async function prepareSandbox(sandbox: Sandbox) {
   const result = await sandbox.runCommand("bash", ["-lc", commands.join(" && ")]);
   if (result.exitCode !== 0) {
     const stderr = (await result.stderr()).trim().slice(-2000);
-    throw new Error(stderr || "Playwright sandbox setup exited with code " + String(result.exitCode ?? "unknown") + ".");
+    throw new Error(stderr || "Playwright Sandbox setup exited with code " + String(result.exitCode ?? "unknown") + ".");
   }
+}
+
+async function scrapeBoras(sandbox: Sandbox): Promise<JsonRecord> {
+  const command = "cd " + WORKSPACE + " && BORAS_EVENTS_HORIZON_DAYS=" + BORAS_EVENT_HORIZON_DAYS + " node scrape-boras-events.mjs";
+  const result = await sandbox.runCommand("bash", ["-lc", command]);
+  if (result.exitCode !== 0) {
+    const stderr = (await result.stderr()).trim().slice(-1500);
+    throw new Error(stderr || "Borås scraper exited with code " + String(result.exitCode ?? "unknown") + ".");
+  }
+  const output = await sandbox.readFileToBuffer({ path: WORKSPACE + "/boras-events-scrape.json" });
+  if (!output) throw new Error("Borås scraper did not create boras-events-scrape.json.");
+  const parsed: unknown = JSON.parse(output.toString("utf8"));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Expected a JSON object from the Borås scraper.");
+  }
+  return parsed as JsonRecord;
 }
 
 export async function GET(request: Request) {
@@ -95,7 +91,7 @@ export async function GET(request: Request) {
   if (clock.hour < 1 || clock.hour >= 6) {
     return Response.json({
       ok: false,
-      error: "Browser refresh is only allowed from 01:00–05:59 Europe/Stockholm.",
+      error: "Borås refresh is only allowed from 01:00–05:59 Europe/Stockholm.",
       localTime: String(clock.hour).padStart(2, "0") + ":" + String(clock.minute).padStart(2, "0"),
     }, { status: 503 });
   }
@@ -105,38 +101,21 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "Missing or invalid VERCEL_GIT_COMMIT_SHA." }, { status: 503 });
   }
 
-  const results: { boras: RefreshResult; fotbollskanalen: RefreshResult } = {
-    boras: { status: "current" },
-    fotbollskanalen: { status: "current" },
-  };
-
   try {
-    const [borasStatusResponse, fotbollskanalenStatusResponse] = await Promise.all([
-      getBorasSnapshotStatus(internalRequest("/api/cron/ingest-boras-events", "GET")),
-      getFotbollskanalenSnapshotStatus(internalRequest("/api/cron/ingest-fotbollskanalen-articles", "GET")),
-    ]);
-    const [borasStatus, fotbollskanalenStatus] = await Promise.all([
-      readJson(borasStatusResponse),
-      readJson(fotbollskanalenStatusResponse),
-    ]);
-
-    const refreshBoras = borasStatus.shouldRefresh === true;
-    const refreshFotbollskanalen = fotbollskanalenStatus.shouldRefresh === true;
-    if (!refreshBoras && !refreshFotbollskanalen) {
+    const status = await readJson(await getBorasSnapshotStatus(
+      internalRequest("/api/cron/ingest-boras-events", "GET")
+    ));
+    if (status.shouldRefresh !== true) {
       return Response.json({
         ok: true,
         skipped: true,
-        reason: "Both browser snapshots are already fresh for today's Stockholm date.",
-        boras: { status: "current", count: borasStatus.eventCount },
-        fotbollskanalen: { status: "current", count: fotbollskanalenStatus.articleCount },
+        reason: "Today's Borås.com snapshot is already current.",
+        boras: { status: "current", count: status.eventCount },
       });
     }
 
     let sandbox: Sandbox | undefined;
-    let borasPayload: JsonRecord | undefined;
-    let fotbollskanalenPayload: JsonRecord | undefined;
-    let setupError: string | undefined;
-
+    let payload: JsonRecord;
     try {
       sandbox = await Sandbox.create({
         projectId: process.env.VERCEL_PROJECT_ID || PROJECT_ID,
@@ -146,93 +125,42 @@ export async function GET(request: Request) {
         resources: { vcpus: 1 },
         timeout: 240_000,
         persistent: false,
-        tags: { application: "glenn-news", purpose: "browser-refresh" },
+        tags: { application: "glenn-news", purpose: "boras-browser-refresh" },
       });
-
       await prepareSandbox(sandbox);
-
-      if (refreshBoras) {
-        try {
-          borasPayload = await runBrowserCommand(sandbox, "scrape-boras-events.mjs", "boras-events-scrape.json");
-        } catch (error) {
-          results.boras = { status: "failed", detail: error instanceof Error ? error.message : String(error) };
-        }
-      }
-      if (refreshFotbollskanalen) {
-        try {
-          fotbollskanalenPayload = await runBrowserCommand(
-            sandbox,
-            "scrape-fotbollskanalen-articles.mjs",
-            "fotbollskanalen-articles.json"
-          );
-        } catch (error) {
-          results.fotbollskanalen = { status: "failed", detail: error instanceof Error ? error.message : String(error) };
-        }
-      }
-    } catch (error) {
-      setupError = error instanceof Error ? error.message : String(error);
+      payload = await scrapeBoras(sandbox);
     } finally {
       if (sandbox) {
         try {
           await sandbox.stop();
         } catch (error) {
-          console.warn("[browser-refresh] Sandbox cleanup failed:", error);
+          console.warn("[boras-refresh] Sandbox cleanup failed:", error);
         }
       }
     }
 
-    if (setupError) {
-      return Response.json({
-        ok: false,
-        error: "Could not prepare the isolated browser runtime.",
-        detail: setupError.slice(0, 1500),
-        boras: refreshBoras ? { status: "failed" } : results.boras,
-        fotbollskanalen: refreshFotbollskanalen ? { status: "failed" } : results.fotbollskanalen,
-      }, { status: 503 });
-    }
-
-    if (borasPayload) {
-      try {
-        const stored = await readJson(await ingestBorasSnapshot(internalRequest(
-          "/api/cron/ingest-boras-events", "POST", {
-            events: borasPayload.events,
-            complete: borasPayload.complete,
-            expectedHorizonDays: borasPayload.expectedHorizonDays,
-          }
-        )));
-        results.boras = {
-          status: stored.skipped === true ? "current" : "updated",
-          count: typeof stored.stored === "number" ? stored.stored : undefined,
-        };
-      } catch (error) {
-        results.boras = { status: "failed", detail: error instanceof Error ? error.message : String(error) };
+    const stored = await readJson(await ingestBorasSnapshot(internalRequest(
+      "/api/cron/ingest-boras-events",
+      "POST",
+      {
+        events: payload.events,
+        complete: payload.complete,
+        expectedHorizonDays: payload.expectedHorizonDays,
       }
-    }
+    )));
 
-    if (fotbollskanalenPayload) {
-      try {
-        const stored = await readJson(await ingestFotbollskanalenSnapshot(internalRequest(
-          "/api/cron/ingest-fotbollskanalen-articles", "POST", { articles: fotbollskanalenPayload.articles }
-        )));
-        results.fotbollskanalen = {
-          status: stored.skipped === true ? "current" : "updated",
-          count: typeof stored.stored === "number" ? stored.stored : undefined,
-        };
-      } catch (error) {
-        results.fotbollskanalen = { status: "failed", detail: error instanceof Error ? error.message : String(error) };
-      }
-    }
-
-    const ok = results.boras.status !== "failed" && results.fotbollskanalen.status !== "failed";
-    console.info("[browser-refresh] completed", {
-      ok, boras: results.boras.status, fotbollskanalen: results.fotbollskanalen.status, commitSha,
-    });
-    return Response.json({ ok, boras: results.boras, fotbollskanalen: results.fotbollskanalen }, { status: ok ? 200 : 503 });
+    const result = {
+      status: stored.skipped === true ? "current" : "updated",
+      count: typeof stored.stored === "number" ? stored.stored : undefined,
+      savedAt: typeof stored.savedAt === "string" ? stored.savedAt : undefined,
+    };
+    console.info("[boras-refresh] completed", { ok: true, ...result, commitSha });
+    return Response.json({ ok: true, boras: result });
   } catch (error) {
-    console.error("[browser-refresh] refresh failed:", error);
+    console.error("[boras-refresh] refresh failed:", error);
     return Response.json({
       ok: false,
-      error: "Browser-source refresh failed.",
+      error: "Borås.com refresh failed.",
       detail: error instanceof Error ? error.message : String(error),
     }, { status: 503 });
   }
