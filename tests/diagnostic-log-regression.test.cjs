@@ -39,6 +39,15 @@ test("diagnostics use redacted, deduplicated runtime logs without Blob writes", 
   assert.ok(!logger.includes("await list("));
 });
 
+test("weekly-read writes fail closed when the existing snapshot cannot be read", () => {
+  const weeklyRead = read("lib/weeklyRead.ts");
+  assert.match(weeklyRead, /async function readWeeklyReadSnapshot\(\): Promise<WeeklyReadSnapshotResult>/);
+  assert.match(weeklyRead, /if \(!snapshot\.ok\) return false/);
+  assert.match(weeklyRead, /befintlig historik lämnas orörd/);
+  assert.match(weeklyRead, /if \(!Array\.isArray\(parsed\)\) return \{ ok: false, links: \[\] \}/);
+  assert.doesNotMatch(weeklyRead, /const current = await getWeeklyReadLinks\(\)/);
+});
+
 test("Week Focus uses one cached edition for Saturday and Sunday", () => {
   const cache = read("lib/weekFocusCache.ts");
   const focus = read("lib/weekFocus.ts");

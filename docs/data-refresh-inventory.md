@@ -15,6 +15,8 @@ This inventory distinguishes editorial article ingestion from supplemental homep
 
 The homepage, direct feed-health page, and manual refresh action are also gated so they cannot initiate article-feed requests before 06:00. The sports-panel loader no longer imports or calls the editorial article cache.
 
+**Per-source RSS failure handling:** `getArticles()` uses `Promise.allSettled` for the configured feed list. A failed feed is logged and skipped while fulfilled feeds continue into the article pool. `getFeedHealth()` reports a failed endpoint as that source's `error` status instead of rejecting the full health check. A provider 4xx/5xx therefore reduces source coverage, but does not by itself prove that the whole morning refresh failed.
+
 ## Supplemental data sources — refresh from 01:00
 
 | Source / code | Data | Existing cache lifetime | Failure handling |
