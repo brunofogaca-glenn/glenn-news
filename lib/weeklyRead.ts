@@ -17,8 +17,9 @@ async function readWeeklyReadSnapshot(): Promise<WeeklyReadSnapshotResult> {
 
   try {
     const result = await get(READ_PATH, { access: "private" });
+    // The Blob SDK represents a missing object as null; 404 is not part of
+    // the successful result type and is handled only if the SDK throws it.
     if (!result) return { ok: true, links: [] };
-    if (result.statusCode === 404) return { ok: true, links: [] };
     if (!result.stream || result.statusCode !== 200) return { ok: false, links: [] };
 
     const parsed = JSON.parse(await new Response(result.stream).text()) as unknown;
