@@ -156,7 +156,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | OPS-03 | Visa sparad status för morgonhämtning och nattlig kompletteringskörning utan att själva statusvisningen startar nya leverantörsanrop. | Implementerat + testskyddat | `lib/articleRefreshStatus.ts`, `lib/supplementalRefreshRun.ts`, `app/health/page.tsx` |
 | OPS-04 | När diagnostikhistorik är tillgänglig ska vyn kunna filtrera 24 timmar/sju dagar och fel/varningar, tillåta omladdning och kopiering samt visa begriplig status. När historiken är avstängd ska UI förklara detta och inte visa tom lista som bevis på felfri drift. Högst 80 poster visas. | Implementerat + regressionstest | `app/components/HealthLogPanel.tsx`, `app/health/page.tsx`, diagnostiktester |
 | OPS-05 | Loggar ska maskera vanliga hemligheter/tokens och URL-frågeparametrar, begränsa kontextfält och deduplicera upprepade fel. Persistenta Blob-skrivningar för varje diagnostikhändelse ska undvikas. | Implementerat + testskyddat | `lib/diagnosticLog.ts`, diagnostiktester |
-| OPS-06 | Kompletterande faktapaneler, läshistorik och webbläsarskrapningar schemaläggs med Vercel Cron före 06.00 svensk tid. Borås.com och Fotbollskanalen körs i en isolerad Vercel Sandbox; GitHub Actions behålls endast för manuell återställning. Idempotens, sista giltiga snapshot och Blob-kostnadsgränser ska bevaras. | Implementerat; produktionsverifiering av nya nattkörningar återstår | `vercel.json`, `app/api/cron/refresh-data/route.ts`, `app/api/cron/process-reader-history/route.ts`, `app/api/cron/refresh-browser-sources/route.ts`, refresh-tester |
+| OPS-06 | Kompletterande faktapaneler, läshistorik och Borås.com-scraping schemaläggs med Vercel Cron före 06.00 svensk tid. Borås.com körs i en isolerad Vercel Sandbox; GitHub Actions behålls endast för manuell återställning. Idempotens, sista giltiga snapshot och Blob-kostnadsgränser ska bevaras. | Implementerat; produktionsverifiering av nya nattkörningar återstår | `vercel.json`, `app/api/cron/refresh-data/route.ts`, `app/api/cron/process-reader-history/route.ts`, `app/api/cron/refresh-browser-sources/route.ts`, refresh-tester |
 
 ## 4. Aktiva datakällor och cachetider
 
@@ -189,7 +189,6 @@ Tider uttrycks i UTC i CI/cron-konfiguration men tidsgränser i applikationskod 
 | --- | --- | --- |
 | Borås-händelser | 00.13 | Webbläsarhämtning och sparning av lokala event-snapshots. |
 | Kompletterande fakta | 00.43 | Uppdatering av sport, marknad, lokalt, Riksdag, kultur, världsläge, väder och headerdata. |
-| Fotbollskanalen-artiklar | 00.17, 01.17, 02.17, 03.17 UTC | Fyra nattliga försök med autentiserad preflight; skippa scrape och Blob-skrivning när dagens Stockholmssnapshot redan finns. Ingestion spärras fortsatt utanför 01.00–05.59 lokal tid. |
 | Läshistorik/profil/Veckofokus | 02.15 | Konsolidera batchar, uppdatera ledger och profil-snapshot, försök igen med veckoläststatus och förbereda lördagens Veckofokus. |
 | Morgonutgåva | Fyra Vercel-anrop: 04.30, 04.34, 05.30, 05.34 | De aktuella offset-paren täcker 06-timmen i CET/CEST; lokal tidsgrind tillåter bara 06.00–06.59 svensk tid. |
 
@@ -353,7 +352,7 @@ För snabb orientering:
 
 **Åtgärd:** Flytta obligatorisk schemaläggning till två Vercel Cron-fönster före 06.00 Stockholmstid; behåll GitHub Actions som manuell OIDC-säkrad reservväg. Använd källspecifika TTL:er, beständig last-good-snapshot även för börsdata och HTTP 503 om ett jobb startar utanför nattfönstret. Faktapanelernas tidsstämplar ska visa datum och tid. Regressionstester skyddar dessa invariants.
 
-**Begränsning:** Ingen schemaläggare eller extern datakälla kan garanteras vara tillgänglig. De två Vercel-körningarna minskar beroendet av en enda schemalagd körning, men om båda misslyckas ska **Nattlig uppdatering** och Vercels Runtime Logs kontrolleras. Browser-scraping av Borås.com och Fotbollskanalen är fortsatt beroende av GitHub Actions, men ett missat tidsfönster ska nu bli ett synligt fel.
+**Begränsning:** Ingen schemaläggare eller extern datakälla kan garanteras vara tillgänglig. De två Vercel-körningarna minskar beroendet av en enda schemalagd körning, men om båda misslyckas ska **Nattlig uppdatering** och Vercels Runtime Logs kontrolleras. Browser-scraping av Borås.com körs via Vercel Cron/Sandbox; ett missat tidsfönster ska bli ett synligt fel.
 
 ### RECON-08 — Health diagnostic panel implied persistent Blob log history (observed 29 October 2026)
 
@@ -370,15 +369,9 @@ Tracked in [issue #56](https://github.com/brunofogaca-glenn/glenn-news/issues/56
 Ta bort eller ändra ett avvikelse-ID först när koden, regressionstester och relevanta dokument är synkade. Lägg till nya avvikelser med observerad kod, konsekvens och vägledning till framtida agenter; håll denna lista kort och handlingsorienterad.
 
 
-### RECON-05 — Fotbollskanalen schedule delay caused skipped scrape/ingestion runs (observed 29 October 2026)
+### RECON-05 — retired external football publisher source (3 November 2026)
 
-**Observerat:** Produktionspanelen `/health` markerade Fotbollskanalen som inaktuell, med senaste daterade artikel 24 oktober 2026 kl. 14.00 svensk tid. De tidigare GitHub Actions-körningarna [#24 den 28 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40646434245) och [#25 den 29 oktober](https://github.com/brunofogaca-glenn/glenn-news/actions/runs/40833131784) startade efter kl. 06.00 och misslyckades i tidsgrinden; scraping och ingestion kördes därför inte.
-
-**Åtgärd i kod:** PR #50 lades i produktion via commit [403464d](https://github.com/brunofogaca-glenn/glenn-news/commit/403464dbec1679ab7d530dfecac2b188910c514d). Den införde fyra nattliga schemaförsök, en autentiserad read-only preflight, idempotent ingestion samt 72-timmarsvalidering. Automatschemat är nu flyttat till två Vercel Cron-fönster per natt. En gemensam Vercel Sandbox kör endast de skrapare som behöver uppdateras; GitHub Actions har övergått till manuell återställning. Preflight hoppar över Sandbox och Blob-skrivning när dagens snapshot redan är aktuell. Tidsgränsen 01.00–05.59 och kravet på minst sex giltiga artiklar behålls. Den stora Fotbollskanalen-HTML-reserven hämtas utan Next.js-datacache eftersom svaret överskrider gränsen för cachelagrade svar.
-
-**Verifiering efter migreringen:** Båda skraparna har körts framgångsrikt i en isolerad Vercel Sandbox under utvecklingstest och gav validerbara payloads. Den första schemalagda produktionskörningen måste fortfarande bekräfta att Vercel Cron startar rutten, att snapshots sparas och att `/health` visar nyare artikeldata. Den daterade morgonutgåvan skrivs inte om under dagen. Om produktionskörningen misslyckas, följ Vercel Runtime Logs och `/health` och återöppna ärendet.
-
-Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och [issue #49](https://github.com/brunofogaca-glenn/glenn-news/issues/49).
+The browser-scraped publisher integration described in this historical incident has been removed. Borås.com remains the only browser-scraped publisher source; no active route, workflow, scraper, store, or editorial source configuration remains.
 
 ### RECON-06 — refresh-status bevisar inte att underliggande marknads- eller sportobservationer är aktuella (observerat 29 oktober 2026)
 
@@ -396,7 +389,7 @@ Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och
 
 **Nuvarande implementation — migrering till Vercel Cron/Sandbox den 31 oktober:**
 - Reader-history körs av Vercel Cron vid `15 1,2 * * *` UTC. GitHub Actions är kvar som manuell OIDC-säkrad återställning och för den begränsade migration-marker-pushen.
-- Borås.com och Fotbollskanalen körs av en gemensam Vercel Cron-route vid `13 2,3 * * *` UTC. Den kontrollerar båda fasta Blob-snapshot-patharna först och startar ingen Sandbox om båda snapshotarna redan är aktuella för dagens Stockholm-datum.
+- Borås.com körs av `/api/cron/refresh-browser-sources` vid `13 2,3 * * *` UTC. Rutten kontrollerar den fasta Blob-snapshot-pathen först och startar ingen Sandbox om dagens Stockholmssnapshot redan är aktuell.
 - När en källa behöver uppdateras startas en kortlivad Vercel Sandbox med Node 22 och Playwright 1.64.1/Chromium. Bara de skrapare som behöver uppdatering körs. Befintliga ingestion-rutter validerar payloaden och bevarar senaste giltiga snapshot vid fel.
 - Automatiska GitHub Actions-scheman för de tre jobben är borttagna. Manuella OIDC-säkrade återställningsflöden finns kvar.
 - Vercel Cron använder `CRON_SECRET`. `manual=1` för reader-history avvisas när anropet autentiseras med Cron-hemligheten; bypass kräver fortfarande den begränsade OIDC-auktoriserade migration-marker-pushen. Anrop utanför `01:00–05:59 Europe/Stockholm` ska returnera HTTP 503, inte en grön skip.
@@ -404,11 +397,11 @@ Se [incidentanteckningen](incident-notes/2026-10-29-morning-data-quality.md) och
 **Kostnads- och idempotenskontrakt:**
 - Använd fasta privata Blob-paths och `get()`; lägg inte till `list()` för att hitta de två kända browser-snapshotarna.
 - Preflight ska undvika Sandbox, skrapning och Blob-skrivningar när snapshotarna redan är aktuella.
-- En normal lyckad dag ska kräva högst en browser-snapshot-`put()` per källa. Borås kan därutöver uppdatera den befintliga sammanslagna lokalsnapshoten; följ den operationen separat i kostnadsmätningen.
+- En normal lyckad dag ska kräva högst en Borås browser-snapshot-`put()`. Borås kan därutöver uppdatera den befintliga sammanslagna lokalsnapshoten; följ den operationen separat i kostnadsmätningen.
 - Inga lock-/indexblobbar utan mätning och ett separat designbeslut. Reader-history behåller sin befintliga listning för att hitta väntande batchar; ingen ny listning har lagts till.
 - Ledgerns `sourceLedgerUpdatedAt` fortsätter skydda profilsnapshoten mot redundanta skrivningar. Senaste giltiga data får inte ersättas med tom eller felaktig payload.
 
-**Verifiering och status:** Migreringen är mergad till `main` och driftsatt. CI passerade för både migreringen och den efterföljande reader-history-säkerhetshärdningen; senaste produktionsdeployment `b6fc04b0fcbc549b5ed2e4cc8d25888a69f0c008` är READY. Den första nattliga produktionskörningen har ännu inte verifierats. Den ska bekräfta reader ledger/profilmarkören, minst sex giltiga kommande Borås-evenemang, minst sex giltiga Fotbollskanalen-artiklar med senaste artikel högst 72 timmar gammal, beständig sammanslagen lokalsnapshot, Sandbox-start/cleanup och no-op-beteendet vid andra Cron-fönstret. Mät Blob Advanced Operations innan beslut om att ta bort någon källa.
+**Verifiering och status:** Migreringen är mergad till `main` och driftsatt. CI passerade för både migreringen och den efterföljande reader-history-säkerhetshärdningen; senaste produktionsdeployment `b6fc04b0fcbc549b5ed2e4cc8d25888a69f0c008` är READY. Den första nattliga produktionskörningen har ännu inte verifierats. Den ska bekräfta reader ledger/profilmarkören, minst sex giltiga kommande Borås-evenemang, beständig sammanslagen lokalsnapshot, Sandbox-start/cleanup och no-op-beteendet vid andra Cron-fönstret. Mät Blob Advanced Operations innan beslut om att ta bort någon källa.
 
 Se [reader-history recovery issue #54](https://github.com/brunofogaca-glenn/glenn-news/issues/54), [browser scraping issue #66](https://github.com/brunofogaca-glenn/glenn-news/issues/66), [migration tracking issue #69](https://github.com/brunofogaca-glenn/glenn-news/issues/69) och [backlog #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52).
 
