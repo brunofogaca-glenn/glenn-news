@@ -14,6 +14,11 @@ For iterative product work, user-reported bugs, or requests for the next improve
 6. Review only the changed diff and the specific checks relevant to it. Avoid broad log dumps; pull the failing section when diagnosing an error.
 7. Prefer a single branch and one pull request per coherent task. Do not push directly to `main` unless explicitly requested; each production-branch commit can trigger another Vercel build. Avoid creating a deployment for every intermediate fix.
 
+## Testing
+
+- Follow [docs/test-strategy.md](docs/test-strategy.md): prioritize behavior-based unit/integration tests over source-string assertions. Inject provider and storage failures at controlled boundaries, and assert that last-known-good data is preserved.
+- Do not remove a useful existing regression check until equivalent behavioral coverage is in place. Every critical PBI must add or update a behavioral regression test.
+
 ## Production invariants
 
 - **Blob operations are costly.** Do not add per-click, per-article, or per-render writes. Queue reading activity in the browser and submit bounded batches; process them in the nightly job.
