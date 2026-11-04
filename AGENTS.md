@@ -4,6 +4,18 @@ The goal is to deliver correct changes with the **smallest relevant investigatio
 
 For iterative product work, user-reported bugs, or requests for the next improvement, follow [docs/improvement-process.md](docs/improvement-process.md) and keep [issue #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52) current. Treat user feedback as product evidence, investigate before guessing at causes, and distinguish code fixes, deployment, and production verification.
 
+## Scope and task sizing — mandatory
+
+- Start from one concrete outcome. An issue that contains several independently verifiable outcomes is not ready for implementation.
+- Use BUG for one defect, TASK for one implementation/investigation, VERIFY for one production check, and EPIC only as a parent for independent child tasks.
+- Every implementation issue must state the outcome, scope/exclusions, 2–5 observable done checks, and only the relevant risk guardrails.
+- Default to XS/S: one narrow behaviour or fix, normally 1–5 changed files. 6–8 files requires a reason. More than 8 files, multiple independent behaviours, or a mix of unrelated refactor/test rewrite/documentation cleanup must be split before coding.
+- A legitimate vertical slice may span UI, API, storage and tests. Do not split layers into PRs that cannot work independently.
+- Do not add extra scope to an open PR. New discoveries become separate issues unless they are required to complete the same outcome.
+- Keep only one active PR per coherent workstream and no more than three active priorities in Issue #52.
+- A VERIFY issue must name one exact production signal and one success condition. If it waits for a scheduled run, record the deployment and next check; do not keep implementation work open while waiting. Close after a successful check. If it fails, create one small BUG for the observed failure.
+- Never treat code complete, merged, deployed, and production-verified as interchangeable states.
+
 ## Fast path for every task
 
 1. **Always start with [docs/product-requirements.md](docs/product-requirements.md).** Identify the relevant requirement IDs and read their status and known discrepancies before touching code. It is the canonical product-level starting point for every task, not an optional reference.
@@ -40,7 +52,7 @@ For iterative product work, user-reported bugs, or requests for the next improve
 - `npm run build` — ranking tests + refresh/diagnostic tests + Next.js production build.
 - `npm run lint` — ESLint.
 - `npm run test:ranker` — ranking regression suite only.
-- `npm run test:refresh` — refresh, diagnostic, workflow and reader-batch regression suites.
+- `npm run test:refresh` — refresh, diagnostic, workflow-issue-reporter and reader-batch regression suites.
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
