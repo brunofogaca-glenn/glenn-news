@@ -61,7 +61,7 @@ Visible sections, interactions, responsive navigation and empty/error states are
 | Personalization and history | `lib/readerProfile.ts`, `lib/weeklyRead.ts`, `lib/weekFocus*.ts` |
 | Supplemental snapshots and fallbacks | `lib/dailySnapshots.ts`, `lib/supplementalCache.ts`, source-specific `*Cache.ts` modules |
 | Job orchestration and authorization | `vercel.json`, `app/api/cron/`, `.github/workflows/` (manual recovery), `lib/githubActionsAuth.ts` |
-| Regression protection | `tests/ranker-regression.test.cjs`, `tests/data-refresh-regression.test.cjs`, `tests/diagnostic-log-regression.test.cjs` |
+| Regression protection | `tests/ranker-regression.test.cjs`, `tests/critical-flows.test.cjs`, `tests/critical-data-flow.integration.test.cjs`, `tests/workflow-issue-reporter-regression.test.cjs` |
 
 ## How to make common changes
 
