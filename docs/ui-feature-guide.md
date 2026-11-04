@@ -42,11 +42,11 @@ The page implementations are `app/page.tsx`, `app/veckofokus/page.tsx`, `app/pro
 
 Relevant files: `TrackableLink.tsx`, `WeeklyStoryLink.tsx`, `readerQueue.ts`, `SaveReadingHistoryButton.tsx`, `app/api/events/batch/route.ts`, `lib/readerProfile.ts`.
 
-1. News cards use `TrackableLink`; Week Focus stories use `WeeklyStoryLink`. They open the original article in a separate tab and queue the click metadata in browser `sessionStorage`. Signals include category, article type, source, topic, title and article URL.
+1. News cards use `TrackableLink`; Week Focus stories use `WeeklyStoryLink`. They open the original article in a separate tab and queue click metadata in browser `sessionStorage`. Text metadata is whitespace-normalized and capped (category 80, article type 100, source 160, topic 160, title 300 and summary 1,500 characters); article URLs are validated, not truncated.
 2. A click updates the small in-page read counter through the `glenn-reader-click` browser event. This counter is an immediate UI signal, not proof that the server-side profile has already been updated.
 3. The queue is per browser tab and does **not** send a network request or write a Blob for every click. The user explicitly presses **Spara läshistorik** after reading.
-4. One save sends up to 50 events to `POST /api/events/batch`. Larger queues remain in place for another save. A failed save keeps the unsaved events in the queue and offers a retry message.
-5. Successful batches are marked for nightly processing. The overnight workflow consolidates events into the shared ledger and profile snapshot; reading history therefore syncs through Glenn News rather than being recomputed for each page render.
+4. One save sends up to 50 events to `POST /api/events/batch`. It stores a stable batch ID before sending and removes submitted events only after the server confirms the full batch. Larger queues remain for another save. A failed save keeps every unsaved event, keeps the same batch ID for retry, and displays the HTTP/storage or offending article/field error when available.
+5. Per-article summaries are omitted from the upload because the nightly profile ledger does not retain them. Successful batches are stored in one private Blob object per batch and marked for nightly processing. Retries reuse the same object path; overnight processing consolidates batches into the shared ledger and profile snapshot.
 
 The save control is mounted by the shared layout but only renders for its intended page: **Spara morgonens läsning** on `/`, or **Spara Veckofokus-läsning** on `/veckofokus`. A zero-length queue disables the button. Do not add per-click API calls, AI classification or Blob writes to the article-link components.
 
