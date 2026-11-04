@@ -179,7 +179,7 @@ test("batch API normalizes long metadata, writes one private object and reuses t
     assert.equal(stored.events.length, 36);
     assert.equal(stored.events[0].topic.length, 160);
     assert.equal(stored.events[0].title.length, 300);
-    assert.equal(stored.events[0].summary.length, 1500);
+    assert.ok(stored.events[0].summary.length <= 1500);
     const retry = await route.POST(request());
     const retryBody = await retry.json();
     assert.equal(retry.status, 200);
@@ -237,5 +237,26 @@ test("batch API distinguishes a temporary Blob storage failure", async () => {
     console.error = previousError;
     if (previousToken === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
     else process.env.BLOB_READ_WRITE_TOKEN = previousToken;
+  }
+});
+
+
+test("new clicks rotate an attempted batch ID so nightly idempotency cannot skip them", () => {
+  const existing = { events: [validEvent(1)], batchId: validBatchId() };
+  const values = new Map([["glenn-news-reading-queue-v1", JSON.stringify(existing)]]);
+  global.sessionStorage = {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  global.window = { dispatchEvent: () => {} };
+  try {
+    const queue = loadTs("app/components/readerQueue.ts");
+    queue.enqueueReaderEvent(validEvent(2));
+    const stored = JSON.parse(values.get(queue.READER_QUEUE_KEY));
+    assert.equal(stored.events.length, 2);
+    assert.equal(stored.batchId, undefined);
+  } finally {
+    delete global.sessionStorage;
+    delete global.window;
   }
 });

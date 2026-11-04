@@ -61,6 +61,11 @@ export function readReaderQueue(): ReaderQueueState {
 }
 export function enqueueReaderEvent(event: PendingReaderEvent) {
   const queue = readReaderQueue();
+  // New clicks cannot be appended to an already-attempted batch: the server may
+  // have stored/processed that ID even when the browser did not receive its reply.
+  // A fresh ID lets the next upload carry these new events without being skipped
+  // by the nightly ledger's processedBatchPaths idempotency check.
+  if (queue.batchId) delete queue.batchId;
   queue.events.push(normalizePendingReaderEvent(event));
   sessionStorage.setItem(READER_QUEUE_KEY, JSON.stringify(queue));
   window.dispatchEvent(new Event(READER_QUEUE_EVENT));
