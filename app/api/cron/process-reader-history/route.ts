@@ -32,4 +32,69 @@ export async function GET(request: Request) {
   if (manualRun && isVercelCron) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  if (!manualRun && (clo¶»§q«^
+  if (!manualRun && (clock.hour < 1 || clock.hour >= 6)) {
+    return NextResponse.json({
+      ok: false,
+      skipped: true,
+      error: "Reader-history maintenance is only allowed from 01:00 to 05:59 Europe/Stockholm",
+      localTime: `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`,
+    }, { status: 503 });
+  }
+
+  try {
+    const processed = await processPendingReaderBatches(100);
+    const {
+      ledgerEvents,
+      ledgerAvailable,
+      ledgerChanged,
+      ledgerUpdatedAt,
+      ...processedSummary
+    } = processed;
+    if (!processed.storageAvailable) {
+      return NextResponse.json({ ok: false, error: "Blob storage is unavailable" }, { status: 503 });
+    }
+    if (!ledgerAvailable) {
+      return NextResponse.json({
+        ok: false, snapshotUpdated: false,
+        error: "Reader-history ledger could not be read or saved safely", ...processedSummary,
+      }, { status: 503 });
+    }
+
+    const currentSnapshot = manualRun ? null : await getReaderProfileSnapshotForMaintenance();
+    const snapshotAlreadyCurrent = Boolean(
+      currentSnapshot &&
+      ledgerUpdatedAt &&
+      currentSnapshot.sourceLedgerUpdatedAt === ledgerUpdatedAt
+    );
+    const snapshot = snapshotAlreadyCurrent && currentSnapshot
+      ? {
+          saved: true,
+          generatedAt: currentSnapshot.generatedAt,
+          profile: currentSnapshot.profile,
+          updated: false,
+        }
+      : {
+          ...(await rebuildAndSaveReaderProfileSnapshot(ledgerEvents, ledgerUpdatedAt ?? undefined)),
+          updated: true,
+        };
+    if (!snapshot.saved) {
+      return NextResponse.json({
+        ok: false, snapshotUpdated: false,
+        error: "Reader profile snapshot could not be saved", ...processed,
+      }, { status: 503 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      snapshotUpdated: snapshot.updated,
+      snapshotSkipped: !snapshot.updated,
+      snapshotGeneratedAt: snapshot.generatedAt,
+      ledgerChanged,
+      ledgerUpdatedAt,
+      ...processedSummary,
+    });
+  } catch (error) {
+    console.error("Nightly reader-history processing failed:", error);
+    return NextResponse.json({ ok: false, error: "Nightly reader-history processing failed" }, { status: 500 });
+  }
+}
