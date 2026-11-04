@@ -1,109 +1,105 @@
-# Glenn News — löpande förbättringsarbete
+# Glenn News — small, continuous improvements
 
-**Syfte:** ge Glenn News ett återkommande, lättviktigt och spårbart arbetssätt där användarens erfarenheter styr nästa förbättring. Målet är att förbättra tjänsten steg för steg utan att tappa fungerande beteenden, skapa onödig komplexitet eller återinföra kostnadsproblem.
+## Source of truth
 
-## Källor och ansvar
+- [Issue #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52) is the short active-work queue. Keep no more than three active priorities there.
+- Individual GitHub issues own one deliverable each.
+- [product-requirements.md](product-requirements.md) defines intended product behaviour and invariants.
+- [architecture.md](architecture.md), [ui-feature-guide.md](ui-feature-guide.md), and [data-refresh-inventory.md](data-refresh-inventory.md) document only the areas a change actually affects.
+- [AGENTS.md](../AGENTS.md) defines repository implementation and validation rules.
 
-- **[Samlingsärende för aktivt fokus och backlog (#52)](https://github.com/brunofogaca-glenn/glenn-news/issues/52):** aktuell prioritering, status, nästa kö och uppdateringslogg. Detta är den levande arbetslistan.
-- **Produktkrav** ([product-requirements.md](product-requirements.md)): avsett produktbeteende, krav-ID:n, tekniska invariants och kända avvikelser.
-- **[UI- och funktionsguide](ui-feature-guide.md):** vad användaren möter i gränssnittet.
-- **[Arkitekturdokumentation](architecture.md):** ägande moduler och dataflöden.
-- **[Data-refresh-inventering](data-refresh-inventory.md):** källor, färskhet, scheman och reservbeteenden.
-- **[Agentregler](../AGENTS.md):** undersökning, validering, gren/PR och releasehygien.
+Do not copy full backlogs, acceptance criteria, or long status histories into #52. Link to the owning issues instead.
 
-Issue #52 ska länkas till relevanta separata buggar/PR:ar. Dokumentet här beskriver processen; issue #52 håller den uppdaterade arbetsstatusen. Ändra inte produktkrav för att få dokumentation att se ut att matcha kod: dokumentera avvikelsen och lös den medvetet.
+## The size rule
 
-## Den kontinuerliga förbättringskedjan
+Every issue selected for implementation must describe **one observable outcome** that can be completed in one focused PR.
 
-Följ samma loop för varje förbättring:
+Use this sizing before starting:
 
-1. **Lyssna och fånga signalen.** Registrera användarens rapport eller återkoppling så som den upplevs. Skilj mellan det observerade beteendet och en ännu obekräftad förklaring.
-2. **Triage och prioritera.** Kontrollera om problemet redan är känt. Bedöm användarpåverkan, frekvens, hur centralt beteendet är, evidens/reproducerbarhet, risk att ändra samt kostnad/driftspåverkan. Uppdatera issue #52 och öppna ett separat GitHub-ärende när problemet behöver egen livscykel.
-3. **Undersök före ändring.** Läs produktkrav först; inspektera sedan relevant implementation, närliggande regressionstest, produktionsloggar och senaste driftsättning. En grön byggning eller frånvaro av loggar bevisar inte i sig att användarbeteendet fungerar.
-4. **Välj en liten, sammanhängande ändring.** Ha normalt ett tydligt huvudmål per PR. Undvik breda ombyggnader, nya beroenden och nya funktioner som inte behövs för att lösa det prioriterade problemet.
-5. **Skydda beteendet.** Lägg till eller justera regressionstest som fångar felet. Behåll befintliga cache-, tidsfönster-, idempotens-, reservdata-, säkerhets- och kostnadsinvarianter.
-6. **Dokumentera tillsammans med koden.** Uppdatera produktkrav, UI-guide, arkitektur eller data-refresh-inventering när respektive kontrakt ändras. Uppdatera ärendets status och ändringslogg.
-7. **Validera och leverera sparsamt.** Följ [AGENTS.md](../AGENTS.md): normalt en arbetsgren och PR, relevanta tester, lint när källkod ändras och så få onödiga byggen/deployar som möjligt. Dokumentationsändringar ska inte skapa produktionsdeploy i onödan.
-8. **Verifiera och lär.** Separera vad som är ändrat i kod, vad som är driftsatt och vad som faktiskt är verifierat i produktion. När liveverifiering inte är möjlig ännu ska det stå kvar som väntande.
-9. **Välj nästa sak.** Stäng inte loopen förrän aktivt fokus och nästa kö är uppdaterade. Ny användarfeedback kan alltid omprioritera kön.
-
-## Prioritering
-
-Använd nivåerna som stöd, inte som mekanisk poängräkning.
-
-| Prioritet | När den används | Förväntad hantering |
+| Size | Guide | Decision |
 | --- | --- | --- |
-| **P0 — akut** | Säkerhetsproblem, dataläckage, dataförlust eller att tjänstens centrala flöde är nere. | Stoppa annat arbete och hantera omedelbart inom säkra releasegränser. |
-| **P1 — hög** | Morgonutgåvan är felaktig/inaktuell, centrala funktioner misslyckas återkommande eller fel ger vilseledande information. | Nästa fokus om inte P0 finns. |
-| **P2 — normal** | En isolerad funktion/panel, läshistorik eller interaktion har ett reproducerbart fel eller en tydlig återkommande brist. | Prioritera efter påverkan och om den blockerar daglig användning. |
-| **P3 — förbättring** | Visuell putsning, mindre friktion eller nya idéer utan tydlig funktionsrisk. | Ta när högre prioriterade problem är verifierade och stängda. |
+| XS | One small change, usually 1–2 files | Ready |
+| S | One behaviour or one narrow bug, usually 3–5 files | Preferred |
+| M | One vertical slice, 6–8 files or more than one layer | Ready only with a short reason why it cannot be smaller |
+| L | More than 8 files, multiple independent behaviours, or several separately verifiable outcomes | Not ready: split before coding |
 
-När två saker har samma nivå, föredra det som påverkar den dagliga läsningen mest, har tydligast evidens och kan lösas säkert med minst ändringsyta. En rapport från Glenn är viktig produktfeedback, men anta inte teknisk orsak förrän den undersökts.
+File counts are a warning signal, not a goal or an absolute limit. A vertical slice may legitimately touch UI, API, storage and tests. Do not split a coherent slice into PRs that cannot work independently.
 
-## Så hanterar vi återkommande frågor i chatten
+A task is too large when it:
+- changes more than one independent user-visible or operational behaviour;
+- mixes implementation with an unrelated refactor, test-suite redesign, or documentation cleanup;
+- has more than five acceptance checks that can pass or fail independently;
+- cannot be described in one sentence without using “and” repeatedly.
 
-### När Glenn rapporterar en bugg
+When an issue is too large, keep it as an EPIC/parent only if there are at least two genuinely independent deliverables. Create small child issues, each with its own result and acceptance checks. Otherwise rewrite the issue as the first thin slice and move later ideas back to the backlog.
 
-- Sammanfatta kort vad som observerats och vilket beteende som borde ske.
-- Undersök befintlig kod, relevanta loggar, tester och dokumentation innan du föreslår en orsak.
-- Registrera buggen i issue #52 och, om det behövs, skapa ett separat GitHub-ärende med steg för att återskapa, påverkan, evidens, relevanta krav och testidé.
-- Om felet är tydligt, avgränsat och säkert att åtgärda: gör en riktad fix med regressionstest enligt repositoryts regler. Om det kräver ett större produktbeslut eller saknar avgörande underlag, dokumentera status och föreslå nästa konkreta undersökning i stället för att gissa.
-- Prioritera om aktivt fokus när felet har större påverkan än pågående arbete.
+## Issue template
 
-### När Glenn frågar ”vad är nästa förbättringsområde?”
+Use one of these types in the title/body:
 
-1. Läs issue #52 och detta arbetsflöde.
-2. Kontrollera ny användarfeedback, relevanta öppna ärenden, senaste produktionsfel och de senaste releaserna.
-3. Skilj mellan gammal historik, åtgärdat i kod, driftsatt och verifierat i produktion.
-4. Rekommendera ett huvudområde med konkret motivering, klart avslutskriterium och minsta rimliga arbetssteg.
-5. Om Glenn vill genomföra arbetet, fortsätt enligt samma loop. Börja inte en stor, osammanhängande ombyggnad bara för att det finns fler idéer.
+- **BUG** — one broken behaviour, with reproduction/evidence and expected result.
+- **TASK** — one small implementation or investigation.
+- **VERIFY** — one production behaviour to confirm after a release.
+- **EPIC** — parent for two or more independently deliverable child issues; never a coding ticket itself.
 
-### När en ändring är klar
+Every implementation issue should contain:
+1. **Outcome:** one sentence describing what will be different.
+2. **Scope:** what is included and what is explicitly excluded.
+3. **Done when:** usually 2–5 observable checks.
+4. **Risk guardrails:** only the relevant invariants.
 
-Uppdatera issue #52 med:
-- **Aktuellt fokus:** vad som är i arbete eller väntar på verifiering.
-- **Status:** nytt, triagerat, pågår, åtgärdat i kod, driftsatt, verifierat, parkerat eller ersatt.
-- **Bevis:** PR/commit, tester, relevanta loggar och vad som kontrollerats manuellt.
-- **Kvarstående osäkerhet:** vad som ännu inte går att hävda.
-- **Nästa kö:** högst tre konkreta punkter i prioriterad ordning.
-- **Ändringslogg:** datum och en kort notering.
+Do not add speculative acceptance criteria for future phases. Do not create an issue for a possibility that has not been triaged.
 
-Markera inte produktionsverifiering enbart utifrån att en PR slagits samman, Vercel visar READY eller tester går grönt. Verifiera det berörda beteendet/dataflödet där det är möjligt.
+## PR rules
 
-## Skyddsräcken som alltid gäller
+- One active PR per coherent issue/workstream.
+- One PR has one purpose. Include only the tests and documentation needed for that purpose.
+- Aim for 1–5 changed files. 6–8 needs a brief explanation. More than 8 requires splitting or an explicit explanation of why a single vertical slice is safer.
+- Do not add unrelated cleanup, broad test rewrites, or “while here” improvements.
+- Before merge: inspect the full diff, run the relevant regression tests, verify GitHub CI on the exact head SHA, and check the Vercel preview when the app build is affected.
+- A READY preview, a Vercel status check, or an old green Actions run does not prove current GitHub CI.
+- Avoid repeated builds/deployments for intermediate edits. Do not push directly to main unless explicitly requested.
 
-- Kvalitet, korrekt information och förtroende går före antal funktioner.
-- Behåll kostnadsdisciplinen: inga Blob-skrivningar per klick/rendering, inga duplicerade hämtningar eller dyra AI-anrop utan tydligt värde.
-- Behåll dataskydd: tidsfönster, autentisering, idempotens, last-good-snapshot och skydd mot att giltig historik ersätts med tom data vid fel.
-- För redaktionell data: skilj mellan senaste hämtningstid och observationens/artikelns datum. Visa gammal eller partiell data tydligt.
-- Förändra inte fungerande produktbeteenden som sidoeffekt av en orelaterad fix.
-- Undvik flera parallella experimentella fixar, repetitiva produktionsbyggen och direkta pushar till main.
-- Dokumentera endast det som är sant och verifierat; kalla inte intention för garanti.
+## Verification rules
 
-## Kontrolläge — 3 november 2026
+A VERIFY issue must describe one thing to check, not hold a combined list of unrelated follow-ups.
 
-### Genomfört och driftsatt
+- State the exact production signal, data field, route, page or user action to inspect.
+- State what success looks like and what must not be changed during the check.
+- Do not use production data mutations or manual Cron runs unless explicitly approved and safely controlled.
+- If verification depends on a future scheduled run, mark it **waiting for next scheduled run**, record the relevant deployment/commit and next check, then return to other work. Do not keep a developer task open just to wait.
+- Close the VERIFY issue immediately after the stated check passes. If it fails, open one small BUG for the observed failure and close/replace the VERIFY issue as appropriate.
+- Never describe “fixed in code”, “merged”, “deployed” and “verified in production” as the same status.
 
-- PR [#101](https://github.com/brunofogaca-glenn/glenn-news/pull/101) är mergad till `main` i commit `efbfba1ee7fe037568761224600798ad3a03765f`.
-- Fotbollskanalen-integrationen är borttagen. Borås.com är enda browser-scrapade publisher-källan.
-- Borås-refresh använder fortsatt Vercel Cron, read-only snapshot-preflight och en kortlivad Vercel Sandbox endast när en ny scrape behövs.
-- Huvud-CI passerade och refresh-/diagnostiksamlingen hade 44 godkända tester.
-- Produktionsdeployment `dpl_AkujjaNsLHb3YfxfbYqSyJKL88zB` är READY och har aliaset `https://glenn-news.vercel.app`.
+## Working cadence
 
-### Produktionsobservationer och begränsningar
+1. Check #52 and the active PR before starting. Do not create duplicate issues or parallel PRs.
+2. Pick the highest-priority ready issue. If it is L-sized, split it before coding.
+3. Inspect only the relevant requirement, owning module, closest test and current production evidence.
+4. Make one complete, narrow change and add the smallest regression test that would have caught the problem.
+5. Update only documentation affected by the behaviour or invariant change.
+6. Review diff and exact-SHA checks once. Fix failures; do not repeatedly rerun successful checks without a relevant edit.
+7. Update the owning issue and #52 with evidence, uncertainty and the next single action.
+8. Move on. Do not grow the current PR to absorb newly discovered unrelated work.
 
-- Vercel Runtime Logs registrerade HTTP 503 från Guliganernas RSS den 3 november kl. 06.30 svensk tid. Händelsen tillhörde deploymenten före den senaste utrullningen. Koden isolerar enskilda RSS-fel med `Promise.allSettled`; övriga källor ska därför kunna fortsätta, men 503:an betyder att just den källan inte levererade data vid försöket.
-- Den nya deploymenten kom efter morgonens publiceringsförsök. Dess första schemalagda morgonkörning är därför ännu inte verifierad.
-- Borås.com-katalogen, sammanslagna lokalsnapshoten och faktapanelen har ännu inte verifierats tillsammans med en verklig produktionskörning.
-- Läshistorikens batch-POST, ledger, weekly read-state och profilsnapshot har ännu inte verifierats end-to-end i produktion.
-- Ingen manuell Cron-körning eller extra Blob-skrivning användes för denna kontroll.
+## Priorities
 
-### Aktuellt P1-fokus
+- **P0:** security, privacy, data loss or central service unavailable.
+- **P1:** morning edition or a core reader flow is broken or misleading.
+- **P2:** a contained feature or recurring defect with clear user value.
+- **P3:** polish and optional future ideas.
 
-1. [#77 — Borås.com-faktarutor: snapshot → cache → startsida](https://github.com/brunofogaca-glenn/glenn-news/issues/77).
-2. [#54 — läshistorik: browser-kö → batch → ledger → profil](https://github.com/brunofogaca-glenn/glenn-news/issues/54).
-3. [#102 — oberoende felgränser för nattjobb](https://github.com/brunofogaca-glenn/glenn-news/issues/102).
-4. [#66 — verifiera Borås.com scraping i produktion](https://github.com/brunofogaca-glenn/glenn-news/issues/66).
-5. [#69 — verifiera nattlig Vercel Cron för Borås och läshistorik](https://github.com/brunofogaca-glenn/glenn-news/issues/69).
+Priority does not override size. Split a P1 into small safe deliveries rather than creating one large emergency PR.
 
-Nästa schemalagda körning den 4 november är första tillfället att verifiera den nya deploymentens natt- och morgonkedja. Kontrollera separat **Nattlig uppdatering**, Borås snapshot-/evenemangsantal, läshistorikens ledger- och profilmarkör, samt UI-beteendet. Stäng inte P1-ärendena baserat på grön CI eller READY-deployment ensam. Uppdatera den levande kön i [issue #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52) när ny evidens finns.
+## Permanent guardrails
+
+- No Blob writes per click, article or render. Preserve bounded batch writes and existing cost ceilings.
+- Preserve private paths, idempotency, 01:00–05:59 Europe/Stockholm write windows, authentication and last-good data.
+- Never replace valid history/snapshots with empty data after transient read or parse errors.
+- Preserve editorial source gating and existing cache/coalescing behaviour.
+- No additional AI calls, upstream calls, Blob operations, paid observability products or schedule changes without a separate justified decision.
+- Documentation must describe verified behaviour, not intended behaviour.
+
+## Current work
+
+The live status and next three priorities are maintained only in [Issue #52](https://github.com/brunofogaca-glenn/glenn-news/issues/52). Do not maintain a second dated status register in this file.
