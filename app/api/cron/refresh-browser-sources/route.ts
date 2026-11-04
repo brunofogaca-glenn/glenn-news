@@ -51,6 +51,20 @@ async function readJson(response: Response): Promise<JsonRecord> {
   return record;
 }
 
+function sandboxAuthOptions() {
+  const accessToken = process.env.VERCEL_TOKEN;
+  const teamId = process.env.VERCEL_TEAM_ID;
+  const projectId = process.env.VERCEL_PROJECT_ID || PROJECT_ID;
+
+  // On Vercel, Sandbox.create() normally uses the deployment's OIDC token.
+  // Only use access-token auth when all required credentials are explicitly configured.
+  if (accessToken && teamId && projectId) {
+    return { token: accessToken, teamId, projectId };
+  }
+
+  return {};
+}
+
 async function prepareSandbox(sandbox: Sandbox) {
   const commands = [
     "set -euo pipefail",
@@ -118,7 +132,7 @@ export async function GET(request: Request) {
     let payload: JsonRecord;
     try {
       sandbox = await Sandbox.create({
-        projectId: process.env.VERCEL_PROJECT_ID || PROJECT_ID,
+        ...sandboxAuthOptions(),
         image: "vercel/sandbox/node:22",
         source: { type: "git", url: REPOSITORY_URL, revision: commitSha, depth: 1 },
         region: "arn1",
