@@ -20,8 +20,10 @@ Läs alltid denna kravspecifikation först. Läs därefter bara de detaljerade d
 | [Data-refresh-inventering](data-refresh-inventory.md) | Aktiva datakällor, cachetider, scheman, lokala tidsgränser, autentisering och reservdata. |
 | [Agentregler](../AGENTS.md) | Arbetsflöde, tester, pull requests, releasehygien och produktionsinvariants. |
 | [Rankingtester](../tests/ranker-regression.test.cjs) | Redaktionellt urval, personalisering, läsvärde, dubbletter, Veckofokus och publiceringskontrakt. |
-| [Refresh-tester](../tests/data-refresh-regression.test.cjs) | Scheman, datakällor, OIDC, källhygien, cache och uppdateringsbeteende. |
-| [Diagnostiktester](../tests/diagnostic-log-regression.test.cjs) | Loggning, maskering, läshistorik och cachekontrakt. |
+| [Kritiska flödestester](../tests/critical-flows.test.cjs) | Scenariotester för RSS, nattjobb, Borås.com, läshistorik och diagnostik. |
+| [Dataintegritetstester](../tests/critical-data-flow.integration.test.cjs) | Integrationstester för Borås-katalogens merge och weekly-read-lagring med felinjektion. |
+| [Workflow-kontraktstest](../tests/workflow-issue-reporter-regression.test.cjs) | Main-only, idempotens och sekretess i automatisk CI-felrapportering. |
+| [Teststrategi](testing-strategy.md) | Testnivåer, kritiska scenarier och gränsen mellan simulerade tester och produktionsverifiering. |
 
 ### Om dokumentation, kod och tester skiljer sig åt
 
@@ -222,8 +224,8 @@ Dessa regler gäller oavsett vilken synlig funktion som ändras.
 ### Automatiserade testområden
 
 - `tests/ranker-regression.test.cjs`: ranker, public importance, personaliseringstak, innehållstyper, källbredd, Veckofokus-kandidater, dubbletter, cachekoalescing, källhälsa, publiceringskontrakt, sporturval och retention.
-- `tests/data-refresh-regression.test.cjs`: OIDC, tidsgrindar, schema, källinventering, fallback/snapshots, ligatabeller, profilsemantik, manuell återställning och byggkonfiguration.
-- `tests/diagnostic-log-regression.test.cjs`: diagnostikmaskering, deduplicering, inga Blob-skrivningar per logg, Veckofokus-cache, läshistorik-ledger och nattprocessning.
+- `tests/critical-flows.test.cjs`: 18 körbara scenariotester av RSS, morgonutgåva, artikeluppdatering, nattjobb, Borås-katalog, läshistorik och diagnostik.
+- `tests/workflow-issue-reporter-regression.test.cjs`: ett avgränsat kontraktstest för main-only, idempotens och sekretess i CI-felrapportering.
 
 Testerna ska återspegla önskat produktkontrakt, inte bara råka godkänna nuvarande implementation. När en bugg eller ett krav ändras ska relevant test läggas till eller uppdateras.
 
