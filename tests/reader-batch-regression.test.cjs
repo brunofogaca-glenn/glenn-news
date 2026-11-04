@@ -180,6 +180,7 @@ test("batch API normalizes long metadata, writes one private object and reuses t
     assert.equal(stored.events[0].topic.length, 160);
     assert.equal(stored.events[0].title.length, 300);
     assert.ok(stored.events[0].summary.length <= 1500);
+    assert.equal(stored.events[0].summary.trim(), stored.events[0].summary);
     const retry = await route.POST(request());
     const retryBody = await retry.json();
     assert.equal(retry.status, 200);
