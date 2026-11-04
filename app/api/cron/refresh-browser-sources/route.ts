@@ -10,7 +10,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const REPOSITORY_URL = "https://github.com/brunofogaca-glenn/glenn-news";
-const PROJECT_ID = "prj_mZabEDP074jUlH246TPxJNSrTbXt";
 const PLAYWRIGHT_VERSION = "1.64.1";
 const WORKSPACE = "/tmp/glenn-news-boras-refresh";
 
@@ -118,7 +117,6 @@ export async function GET(request: Request) {
     let payload: JsonRecord;
     try {
       sandbox = await Sandbox.create({
-        projectId: process.env.VERCEL_PROJECT_ID || PROJECT_ID,
         image: "vercel/sandbox/node:22",
         source: { type: "git", url: REPOSITORY_URL, revision: commitSha, depth: 1 },
         region: "arn1",
