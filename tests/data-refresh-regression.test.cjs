@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const Module = require("node:module");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -762,4 +763,99 @@ test("Borås browser refresh requires full pagination metadata and revalidates o
   assert.match(store, /value.version !== 1 && value.version !== 2/);
   assert.match(store, /STALE_AFTER_MS = 72/);
   assert.match(store, /MAX_AGE_MS = 365/);
+});
+
+
+test("Borås Sandbox refresh uses deployment OIDC without partial explicit credentials", async () => {
+  const routeFile = path.join(root, "app/api/cron/refresh-browser-sources/route.ts");
+  delete require.cache[routeFile];
+
+  const commitSha = "a".repeat(40);
+  const events = Array.from({ length: 6 }, (_, index) => ({
+    title: "Borås test event " + index,
+    url: "https://www.boras.com/evenemang/test-" + index + "/",
+    date: "2027-01-12",
+  }));
+  const sandboxOptions = [];
+  const ingested = [];
+  let stopped = false;
+
+  const sandbox = {
+    runCommand: async () => ({ exitCode: 0, stderr: async () => "" }),
+    readFileToBuffer: async () => Buffer.from(JSON.stringify({
+      events,
+      complete: true,
+      expectedHorizonDays: 180,
+    })),
+    stop: async () => { stopped = true; },
+  };
+
+  const originalLoad = Module._load;
+  const originalEnv = {
+    CRON_SECRET: process.env.CRON_SECRET,
+    VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA,
+    VERCEL_PROJECT_ID: process.env.VERCEL_PROJECT_ID,
+  };
+  process.env.CRON_SECRET = "test-cron-secret";
+  process.env.VERCEL_GIT_COMMIT_SHA = commitSha;
+  delete process.env.VERCEL_PROJECT_ID;
+
+  Module._load = function(request, parent, isMain) {
+    if (request === "@vercel/sandbox") {
+      return {
+        Sandbox: {
+          create: async options => {
+            sandboxOptions.push(options);
+            return sandbox;
+          },
+        },
+      };
+    }
+    if (request === "../ingest-boras-events/route") {
+      return {
+        GET: async () => Response.json({ ok: true, shouldRefresh: true, eventCount: 0 }),
+        POST: async request => {
+          ingested.push(await request.json());
+          return Response.json({ ok: true, stored: events.length, savedAt: "2026-11-04T02:15:00.000Z" });
+        },
+      };
+    }
+    if (request === "@/lib/updateSchedule") {
+      return { getStockholmClock: () => ({ hour: 2, minute: 13 }) };
+    }
+    if (request === "@/lib/borasEventCatalog") {
+      return { BORAS_EVENT_HORIZON_DAYS: 180 };
+    }
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  try {
+    const route = require(routeFile);
+    const response = await route.GET(new Request(
+      "https://glenn-news.vercel.app/api/cron/refresh-browser-sources",
+      { headers: { authorization: "Bearer test-cron-secret" } }
+    ));
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.boras.status, "updated");
+    assert.equal(body.boras.count, events.length);
+    assert.equal(sandboxOptions.length, 1);
+    assert.equal(Object.hasOwn(sandboxOptions[0], "token"), false);
+    assert.equal(Object.hasOwn(sandboxOptions[0], "teamId"), false);
+    assert.equal(Object.hasOwn(sandboxOptions[0], "projectId"), false);
+    assert.equal(sandboxOptions[0].source.revision, commitSha);
+    assert.equal(ingested.length, 1);
+    assert.equal(ingested[0].complete, true);
+    assert.equal(ingested[0].expectedHorizonDays, 180);
+    assert.equal(ingested[0].events.length, events.length);
+    assert.equal(stopped, true);
+  } finally {
+    Module._load = originalLoad;
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 });

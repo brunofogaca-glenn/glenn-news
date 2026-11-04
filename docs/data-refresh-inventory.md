@@ -36,7 +36,7 @@ All schedules are Vercel Cron expressions in UTC. Code-level write guards use `E
 
 - Supplemental homepage panels use `/api/cron/refresh-data` at `13 0 * * *` and `13 1 * * *`. A successful same-day source refresh makes the second invocation a cheap no-op unless an individual source remains due or stale.
 - Reader history uses `/api/cron/process-reader-history` at `15 1,2 * * *`. Both attempts stay inside the 01:00–05:59 local write window. Existing ledger/snapshot idempotence remains in place; the second attempt retries work that remains pending or failed. GitHub Actions is manual recovery only.
-- Borås.com is the only browser-scraped publisher source. `/api/cron/refresh-browser-sources` preflights its fixed private Blob path and starts no Sandbox when today's snapshot is already current. Otherwise one ephemeral Vercel Sandbox runs the Borås scraper and the existing ingestion handler validates the payload and preserves last-good data.
+- Borås.com is the only browser-scraped publisher source. `/api/cron/refresh-browser-sources` preflights its fixed private Blob path and starts no Sandbox when today's snapshot is already current. Otherwise one ephemeral Vercel Sandbox runs the Borås scraper and the existing ingestion handler validates the payload and preserves last-good data. The Sandbox SDK must receive no explicit credential fields in Vercel Functions: it derives token, team and project scope from deployment OIDC. Never pass only `projectId`; explicit API credentials are an all-or-none `token` + `teamId` + `projectId` set.
 - The morning edition uses `/api/cron/refresh-news` at `30 4`, `34 4`, `30 5` and `34 5` UTC, covering the 06:00–06:59 Stockholm hour.
 
 ### Blob operation and cost policy
