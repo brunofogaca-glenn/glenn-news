@@ -40,7 +40,8 @@ For iterative product work, user-reported bugs, or requests for the next improve
 - `npm run build` — ranking tests + refresh/diagnostic tests + Next.js production build.
 - `npm run lint` — ESLint.
 - `npm run test:ranker` — ranking regression suite only.
-- `npm run test:refresh` — refresh and diagnostic regression suites only.
+- `npm run test:critical` — critical integration and recovery scenarios.
+- `npm run test:refresh` — compatibility alias for the critical-flow suite.
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
