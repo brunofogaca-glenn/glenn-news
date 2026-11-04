@@ -39,35 +39,6 @@ test("diagnostics use redacted, deduplicated runtime logs without Blob writes", 
   assert.ok(!logger.includes("await list("));
 });
 
-test("weekly-read writes fail closed when the existing snapshot cannot be read", () => {
-  const weeklyRead = read("lib/weeklyRead.ts");
-  assert.match(weeklyRead, /async function readWeeklyReadSnapshot\(\): Promise<WeeklyReadSnapshotResult>/);
-  assert.match(weeklyRead, /if \(!snapshot\.ok\) return false/);
-  assert.match(weeklyRead, /befintlig historik lämnas orörd/);
-  assert.match(weeklyRead, /if \(!Array\.isArray\(parsed\)\) return \{ ok: false, links: \[\] \}/);
-  assert.doesNotMatch(weeklyRead, /const current = await getWeeklyReadLinks\(\)/);
-});
-
-test("Week Focus uses one cached edition for Saturday and Sunday", () => {
-  const cache = read("lib/weekFocusCache.ts");
-  const focus = read("lib/weekFocus.ts");
-  const page = read("app/veckofokus/page.tsx");
-
-  assert.ok(cache.includes('CACHE_PREFIX = "glenn-news/week-focus/cache/"'));
-  assert.ok(cache.includes('timeZone: "Europe/Stockholm"'));
-  assert.ok(cache.includes("const dateKey = weekendEditionDateKey()"));
-  assert.ok(cache.includes("getCachedWeeklyFocus"));
-  assert.ok(cache.includes("readPersistentCache(dateKey, isValid)"));
-  assert.ok(cache.includes("writePersistentCache(dateKey, fingerprint, value)"));
-  assert.ok(cache.includes("inFlight.get(dateKey)"));
-  assert.ok(!cache.includes("WEEK_FOCUS_CACHE_TTL_MS"));
-  assert.ok(focus.includes("getCachedWeeklyFocus<WeeklyFocus>(isValidWeeklyFocus)"));
-  assert.ok(focus.includes("collectWeeklyCandidates(editions, readLinks)"));
-  assert.ok(focus.includes("dependencies.loadSavedEditions(7)"));
-  assert.ok(page.includes('weekday === "Sat" || weekday === "Sun"'));
-  assert.ok(page.includes('<SaveReadingHistoryButton mode="weekfocus" />'));
-});
-
 test("reader history is consolidated and clicked articles are not individually classified", () => {
   const profile = read("lib/readerProfile.ts");
   const processor = profile.slice(
@@ -82,6 +53,19 @@ test("reader history is consolidated and clicked articles are not individually c
   assert.doesNotMatch(processor, /classifyClickedArticle/);
   assert.doesNotMatch(processor, /put\(blob\.pathname/);
   assert.ok(profile.includes("const ledger = await readReaderHistoryLedger()"));
+});
+
+test("retired Veckofokus has no active route, navigation or nightly side writes", () => {
+  const cron = read("app/api/cron/process-reader-history/route.ts");
+  const profile = read("lib/readerProfile.ts");
+  const nav = read("app/components/MobileNav.tsx");
+  const homepage = read("app/page.tsx");
+
+  assert.equal(fs.existsSync(path.join(root, "app/veckofokus/page.tsx")), false);
+  assert.doesNotMatch(nav + homepage, /href="\/veckofokus"/);
+  assert.doesNotMatch(cron, /weeklyRead|weeklyFocus|createWeeklyFocus|addWeeklyReadLinks/i);
+  assert.doesNotMatch(profile, /weeklyReadLinks|weeklyRead\.ts/);
+  assert.ok(profile.includes("const events = [...currentLedger.events]"), "existing history must survive consolidation");
 });
 
 test("critical production error paths record diagnostics", () => {

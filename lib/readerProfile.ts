@@ -331,7 +331,6 @@ export type ReaderBatchProcessingResult = {
   classifiedEvents: number;
   classificationFailures: number;
   pendingEvents: number;
-  weeklyReadLinks: string[];
 };
 
 /**
@@ -358,7 +357,6 @@ export async function processPendingReaderBatches(
     classifiedEvents: 0,
     classificationFailures: 0,
     pendingEvents: 0,
-    weeklyReadLinks: [],
   };
   if (!process.env.BLOB_READ_WRITE_TOKEN) return emptyResult;
 
@@ -370,8 +368,6 @@ export async function processPendingReaderBatches(
   const knownEventIds = new Set(currentLedger.events.map(event => event.eventId));
   const processedBatchPaths = [...currentLedger.processedBatchPaths];
   const events = [...currentLedger.events];
-  const weeklyReadLinks = new Set<string>();
-  const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
   let scannedBatches = 0;
   let changed = false;
 
@@ -392,16 +388,6 @@ export async function processPendingReaderBatches(
       for (const rawEvent of parsed.events) {
         if (!isLedgerEvent(rawEvent)) continue;
         const event = rawEvent as BatchedReaderEvent;
-        const timestamp = Date.parse(event.timestamp);
-        if (
-          event.category === "weekfocus" &&
-          event.link &&
-          Number.isFinite(timestamp) &&
-          timestamp >= recentCutoff &&
-          /^https?:\/\//i.test(event.link)
-        ) {
-          weeklyReadLinks.add(event.link);
-        }
         if (!knownEventIds.has(event.eventId)) {
           events.push(compactLedgerEvent(event));
           knownEventIds.add(event.eventId);
@@ -409,21 +395,6 @@ export async function processPendingReaderBatches(
       }
     } catch {
       // A failed batch is not marked processed; the next night retries it.
-    }
-  }
-
-  // Retry any recent Week Focus read marks until the weekly-read snapshot
-  // accepts them. This makes a temporary write failure recover on the next night.
-  for (const event of currentLedger.events) {
-    const timestamp = Date.parse(event.timestamp);
-    if (
-      event.category === "weekfocus" &&
-      event.link &&
-      Number.isFinite(timestamp) &&
-      timestamp >= recentCutoff &&
-      /^https?:\/\//i.test(event.link)
-    ) {
-      weeklyReadLinks.add(event.link);
     }
   }
 
@@ -458,7 +429,6 @@ export async function processPendingReaderBatches(
     classifiedEvents: 0,
     classificationFailures: 0,
     pendingEvents: 0,
-    weeklyReadLinks: [...weeklyReadLinks],
   };
 }
 
@@ -1037,7 +1007,7 @@ export async function getReaderActivitySince(
       legacyItems.push(...resolved);
     }
   } catch (error) {
-    // Week Focus can still use valid ledger reads if legacy storage is unavailable.
+    // Recent activity can still use valid ledger reads if legacy storage is unavailable.
     console.warn("Kunde inte läsa äldre veckohistorik; tillgänglig batchhistorik används:", error);
   }
 

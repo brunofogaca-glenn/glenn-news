@@ -4,8 +4,7 @@ import { usePathname } from "next/navigation";
 import { readReaderQueue, READER_QUEUE_EVENT, READER_QUEUE_KEY } from "./readerQueue";
 import { saveReaderBatch } from "./readerBatchClient";
 function makeBatchId() { return String(Date.now()) + "-" + window.crypto.randomUUID().replaceAll("-", ""); }
-type SaveReadingHistoryButtonProps = { mode?: "home" | "weekfocus" };
-export function SaveReadingHistoryButton({ mode = "home" }: SaveReadingHistoryButtonProps) {
+export function SaveReadingHistoryButton() {
   const pathname = usePathname();
   const [count, setCount] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -35,13 +34,13 @@ export function SaveReadingHistoryButton({ mode = "home" }: SaveReadingHistoryBu
       setMessage("Ett oväntat fel hindrade sparandet. Artiklarna ligger kvar i kön – försök igen.");
     } finally { setSaving(false); }
   }
-  if ((mode === "home" && pathname !== "/") || (mode === "weekfocus" && pathname !== "/veckofokus")) return null;
+  if (pathname !== "/") return null;
   return (
     <section className="mx-auto mt-10 max-w-7xl px-4 md:px-8 border-2 border-slate-950 bg-white/70 p-5 md:p-6" aria-label="Läshistorik">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-700">Din läshistorik</div>
-          <h2 className="mt-1 font-serif text-2xl font-black">{mode === "weekfocus" ? "Spara Veckofokus-läsning" : "Spara morgonens läsning"}</h2>
+          <h2 className="mt-1 font-serif text-2xl font-black">Spara morgonens läsning</h2>
           <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">Läsningen skickas tillsammans i en enda batch. Lässtatus och läsarprofil uppdateras av nattjobbet, inte medan du läser. Upp till 50 artiklar sparas per omgång.</p>
           {message && <p role="status" className="mt-2 text-sm font-semibold text-slate-700">{message}</p>}
         </div>

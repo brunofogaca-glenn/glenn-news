@@ -2,7 +2,6 @@ import {
   getReaderProfile,
   getRecentReaderActivity,
 } from "@/lib/readerProfile";
-import { getWeeklyReadLinks } from "@/lib/weeklyRead";
 
 export const dynamic = "force-dynamic";
 
@@ -208,10 +207,9 @@ function Kpi({
 }
 
 export default async function ProfilePage() {
-  const [profile, activity, weeklyReadLinks] = await Promise.all([
+  const [profile, activity] = await Promise.all([
     getReaderProfile(),
     getRecentReaderActivity(50),
-    getWeeklyReadLinks(),
   ]);
 
   const categoryEntries = topEntries(profile.category, 6);
@@ -351,16 +349,11 @@ export default async function ProfilePage() {
           </span>
         </div>
 
-        <section className="mt-7 grid gap-5 md:grid-cols-4">
+        <section className="mt-7 grid gap-5 md:grid-cols-3">
           <Kpi
             value={String(profile.totalClicks)}
             label="Lästa artiklar"
             note="Totalt registrerade artikelklick"
-          />
-          <Kpi
-            value={String(weeklyReadLinks.length)}
-            label="Veckofokus läst"
-            note="Texter du har läst där"
           />
           <Kpi
             value={strongestCategory}
@@ -805,7 +798,7 @@ export default async function ProfilePage() {
                 03 · Redaktionen anpassas
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Profilen används för att göra morgonläsningen och Veckofokus mer relevanta.
+                Profilen används för att göra kommande morgonutgåvor mer relevanta.
               </p>
             </div>
           </div>

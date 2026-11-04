@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/", label: "Tidning", icon: "newspaper" },
-  { href: "/veckofokus", label: "Veckofokus", icon: "book" },
   { href: "/profil", label: "Profil", icon: "user" },
   { href: "/health", label: "Källor", icon: "activity" },
 ] as const;
@@ -35,15 +34,6 @@ function NavIcon({ name }: { name: NavIconName }) {
     );
   }
 
-  if (name === "book") {
-    return (
-      <svg {...shared}>
-        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21V5.5Z" />
-        <path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20M8 7h7M8 10h7" />
-      </svg>
-    );
-  }
-
   if (name === "user") {
     return (
       <svg {...shared}>
@@ -68,7 +58,7 @@ export function MobileNav() {
       aria-label="Huvudnavigation"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-300 bg-[#f4f1e8]/95 pb-[max(env(safe-area-inset-bottom),8px)] shadow-[0_-4px_18px_rgba(15,23,42,0.08)] backdrop-blur md:hidden"
     >
-      <div className="mx-auto grid max-w-xl grid-cols-4">
+      <div className="mx-auto grid max-w-xl grid-cols-3">
         {NAV_ITEMS.map(item => {
           const active = item.href === "/"
             ? pathname === "/"

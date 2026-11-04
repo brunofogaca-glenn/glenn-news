@@ -19,7 +19,7 @@ Läs alltid denna kravspecifikation först. Läs därefter bara de detaljerade d
 | [Arkitektur](architecture.md) | Modulkarta, dataflöden, lagring, prestandakontrakt och hur man säkert ändrar systemet. |
 | [Data-refresh-inventering](data-refresh-inventory.md) | Aktiva datakällor, cachetider, scheman, lokala tidsgränser, autentisering och reservdata. |
 | [Agentregler](../AGENTS.md) | Arbetsflöde, tester, pull requests, releasehygien och produktionsinvariants. |
-| [Rankingtester](../tests/ranker-regression.test.cjs) | Redaktionellt urval, personalisering, läsvärde, dubbletter, Veckofokus och publiceringskontrakt. |
+| [Rankingtester](../tests/ranker-regression.test.cjs) | Redaktionellt urval, personalisering, läsvärde, dubbletter och publiceringskontrakt. |
 | [Refresh-tester](../tests/data-refresh-regression.test.cjs) | Scheman, datakällor, OIDC, källhygien, cache och uppdateringsbeteende. |
 | [Diagnostiktester](../tests/diagnostic-log-regression.test.cjs) | Loggning, maskering, läshistorik och cachekontrakt. |
 
@@ -61,9 +61,9 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 
 | ID | Krav | Status | Primär implementation / test |
 | --- | --- | --- | --- |
-| UI-01 | Produkten har fyra huvudsidor: Tidning `/`, Veckofokus `/veckofokus`, Profil `/profil` och Källor `/health`. | Implementerat | `app/page.tsx`, `app/veckofokus/page.tsx`, `app/profil/page.tsx`, `app/health/page.tsx` |
+| UI-01 | Produkten har tre huvudsidor: Tidning `/`, Profil `/profil` och Källor `/health`. | Implementerat | `app/page.tsx`, `app/profil/page.tsx`, `app/health/page.tsx` |
 | UI-02 | Gränssnittet ska vara svenskt och fungera på mobil, surfplatta och dator. | Implementerat | `app/layout.tsx`, `app/globals.css`, `app/components/MobileNav.tsx` |
-| UI-03 | Mobilnavigeringen ska ha de fyra destinationerna, markera aktuell sida och inte skymma sidinnehåll. | Implementerat | `app/components/MobileNav.tsx`, [UI-guiden](ui-feature-guide.md) |
+| UI-03 | Mobilnavigeringen ska ha de tre destinationerna, markera aktuell sida och inte skymma sidinnehåll. | Implementerat | `app/components/MobileNav.tsx`, [UI-guiden](ui-feature-guide.md) |
 | UI-04 | Asynkrona kontroller ska visa begripliga fel-/statuslägen, korrekta disabled-lägen och tillgängliga etiketter/roller. Hemliga värden får aldrig exponeras i felmeddelanden. | Implementerat; generell testning | [UI-guiden](ui-feature-guide.md), berörda sid- och komponentfiler |
 | UI-05 | Alla ändringar av routes, navigation, paneler, knappar, responsivitet eller tomma/felaktiga lägen ska dokumenteras i UI-guiden. | Agentregel | [AGENTS.md](../AGENTS.md), [UI-guiden](ui-feature-guide.md) |
 | UI-06 | Startsidan presenterar de sju redaktionella områdena som ett blandat flöde, inte separata kategorisektioner. Kategorin finns kvar som artikelmetadata; alla valda artiklar och Elfsborgs fulla bevakning ska finnas kvar. | Implementerat + testskyddat | `app/page.tsx`, `tests/ranker-regression.test.cjs`, [UI-guiden](ui-feature-guide.md) |
@@ -75,7 +75,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | ID | Krav | Status | Primär implementation / test |
 | --- | --- | --- | --- |
 | ED-01 | Publicera en daterad morgonutgåva med sju sektioner: Elfsborg, Lokalt, Sverige, Världen, Ekonomi, Sport och Kultur, Mat & Livsstil. | Implementerat + testskyddat | `lib/dailyEdition.ts`, ranker-regressionstest |
-| ED-02 | Datum och kalenderveckoberäkningar ska använda `Europe/Stockholm`, även vid sommar-/vintertid. | Implementerat + testskyddat | `lib/dailyEdition.ts`, `lib/weekFocus.ts`, refresh-tester |
+| ED-02 | Datum och kalenderveckoberäkningar ska använda `Europe/Stockholm`, även vid sommar-/vintertid. | Implementerat + testskyddat | `lib/dailyEdition.ts`, refresh-tester |
 | ED-03 | Redaktionella RSS-/webbkällor och livekontroller av deras hälsa får inte hämtas före 06.00 svensk tid. Samma tidsgräns gäller sidvägar som annars kunde orsaka dolda hämtningar. | Implementerat + testskyddat | `lib/updateSchedule.ts`, `lib/rss.ts`, `lib/dailyEdition.ts`, refresh-tester |
 | ED-04 | Utgåvan valideras före sparning och återigen vid läsning. Datum, sektioner, rubriker, artikelstruktur, HTTP(S)-länkar och innehållskrav kontrolleras. En utgåva utan artiklar eller utan valda läsbara berättelser ska avvisas. | Implementerat + testskyddat | `lib/dailyEdition.ts`, refresh-tester |
 | ED-05 | Dubbletter ska filtreras med normaliserade länkar och rubriker. Dagens urval ska undvika artiklar från de föregående sju dagsutgåvorna, inte bara gårdagen. | Implementerat; skyddet är delvis testat | `lib/dailyEdition.ts`, `lib/editorV2.ts`, `lib/rss.ts` |
@@ -95,7 +95,7 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 | EDQ-04 | AI-redaktören ska skriva naturlig, rak svenska. Lägesbilden ska normalt vara 4–5 meningar; varje vald artikel ska få kort sammanfattning och en motivering till varför den är läsvärd. | Implementerat; direkt testning är begränsad | `lib/editorV2.ts` |
 | EDQ-05 | AI:n får endast göra faktapåståenden som stöds av artikelunderlaget. Tvetydigt underlag ska hanteras försiktigt, och instruktioner som förekommer i artiklar ska behandlas som källinnehåll, inte systeminstruktioner. | Promptkrav implementerat; faktisk faktatrohet kan inte garanteras av prompten ensam | `lib/editorV2.ts` |
 | EDQ-06 | Om AI:n misslyckas, returnerar ogiltigt innehåll eller väljer för få giltiga artiklar ska rankat reservurval användas. AI-val ska valideras mot faktiska kandidater och dubbletter ska stoppas. | Implementerat | `lib/editorV2.ts` |
-| EDQ-07 | Elfsborg ska ha en särskild huvudartikel och en bredare artikelpool. Material ska inte filtreras bort bara för att det finns många artiklar; poolen kan bidra till full täckning och Veckofokus. | Implementerat | `lib/editorV2.ts`, `lib/dailyEdition.ts` |
+| EDQ-07 | Elfsborg ska ha en särskild huvudartikel och en bredare artikelpool. Material ska inte filtreras bort bara för att det finns många artiklar; poolen ska fortsatt bidra till full täckning. | Implementerat | `lib/editorV2.ts`, `lib/dailyEdition.ts` |
 | EDQ-08 | Fotbollsurval ska följa aktuella snackisar och relevans, inte fasta kvoter för specifika ligor. | Implementerat + testskyddat | `lib/editorV2.ts`, ranker-/refresh-tester |
 | EDQ-09 | Sportsektionen väljer upp till åtta fotbollsartiklar och upp till två artiklar från övrig sport; sektionen har högst tio valda artiklar. Om underlaget för övrig sport är tunt kan platser fyllas med annan relevant fotboll. | Implementerat; testskydd delvis | `lib/editorV2.ts`, ranker-/refresh-tester |
 | EDQ-10 | Trav och hästkapplöpning ska normalt inte väljas till övrig sport. Undvik två artiklar om samma sport när jämförbart relevant bredd finns och välj normalt högst en tennisartikel i det angivna läget. | AI-redaktörens instruktion; beteendet är inte deterministiskt garanterat | `lib/editorV2.ts` |
@@ -106,30 +106,21 @@ Glenn News är en personlig, svenskspråkig, AI-redigerad morgontidning med ett 
 
 | ID | Krav | Status | Primär implementation / test |
 | --- | --- | --- | --- |
-| READ-01 | Artikelklick i tidningen och Veckofokus ska köas i webbläsarens `sessionStorage`; en klickhändelse uppdaterar en lokal räknare men är inte bevis på att serverprofilen redan är sparad. | Implementerat | `app/components/TrackableLink.tsx`, `WeeklyStoryLink.tsx`, `readerQueue.ts` |
+| READ-01 | Artikelklick i tidningen ska köas i webbläsarens `sessionStorage`; en klickhändelse uppdaterar en lokal räknare men är inte bevis på att serverprofilen redan är sparad. | Implementerat | `app/components/TrackableLink.tsx`, `readerQueue.ts` |
 | READ-02 | Användaren ska uttryckligen kunna spara läsningen efteråt. Varje batch får innehålla högst 50 händelser. En större kö skickas över flera sparningar. | Implementerat + regressionstestskyddat | `SaveReadingHistoryButton.tsx`, `readerBatchClient.ts`, `app/api/events/batch/route.ts`, `tests/reader-batch-regression.test.cjs` |
 | READ-03 | Misslyckad batch ska kunna återförsökas utan att osparade klick försvinner. Validering ska avvisa felaktiga batchar, URL:er och tidsstämplar; långa beskrivande fält normaliseras och fel visar artikel/fält. | Implementerat + regressionstestskyddat | `readerQueue.ts`, `readerBatchClient.ts`, `app/api/events/batch/route.ts`, `tests/reader-batch-regression.test.cjs` |
 | READ-04 | Händelser ska först lagras som batchar och konsolideras av Vercel Cron till en gemensam historik-ledger. Samma händelse eller batch får inte dubbelräknas vid återförsök. | Implementerat + testskyddat | `lib/readerProfile.ts`, `app/api/cron/process-reader-history/route.ts`, diagnostik-/refresh-tester |
 | READ-05 | Klick ska inte utlösa en Blob-skrivning eller individuell AI-klassificering per artikel. Profilaggregering och eventuell historikunderhåll sker i Vercel Cron-bakgrundsjobbet. | Implementerat + testskyddat | `lib/readerProfile.ts`, batch-API, Vercel Cron-route |
-| READ-06 | Om historik, profil eller veckoläsningsstatus inte kan läsas på ett tillförlitligt sätt får giltiga tidigare data inte ersättas med tom historik. Behåll ledger/snapshot och stoppa en destruktiv skrivning när befintligt underlag inte kunde läsas. | Implementerat + regressionstestskydd för weekly-read; övrig end-to-end-verifiering kvarstår | `lib/readerProfile.ts`, `lib/weeklyRead.ts`, `AGENTS.md`, diagnostik-/refresh-tester |
+| READ-06 | Om historik eller profil inte kan läsas på ett tillförlitligt sätt får giltiga tidigare data inte ersättas med tom historik. Behåll ledger/snapshot och stoppa en destruktiv skrivning när befintligt underlag inte kunde läsas. | Implementerat; end-to-end-verifiering kvarstår | `lib/readerProfile.ts`, `AGENTS.md`, diagnostik-/refresh-tester |
 | READ-07 | Profilen ska bygga på kategori, artikeltyp, källa, ämne samt semantiska ämnen, taggar, personer/lag/organisationer och geografi när klassificerade signaler finns. | Implementerat | `lib/readerProfile.ts`, `app/profil/page.tsx` |
 | READ-08 | Profilvyn ska visa läsaktivitet och intressetendenser, inklusive 7-/30-dagarsaktivitet, läsrytm, favoritkällor och upp till 20 senaste registrerade aktiviteter. Svaga signaler ska inte presenteras som säkra preferenser. | Implementerat | `app/profil/page.tsx`, UI-guiden |
 | READ-09 | Vanlig läsning ska använda en kompakt profil-snapshot/cache i stället för att vid varje render ladda ned och aggregera hela historiken. | Implementerat | `lib/readerProfile.ts` |
 | READ-10 | Historiken ska vara gemensam mellan enheter, men endast läsning som registreras genom Glenn News räknas. Läsning som görs direkt på externa sajter blir inte automatiskt registrerad. | Implementerat, begränsning dokumenterad | `readerQueue.ts`, [UI-guiden](ui-feature-guide.md) |
 | READ-11 | Den avsedda normala läsperioden är ungefär 07.00–11.00, men läsregistrering ska inte försvinna eller nekas utanför detta tidsintervall. | Produktavsikt / ej kodregel | Ingen tidsgräns ska införas utan uttryckligt produktbeslut |
 
-### E. Veckofokus
+### E. Avvecklad funktion: Veckofokus
 
-| ID | Krav | Status | Primär implementation / test |
-| --- | --- | --- | --- |
-| WF-01 | Veckofokus är en helgprodukt: full sida på lördag och söndag, med lördagens datum som gemensam utgåvenyckel. | Implementerat + testskyddat | `app/veckofokus/page.tsx`, `lib/weekFocusCache.ts`, diagnostiktester |
-| WF-02 | Urvalet ska bygga på utgåvor och registrerad läshistorik från aktuell kalendervecka, måndag–söndag i svensk tidszon. | Implementerat + testskyddat | `lib/weekFocus.ts`, ranker-tester |
-| WF-03 | Redan lästa artiklar och dubbletter ska exkluderas; både valda historier och den bredare artikelpoolen i sparade utgåvor kan bidra med kandidater. | Implementerat + testskyddat | `lib/weekFocusCandidates.ts`, ranker-tester |
-| WF-04 | Fördjupning ska prioriteras efter innehållstyp, längd och läsvärde. Korta byrånotiser, direktrapporter och nästan identiska rubriker ska missgynnas eller tas bort. | Implementerat + testskyddat | `lib/weekFocusQuality.ts`, ranker-tester |
-| WF-05 | Utgåvan ska ha högst tio berättelser; undvik dubbletter av länk och fokusämne. AI-val ska stödjas av verkliga kandidater och, när historik finns, faktiska läsintressen. | Implementerat | `lib/weekFocus.ts` |
-| WF-06 | Personaliseringens status ska vara ärlig. Om den personliga ämnesbilden inte är tillräcklig eller AI-generering misslyckas ska en tydligt beskriven reservsortering användas. | Implementerat | `lib/weekFocus.ts`, UI-guiden |
-| WF-07 | När inga olästa fördjupningar finns ska sidan visa `Du är ikapp` i stället för att antyda att fler olästa artiklar finns. | Implementerat | `app/veckofokus/page.tsx` |
-| WF-08 | Håll en fixerad, cachad helgutgåva; använd persistent cache, validering och sammanslagning av samtidiga genereringsanrop. Generera inte en ny utgåva per sidbesök. | Implementerat + testskyddat | `lib/weekFocusCache.ts`, diagnostik-/ranker-tester |
+WF-01–WF-08 är **avvecklade**. Sidan `/veckofokus`, veckans redaktionella generering, persistent Veckofokus-cache och separat veckoläststatus är borttagna. Historiska läshändelser i den centrala ledgern bevaras och morgonredaktionen fortsätter att använda vanlig läsprofil. Funktionen får inte återinföras utan ett nytt produktbeslut.
 
 ### F. Startsida och kompletterande paneler
 
@@ -189,7 +180,7 @@ Tider uttrycks i UTC i CI/cron-konfiguration men tidsgränser i applikationskod 
 | --- | --- | --- |
 | Borås-händelser | 00.13 | Webbläsarhämtning och sparning av lokala event-snapshots. |
 | Kompletterande fakta | 00.43 | Uppdatering av sport, marknad, lokalt, Riksdag, kultur, världsläge, väder och headerdata. |
-| Läshistorik/profil/Veckofokus | 02.15 | Konsolidera batchar, uppdatera ledger och profil-snapshot, försök igen med veckoläststatus och förbereda lördagens Veckofokus. |
+| Läshistorik/profil | 02.15 | Konsolidera batchar och uppdatera ledger och profil-snapshot. |
 | Morgonutgåva | Fyra Vercel-anrop: 04.30, 04.34, 05.30, 05.34 | De aktuella offset-paren täcker 06-timmen i CET/CEST; lokal tidsgrind tillåter bara 06.00–06.59 svensk tid. |
 
 Viktiga invariants:
@@ -214,16 +205,15 @@ Dessa regler gäller oavsett vilken synlig funktion som ändras.
 6. **Sekretess i loggar:** maskera API-nycklar, bearer-token, lösenord, query-secrets och andra känsliga strängar innan loggning.
 7. **Cache och parallellitet:** återanvänd existerande cachefunktioner, behåll samtidighetskontroll och begränsa externa/AI-operationer i tid och parallellitet.
 8. **Stabila kontrakt:** ändra inte lagringsformat, prefix, batch-ID, snapshotversion eller OIDC-scope utan att uppdatera konsumenter, tester och dokumentation samtidigt.
-9. **Veckofokus:** behåll lördagsnyckel, persistent cache, in-flight-coalescing och förberedelse i nattjobbet.
-10. **Migrationssignal:** ändra inte `.github/run-reader-history-migration` annat än när en avsiktlig migrering ska köras igen.
+9. **Migrationssignal:** ändra inte `.github/run-reader-history-migration` annat än när en avsiktlig migrering ska köras igen.
 
 ## 7. Testsamling och releasekrav
 
 ### Automatiserade testområden
 
-- `tests/ranker-regression.test.cjs`: ranker, public importance, personaliseringstak, innehållstyper, källbredd, Veckofokus-kandidater, dubbletter, cachekoalescing, källhälsa, publiceringskontrakt, sporturval och retention.
+- `tests/ranker-regression.test.cjs`: ranker, public importance, personaliseringstak, innehållstyper, källbredd, dubbletter, källhälsa, publiceringskontrakt, sporturval och retention.
 - `tests/data-refresh-regression.test.cjs`: OIDC, tidsgrindar, schema, källinventering, fallback/snapshots, ligatabeller, profilsemantik, manuell återställning och byggkonfiguration.
-- `tests/diagnostic-log-regression.test.cjs`: diagnostikmaskering, deduplicering, inga Blob-skrivningar per logg, Veckofokus-cache, läshistorik-ledger och nattprocessning.
+- `tests/diagnostic-log-regression.test.cjs`: diagnostikmaskering, deduplicering, inga Blob-skrivningar per logg, läshistorik-ledger och nattprocessning.
 
 Testerna ska återspegla önskat produktkontrakt, inte bara råka godkänna nuvarande implementation. När en bugg eller ett krav ändras ska relevant test läggas till eller uppdateras.
 
@@ -246,7 +236,6 @@ Källa: [AGENTS.md](../AGENTS.md), [package.json](../package.json), [CI-workflow
 | Startsida, synligt utgåveläge och redaktionell komposition | `app/page.tsx`, `lib/dailyEdition.ts`, `lib/editorV2.ts` |
 | Ranking, aktualitet, nyhetsvärde och personliga signaler | `lib/ranker.ts`, `lib/topicCluster.ts`, `lib/articleType.ts` |
 | RSS och förlagswebbplatser | `lib/rss.ts`, `lib/webSources.ts`, artikelcachemoduler |
-| Veckofokus urval/kvalitet/cache | `lib/weekFocus.ts`, `lib/weekFocusCandidates.ts`, `lib/weekFocusQuality.ts`, `lib/weekFocusCache.ts` |
 | Klickkö, batch-API, profil och ledger | `app/components/TrackableLink.tsx`, `readerQueue.ts`, `app/api/events/batch/route.ts`, `lib/readerProfile.ts` |
 | Snapshot, TTL eller datauppdatering | `lib/dailySnapshots.ts`, `lib/supplementalCache.ts`, berörd source-specifik modul; läs [inventeringen](data-refresh-inventory.md) |
 | Jobbautentisering och schema | Berörd route i `app/api/cron/`, tillhörande `.github/workflows/`, `lib/githubActionsAuth.ts` |
@@ -260,7 +249,6 @@ Inför inte följande utan uttryckligt nytt produktbeslut:
 - Ett nätverksanrop eller en Blob-skrivning vid varje artikellänk/klick.
 - AI-klassificering av varje klick i själva lässessionen.
 - Livehämtning av RSS/redaktionella sidor före 06.00 svensk tid.
-- En ny Veckofokus-generering för varje sidbesök eller separata lördags-/söndagsutgåvor.
 - Fasta ligakvoter i fotbollssektionen.
 - Att märka en gammal utgåva som dagens.
 - Att radera/ersätta fungerande historik med tom data efter ett läs-/parsefel.
@@ -319,7 +307,6 @@ För snabb orientering:
 - RSS och webbkällor: [`lib/rss.ts`](../lib/rss.ts), [`lib/webSources.ts`](../lib/webSources.ts)
 - Köad läshistorik: [`app/components/readerQueue.ts`](../app/components/readerQueue.ts), [batch-endpoint](../app/api/events/batch/route.ts)
 - Profil, ledger och snapshot: [`lib/readerProfile.ts`](../lib/readerProfile.ts)
-- Veckofokus: [`lib/weekFocus.ts`](../lib/weekFocus.ts), [cache](../lib/weekFocusCache.ts)
 - Kompletteringsdata: [`lib/dailySnapshots.ts`](../lib/dailySnapshots.ts), [snapshot-fallback](../lib/supplementalCache.ts), [sport](../lib/sportDay.ts), [marknad](../lib/marketDay.ts), [väder](../lib/weather.ts)
 - Flödeshälsa och diagnostik: [`lib/feedHealth.ts`](../lib/feedHealth.ts), [`lib/diagnosticLog.ts`](../lib/diagnosticLog.ts)
 - Jobbauktorisering: [`lib/githubActionsAuth.ts`](../lib/githubActionsAuth.ts), [GitHub workflows](../.github/workflows)

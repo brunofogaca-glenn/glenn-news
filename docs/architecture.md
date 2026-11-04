@@ -33,21 +33,15 @@ Visible sections, interactions, responsive navigation and empty/error states are
 
 ### Reading history and personalization
 
-1. `TrackableLink.tsx` and `WeeklyStoryLink.tsx` normalize captured metadata and queue each click in the per-tab `sessionStorage` queue in `app/components/readerQueue.ts`. There are no per-click requests or Blob writes.
+1. `TrackableLink.tsx` normalizes captured metadata and queues each click in the per-tab `sessionStorage` queue in `app/components/readerQueue.ts`. There are no per-click requests or Blob writes.
 2. `SaveReadingHistoryButton.tsx` uses `readerBatchClient.ts` to submit at most 50 events to `POST /api/events/batch`. It persists a stable batch ID before sending, removes events only after the server confirms the full batch, and retains the queue with an actionable error on failure. Unused per-article summaries are omitted from the request.
 3. The batch route revalidates event IDs, timestamps and URLs, trims descriptive metadata to the storage contract, and returns a structured error code plus the offending event/field when input is invalid. Each accepted batch is one private Blob write under `glenn-news/profile/batches/`; retries with the same ID overwrite the same path.
 4. `lib/readerProfile.ts` consolidates processed batches into `reader-history-ledger.json` and reads the compact `reader-profile-snapshot.json` for typical daytime use.
-5. `app/api/cron/process-reader-history/route.ts` runs nightly through Vercel Cron at 01:15 and 02:15 UTC (inside 01:00–05:59 Stockholm in both CET and CEST). The second opportunity retries work still pending after an earlier failure. It consumes new batches, safely persists the ledger, retries eligible Week Focus read marks, and optionally precomputes Saturday's edition. The saved profile snapshot carries the ledger update marker; an already-current snapshot is reused on retry instead of creating a redundant Blob write. A missing/stale snapshot is still rebuilt, including after a ledger save followed by a failed snapshot write.
+5. `app/api/cron/process-reader-history/route.ts` runs nightly through Vercel Cron at 01:15 and 02:15 UTC (inside 01:00–05:59 Stockholm in both CET and CEST). The second opportunity retries work still pending after an earlier failure. It consumes new batches and safely persists the ledger and profile snapshot. An already-current snapshot is reused on retry instead of creating a redundant Blob write. A missing/stale snapshot is still rebuilt, including after a ledger save followed by a failed snapshot write.
 
 **Performance and recovery contract:** no per-click Blob writes or per-article AI classification in the reading session. A failed request must not remove queued events; retries reuse the stable batch ID while the batch contents remain unchanged. Adding a new click rotates an attempted ID so an event is never appended to a Blob object that the ledger may already have marked processed. A failed ledger read/write must not be interpreted as an empty history or overwrite the last good snapshot. Scheduled Vercel Cron and manually dispatched GitHub recovery runs must remain inside the local write window; only the restricted migration-marker push may use `manual=1`. The endpoint returns an explicit failure when it cannot process safely.
 
-### Weekend Week Focus
-
-- The page is `app/veckofokus/page.tsx`; it is intentionally inactive Monday through Friday.
-- Candidate collection, reading-interest calculations, quality filtering, ranking, and editorial generation live in `lib/weekFocus.ts` and the small `weekFocusCandidates.ts`, `weekFocusInterests.ts`, and `weekFocusQuality.ts` helpers.
-- `lib/weekFocusCache.ts` keeps one fixed edition for Saturday and Sunday, keyed to Saturday in the Stockholm timezone. It uses memory/persistent cache and coalesces concurrent generation.
-
-**Performance contract:** keep the Saturday precompute and weekend cache. Don't regenerate an edition for each page request or use a weekday-specific key.
+Veckofokus and its extra weekly-read Blob store were removed. Old `weekfocus` events remain in the normal consolidated history ledger; removing the feature must not purge them.
 
 ## File map by concern
 
@@ -59,7 +53,7 @@ Visible sections, interactions, responsive navigation and empty/error states are
 | RSS and publisher-page ingestion | `lib/rss.ts`, `lib/webSources.ts`, `lib/categorizer.ts` |
 | Article types, normalization, classification | `lib/articleType.ts`, `lib/articleUrl.ts`, `lib/categorizer.ts` |
 | Editorial ranking and generation | `lib/ranker.ts`, `lib/editorV2.ts`, `lib/dailyEdition.ts` |
-| Personalization and history | `lib/readerProfile.ts`, `lib/weeklyRead.ts`, `lib/weekFocus*.ts` |
+| Personalization and history | `lib/readerProfile.ts` |
 | Supplemental snapshots and fallbacks | `lib/dailySnapshots.ts`, `lib/supplementalCache.ts`, source-specific `*Cache.ts` modules |
 | Job orchestration and authorization | `vercel.json`, `app/api/cron/`, `.github/workflows/` (manual recovery), `lib/githubActionsAuth.ts` |
 | Regression protection | `tests/ranker-regression.test.cjs`, `tests/data-refresh-regression.test.cjs`, `tests/diagnostic-log-regression.test.cjs` |

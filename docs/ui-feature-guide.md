@@ -18,16 +18,15 @@ Artiklar grupperas i avgränsade gridrader. Faktapaneler (lokalt, Sverige, värl
 
 ## At a glance
 
-Glenn News is a Swedish, personalized, AI-edited morning newspaper. The interface has four pages:
+Glenn News is a Swedish, personalized, AI-edited morning newspaper. The interface has three pages:
 
 | Route | Navigation label | Purpose |
 | --- | --- | --- |
 | `/` | Tidning | The saved daily edition and supplemental homepage panels. |
-| `/veckofokus` | Veckofokus | A weekend-only set of unread deep dives selected from recent reading signals and saved editions. |
 | `/profil` | Profil | The reader profile, reading patterns, interest signals, and recent registered activity. |
 | `/health` | Källor | Editorial source health, saved refresh-run status, and diagnostic logs. |
 
-The page implementations are `app/page.tsx`, `app/veckofokus/page.tsx`, `app/profil/page.tsx`, and `app/health/page.tsx`. Navigation and reading-history controls are shared components under `app/components/`.
+The page implementations are `app/page.tsx`, `app/profil/page.tsx`, and `app/health/page.tsx`. Navigation and reading-history controls are shared components under `app/components/`.
 
 ## Shared layout and interaction
 
@@ -35,20 +34,20 @@ The page implementations are `app/page.tsx`, `app/veckofokus/page.tsx`, `app/pro
 
 - `app/layout.tsx` sets the Swedish document language, global metadata, fonts and page shell.
 - The visual system uses a warm paper background, prominent serif headlines, black divider rules and orange emphasis. Responsive Tailwind classes adjust the layouts for mobile, tablet and desktop.
-- `app/components/MobileNav.tsx` supplies a fixed bottom navigation on mobile with four destinations: **Tidning**, **Veckofokus**, **Profil** and **Källor**. It identifies the current route with `aria-current="page"` and a visual marker. The content wrapper reserves bottom space so the fixed nav does not cover the page.
-- On desktop, the homepage header exposes Veckofokus, Min profil and Flödesstatus links. Other pages provide a link back to the newspaper, while the mobile nav remains available on every page.
+- `app/components/MobileNav.tsx` supplies a fixed bottom navigation on mobile with three destinations: **Tidning**, **Profil** and **Källor**. It identifies the current route with `aria-current="page"` and a visual marker. The content wrapper reserves bottom space so the fixed nav does not cover the page.
+- On desktop, the homepage header exposes Min profil and Flödesstatus links. Other pages provide a link back to the newspaper, while the mobile nav remains available on every page.
 
 ### Article clicks and reading-history saving
 
-Relevant files: `TrackableLink.tsx`, `WeeklyStoryLink.tsx`, `readerQueue.ts`, `SaveReadingHistoryButton.tsx`, `app/api/events/batch/route.ts`, `lib/readerProfile.ts`.
+Relevant files: `TrackableLink.tsx`, `readerQueue.ts`, `SaveReadingHistoryButton.tsx`, `app/api/events/batch/route.ts`, `lib/readerProfile.ts`.
 
-1. News cards use `TrackableLink`; Week Focus stories use `WeeklyStoryLink`. They open the original article in a separate tab and queue click metadata in browser `sessionStorage`. Text metadata is whitespace-normalized and capped (category 80, article type 100, source 160, topic 160, title 300 and summary 1,500 characters); article URLs are validated, not truncated.
+1. News cards use `TrackableLink`. They open the original article in a separate tab and queue click metadata in browser `sessionStorage`. Text metadata is whitespace-normalized and capped (category 80, article type 100, source 160, topic 160, title 300 and summary 1,500 characters); article URLs are validated, not truncated.
 2. A click updates the small in-page read counter through the `glenn-reader-click` browser event. This counter is an immediate UI signal, not proof that the server-side profile has already been updated.
 3. The queue is per browser tab and does **not** send a network request or write a Blob for every click. The user explicitly presses **Spara läshistorik** after reading.
 4. One save sends up to 50 events to `POST /api/events/batch`. It stores a stable batch ID before sending and removes submitted events only after the server confirms the full batch. Larger queues remain for another save. A failed save keeps every unsaved event and the same batch ID for retry; if a new click arrives before retry, the queue starts a new batch ID. The UI displays the HTTP/storage or offending article/field error when available.
 5. Per-article summaries are omitted from the upload because the nightly profile ledger does not retain them. Successful batches are stored in one private Blob object per batch and marked for nightly processing. Retries reuse the same object path; overnight processing consolidates batches into the shared ledger and profile snapshot.
 
-The save control is mounted by the shared layout but only renders for its intended page: **Spara morgonens läsning** on `/`, or **Spara Veckofokus-läsning** on `/veckofokus`. A zero-length queue disables the button. Do not add per-click API calls, AI classification or Blob writes to the article-link components.
+The save control is mounted by the shared layout but only renders on `/` as **Spara morgonens läsning**. A zero-length queue disables the button. Do not add per-click API calls, AI classification or Blob writes to the article-link components.
 
 ## 1. Tidning — `/`
 
@@ -92,27 +91,9 @@ The main page starts the required edition load as soon as the reader profile is 
 
 Do not collapse these into one provider-fetching component. Keep visual panels in components and source parsing, cache and last-good-snapshot logic in the existing `lib/` modules.
 
-### Week Focus promotion
+## 2. Profil — `/profil`
 
-A lower-page promotion links to Veckofokus. Its wording and emphasis vary between the weekend and weekdays. The destination itself is only available on Saturday and Sunday; do not mistake the weekday promotion for an enabled Week Focus page.
-
-## 2. Veckofokus — `/veckofokus`
-
-Primary files: `app/veckofokus/page.tsx`, `lib/weekFocus.ts`, `lib/weekFocusCache.ts`, `lib/weekFocusCandidates.ts`, `lib/weekFocusInterests.ts`, `lib/weekFocusQuality.ts`.
-
-- **Saturday/Sunday only.** On weekdays, the page explains that the weekly deep-dive is published Saturday and remains available on Sunday, then links back to the newspaper.
-- The weekend edition presents the number of unique articles read in the last seven days, how many topics informed the edition, and how many unread deep dives remain.
-- Stories are ranked by topical relevance and editorial/news value, with each story's focus topic and explanation (“Därför är den med”). The personalization status says whether the selection is based on this week's actual reading or whether a fallback ordering is being used because the personal topic picture is not reliable enough.
-- Each story uses `WeeklyStoryLink`, so the click joins the same browser reading queue as homepage clicks.
-- The user can press **Spara Veckofokus-läsning** to submit queued Week Focus reads. Read-state updates follow the batch/nightly storage flow rather than an immediate per-click write.
-- Once no unread stories remain, the page displays **Du är ikapp** and explains that there are no more unread deep dives at that moment.
-- The page footer explains that it compares registered Glenn News clicks from the last seven days with articles in saved morning editions. Reads made directly on external sites are not counted unless registered through Glenn News.
-
-Performance contract: one fixed cached weekend edition, keyed to Saturday in the Stockholm timezone. Preserve Saturday precomputation, request coalescing and the weekend cache; do not generate a different edition on every request.
-
-## 3. Profil — `/profil`
-
-Primary file: `app/profil/page.tsx`; data and profile snapshots: `lib/readerProfile.ts`, `lib/weeklyRead.ts`.
+Primary file: `app/profil/page.tsx`; data and profile snapshots: `lib/readerProfile.ts`.
 
 The profile page explains that it is shared centrally across devices and is built from reading signals that influence the next morning's selection. Its visible areas are:
 
@@ -125,11 +106,11 @@ The profile page explains that it is shared centrally across devices and is buil
 - **Topic tags:** themes recovered from classified article content.
 - **Entities and geography:** recurring teams, people, organisations and places when classification finds reliable signals.
 - **Recent activity:** up to the latest 20 registered events, with timestamp, category, article type/source and topic where available. A linked headline opens the original article.
-- **How it works:** a short explanation that opened articles contribute category/type/source/topic signals and that repeated choices influence the morning edition and Week Focus.
+- **How it works:** a short explanation that opened articles contribute category/type/source/topic signals and that repeated choices influence the morning edition.
 
 The page intentionally shows meaningful empty states rather than pretending that one or two clicks establish a strong preference. A profile can show raw click activity before semantic interest/tag/entity sections have enough classified data.
 
-## 4. Källor / Flödesstatus — `/health`
+## 3. Källor / Flödesstatus — `/health`
 
 Primary page/component: `app/health/page.tsx`, `app/components/HealthLogPanel.tsx`. Source-health logic: `lib/feedHealth.ts`, `lib/feedHealthMetrics.ts`; saved statuses: `lib/articleRefreshStatus.ts`, `lib/supplementalRefreshRun.ts`.
 
@@ -163,7 +144,6 @@ Diagnostic events are redacted before being written to Vercel Runtime Logs. Pers
 - **Partial data is better than a broken page.** Optional panels have explicit empty/error messages and should use last-good snapshots when the fetch layer supports them.
 - **Health views must not create hidden work.** Showing saved refresh status must not perform new external requests. Article-source checks remain gated until 06:00 Stockholm time.
 - **The reading queue is explicit and batched.** A click queues metadata; the user saves it in batches of up to 50; nightly maintenance updates the ledger/profile. Preserve retryability and idempotency.
-- **Week Focus is a weekend product.** Keep Saturday/Sunday gating, the fixed weekend edition and its empty “Du är ikapp” state.
 - **Responsive navigation is shared.** When adding a page, update the route map here and decide whether it belongs in `MobileNav.tsx`; retain active-route and keyboard-focus styles.
 - **Accessible status messages matter.** Keep `role="alert"`, `role="status"`, disabled states and descriptive labels on asynchronous controls. New error/empty states should tell the user what happened without exposing credentials or raw secrets.
 
@@ -173,9 +153,8 @@ Diagnostic events are redacted before being written to Vercel Runtime Logs. Pers
 | --- | --- | --- |
 | Homepage layout, editorial card order or visible edition state | `app/page.tsx` | `lib/dailyEdition.ts`, `lib/editorV2.ts`, `lib/ranker.ts` |
 | Supplemental homepage panel UI | `app/components/DailySnapshotPanels.tsx`, `SportDayPanel.tsx`, `MarketDayPanel.tsx` | `lib/dailySnapshots.ts`, `lib/sportDay.ts`, `lib/marketDay.ts`, `lib/weather.ts` |
-| Article click tracking/save button | `TrackableLink.tsx`, `WeeklyStoryLink.tsx`, `SaveReadingHistoryButton.tsx` | `readerQueue.ts`, `app/api/events/batch/route.ts`, `lib/readerProfile.ts` |
-| Week Focus presentation or story state | `app/veckofokus/page.tsx` | `lib/weekFocus.ts`, `lib/weekFocusCache.ts`, related `weekFocus*.ts` |
-| Profile metrics or empty states | `app/profil/page.tsx` | `lib/readerProfile.ts`, `lib/weeklyRead.ts` |
+| Article click tracking/save button | `TrackableLink.tsx`, `SaveReadingHistoryButton.tsx` | `readerQueue.ts`, `app/api/events/batch/route.ts`, `lib/readerProfile.ts` |
+| Profile metrics or empty states | `app/profil/page.tsx` | `lib/readerProfile.ts` |
 | Source status or diagnostics | `app/health/page.tsx`, `HealthLogPanel.tsx` | `lib/feedHealth.ts`, `lib/feedHealthMetrics.ts`, `lib/diagnosticLog.ts` |
 | Navigation, global spacing, metadata or fonts | `app/layout.tsx`, `MobileNav.tsx`, `app/globals.css` | Keep responsive and accessible behavior aligned across all routes. |
 
