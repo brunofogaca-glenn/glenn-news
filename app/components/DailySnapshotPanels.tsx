@@ -313,6 +313,8 @@ export function WorldSnapshotPanel({ data }: { data: WorldSnapshot }) {
                   <div className={"mt-0.5 text-xs font-bold tabular-nums " + (item.changePct > 0 ? "text-emerald-700" : item.changePct < 0 ? "text-red-700" : "text-slate-500")}>
                     {signedPercent(item.changePct)}
                   </div>
+                ) : item.symbol === "BZ=F" ? (
+                  <div className="mt-0.5 text-[10px] text-amber-800">Dagsförändring saknas</div>
                 ) : null}
                 <div className="mt-1 text-[9px] text-slate-400">{item.date}</div>
                 <div className="mt-0.5 text-[9px] text-slate-400">{item.source}</div>

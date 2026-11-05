@@ -498,6 +498,22 @@ test("FT Brent parser selects the latest completed close and ignores the current
   assert.equal(parsed.date, "2026-10-28");
   assert.equal(parsed.value, 115.9);
   assert.ok(Math.abs(parsed.changePct - ((115.9 / 113.88 - 1) * 100)) < 0.000001);
+  const missingSessions = `
+    <table>
+      <tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr>
+      <tr><td>Wednesday, November 04, 2026</td><td>104.37</td><td>104.87</td><td>93.40</td><td>94.62</td><td>60,942</td></tr>
+      <tr><td>Friday, October 30, 2026</td><td>115.67</td><td>118.00</td><td>115.22</td><td>117.64</td><td>23,957</td></tr>
+    </table>`;
+  const gap = parseFtBrentHistory(missingSessions, "2026-11-05");
+  assert.equal(gap.date, "2026-11-04");
+  assert.equal(gap.value, 94.62);
+  assert.equal(gap.changePct, undefined, "missing Monday/Tuesday must not become a daily -19.57% change");
+  const consecutive = missingSessions.replace("Friday, October 30, 2026", "Tuesday, November 03, 2026").replaceAll("117.64", "103.60");
+  const actualDaily = parseFtBrentHistory(consecutive, "2026-11-05");
+  assert.ok(Math.abs(actualDaily.changePct - (94.62 / 103.6 - 1) * 100) < 0.000001);
+  const afterWeekend = missingSessions.replace("Wednesday, November 04, 2026", "Monday, November 02, 2026");
+  assert.ok(parseFtBrentHistory(afterWeekend, "2026-11-05").changePct !== undefined,
+    "Friday-to-Monday is an adjacent trading session");
   assert.equal(parseFtBrentHistory(html, "2026-10-28").date, "2026-10-27");
   assert.equal(parseFtBrentHistory("<table><tr><td>No market data</td></tr></table>", "2026-10-29"), null);
 });
