@@ -36,6 +36,14 @@ function parseNumber(value: string) {
   return normalized && Number.isFinite(parsed) ? parsed : null;
 }
 
+function previousTradingDate(date: string) {
+  const previous = new Date(date + "T12:00:00Z");
+  do {
+    previous.setUTCDate(previous.getUTCDate() - 1);
+  } while (previous.getUTCDay() === 0 || previous.getUTCDay() === 6);
+  return previous.toISOString().slice(0, 10);
+}
+
 export type ParsedBrentClose = {
   date: string;
   value: number;
@@ -74,7 +82,9 @@ export function parseFtBrentHistory(html: string, cutoffDate: string): ParsedBre
   return {
     date: latest.date,
     value: latest.close,
-    changePct: previous && previous.close !== 0
+    // FT sometimes omits entire trading days. A change measured against the
+    // last available row is not a one-day change unless sessions are adjacent.
+    changePct: previous && previous.date === previousTradingDate(latest.date) && previous.close !== 0
       ? (latest.close / previous.close - 1) * 100
       : undefined,
   };
