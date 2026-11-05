@@ -1,6 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { authorizeGitHubActionsRefresh } from "@/lib/githubActionsAuth";
-import { getCachedLocalSnapshot } from "@/lib/dailySnapshots";
+import { saveLocalSnapshotForAcceptedBorasCatalog } from "@/lib/dailySnapshots";
 import { getStockholmClock } from "@/lib/updateSchedule";
 import { getBrowserScrapedBorasEvents, saveBrowserScrapedBorasEvents, type BrowserScrapedBorasEvent } from "@/lib/borasEventStore";
 import { addCalendarDays, BORAS_EVENT_HORIZON_DAYS, normalizeBorasEventUrl } from "@/lib/borasEventCatalog";
@@ -161,11 +161,19 @@ export async function POST(request: Request) {
     });
     let localSnapshotUpdatedAt: string | null = null;
     if (snapshot.contentChanged) {
-      revalidateTag("glenn-news-daily-local", { expire: 0 });
-      const localSnapshot = await getCachedLocalSnapshot();
-      if (localSnapshot.refreshMeta.status !== "fresh" || !localSnapshot.refreshMeta.persistent) {
+      const localSnapshot = await saveLocalSnapshotForAcceptedBorasCatalog({
+        savedAt: snapshot.savedAt,
+        checkedAt: snapshot.checkedAt,
+        contentUpdatedAt: snapshot.contentUpdatedAt,
+        sourceUrl: snapshot.sourceUrl,
+        events: snapshot.events,
+        stale: false,
+      });
+      if (localSnapshot.refreshMeta.status !== "fresh" || !localSnapshot.refreshMeta.persistent ||
+          localSnapshot.eventSource !== "boras.com" || localSnapshot.events.length < 6) {
         throw new Error("Borås-evenemangen sparades, men den sammanslagna faktapanelen kunde inte uppdateras beständigt.");
       }
+      revalidateTag("glenn-news-daily-local", { expire: 0 });
       localSnapshotUpdatedAt = localSnapshot.updatedAt;
     }
     return Response.json({

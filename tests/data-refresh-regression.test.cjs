@@ -22,7 +22,7 @@ require.extensions[".ts"] = (module, filename) => {
   module._compile(output.outputText, filename);
 };
 const { parseFtBrentHistory } = require("../lib/brentHistoryParser.ts");
-const { mergeBorasEventCatalog, normalizeBorasEventUrl, BORAS_EVENT_HORIZON_DAYS } = require("../lib/borasEventCatalog.ts");
+const { addCalendarDays, mergeBorasEventCatalog, normalizeBorasEventUrl, BORAS_EVENT_HORIZON_DAYS } = require("../lib/borasEventCatalog.ts");
 
 test("supplemental Vercel cron and manual recovery use scoped authentication", () => {
   const config = JSON.parse(read("vercel.json"));
@@ -417,7 +417,9 @@ test("Borås events are captured with a real browser and loaded from private cac
   assert.ok(ingest.includes('authorizeGitHubActionsRefresh(request, "borasEvents")'));
   assert.ok(ingest.includes("clock.hour < 1 || clock.hour >= 6"));
   assert.ok(ingest.includes("status: 503"));
-  assert.ok(ingest.includes("getCachedLocalSnapshot"));
+  assert.ok(ingest.includes("saveLocalSnapshotForAcceptedBorasCatalog"));
+  assert.ok(ingest.includes("events: snapshot.events"));
+  assert.ok(ingest.includes('localSnapshot.eventSource !== "boras.com"'));
   assert.ok(ingest.includes("localSnapshotUpdatedAt"));
   assert.ok(ingest.includes("Färre än sex kommande Borås-evenemang"));
   assert.ok(ingest.includes('revalidateTag("glenn-news-daily-local"'));
@@ -427,8 +429,60 @@ test("Borås events are captured with a real browser and loaded from private cac
 
   const snapshots = read("lib/dailySnapshots.ts");
   assert.ok(snapshots.includes("getBrowserScrapedBorasEvents"));
+  assert.ok(snapshots.includes("getLocalSnapshotInternal(catalog)"));
   assert.ok(snapshots.includes("glenn-news-daily-local-v5"));
   assert.ok(snapshots.includes("scrapedEvents.length >= 6"));
+});
+
+test("accepted Borås catalog rebuilds the local panel without reading the just-written Blob", async () => {
+  const originalLoad = Module._load;
+  const originalFetch = global.fetch;
+  let blobReads = 0;
+  let snapshotWrites = 0;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  const events = Array.from({ length: 6 }, (_, index) => ({
+    title: `Evenemang ${index + 1}`,
+    url: `https://www.boras.com/evenemang/test-${index + 1}/`,
+    date: addCalendarDays(today, index + 1),
+    status: "active",
+  }));
+
+  try {
+    Module._load = function(request, parent, isMain) {
+      if (request === "next/cache") return { unstable_cache: loader => loader };
+      if (parent?.filename.endsWith("/lib/dailySnapshots.ts") && request === "./borasEventStore") {
+        return { getBrowserScrapedBorasEvents: async () => { blobReads++; return null; } };
+      }
+      if (parent?.filename.endsWith("/lib/dailySnapshots.ts") && request === "./supplementalCache") {
+        return { withLastGoodSnapshot: async (_key, load) => {
+          const value = await load();
+          snapshotWrites++;
+          return { ...value, refreshMeta: { status: "fresh", persistent: true } };
+        } };
+      }
+      return originalLoad.apply(this, arguments);
+    };
+    global.fetch = async () => new Response("<html></html>", { status: 200 });
+    const { saveLocalSnapshotForAcceptedBorasCatalog } = require("../lib/dailySnapshots.ts");
+    const snapshot = await saveLocalSnapshotForAcceptedBorasCatalog({
+      savedAt: new Date().toISOString(),
+      checkedAt: new Date().toISOString(),
+      contentUpdatedAt: new Date().toISOString(),
+      sourceUrl: "https://www.boras.com/evenemang/",
+      events,
+      stale: false,
+    });
+    assert.equal(snapshot.eventSource, "boras.com");
+    assert.equal(snapshot.events.length, 6);
+    assert.equal(snapshotWrites, 1);
+    assert.equal(blobReads, 0);
+  } finally {
+    Module._load = originalLoad;
+    global.fetch = originalFetch;
+    delete require.cache[require.resolve("../lib/dailySnapshots.ts")];
+  }
 });
 
 test("FT Brent parser selects the latest completed close and ignores the current date", () => {
