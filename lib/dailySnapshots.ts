@@ -10,7 +10,7 @@
 import { unstable_cache } from "next/cache";
 import { withLastGoodSnapshot, type SupplementalRefreshMeta } from "./supplementalCache";
 import { parseFtBrentHistory } from "./brentHistoryParser";
-import { getBrowserScrapedBorasEvents } from "./borasEventStore";
+import { getBrowserScrapedBorasEvents, type BrowserScrapedBorasSnapshot } from "./borasEventStore";
 import { addCalendarDays, BORAS_EVENT_HORIZON_DAYS } from "./borasEventCatalog";
 
 const TIME_ZONE = "Europe/Stockholm";
@@ -403,9 +403,11 @@ function dedupeEntries(entries: SnapshotLink[]) {
 }
 
 // Borås events and meetings, including the municipality fallback.
-async function getLocalSnapshotInternal(): Promise<LocalSnapshot> {
+async function getLocalSnapshotInternal(acceptedBorasCatalog?: BrowserScrapedBorasSnapshot): Promise<LocalSnapshot> {
   const [browserEventsResult, borasHtml, calendarHtml] = await Promise.allSettled([
-    getBrowserScrapedBorasEvents(),
+    // The ingestion request already has the validated catalog in memory. A
+    // second Blob read immediately after put can still return the older value.
+    acceptedBorasCatalog ? Promise.resolve(acceptedBorasCatalog) : getBrowserScrapedBorasEvents(),
     fetchHtml(LOCAL_EVENTS_URL),
     fetchHtml(BORAS_CALENDAR_URL),
   ]);
@@ -1153,6 +1155,12 @@ const getCachedWorldSnapshotInternal = unstable_cache(
 
 export function getCachedLocalSnapshot() {
   return getCachedLocalSnapshotInternal();
+}
+
+export function saveLocalSnapshotForAcceptedBorasCatalog(catalog: BrowserScrapedBorasSnapshot) {
+  // Rebuild from the exact catalog accepted by ingestion, then invalidate the
+  // read cache. This uses the existing single persistent local-snapshot write.
+  return withLastGoodSnapshot("local-snapshot-v5", () => getLocalSnapshotInternal(catalog));
 }
 
 export function getCachedNationalSnapshot() {
